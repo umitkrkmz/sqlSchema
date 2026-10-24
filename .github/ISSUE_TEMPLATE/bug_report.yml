@@ -1,0 +1,47 @@
+name: Hata bildirimi · Bug report
+description: Bir şema yanlış ya da eksik çiziliyor, uygulama hata veriyor · A schema is drawn wrong or incomplete, or the app fails
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Gerçek bir kuruma ait şema paylaşmayın.** Tablo ve kolon adlarını değiştirmek genellikle yeterlidir.
+        **Do not share a schema that belongs to a real organisation.** Renaming tables and columns is usually enough.
+  - type: textarea
+    id: what
+    attributes:
+      label: Ne oldu, ne bekliyordunuz? · What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: schema
+    attributes:
+      label: Hatayı üreten en küçük şema · Smallest schema that reproduces it
+      description: SQL, CQL, Mongo betiği ya da JSON · SQL, CQL, Mongo script or JSON
+      render: sql
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Rapor penceresi · Report window
+      description: Sağ alttaki "rapor" bağlantısının içeriği · Contents of the "report" link in the bottom-right corner
+  - type: dropdown
+    id: dialect
+    attributes:
+      label: Veritabanı · Database
+      options: [Oracle, SQL Server, MySQL / MariaDB, PostgreSQL, SQLite, Cassandra, MongoDB, Diğer · Other]
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Tarayıcı ve açılış biçimi · Browser and how the page was opened
+      placeholder: Chrome 130, http://localhost:8000 / file://
+    validations:
+      required: true
+  - type: dropdown
+    id: lang
+    attributes:
+      label: Arayüz dili · Interface language
+      options: [Türkçe, English]

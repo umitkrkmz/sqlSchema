@@ -1,0 +1,3 @@
+{"_id":{"$oid":"baaaaaaaaaaaaaaaaaaaaaaa"},"campaignId":{"$oid":"12daaaaaaaaaaaaaaaaaaaaa"},"userId":{"$oid":"65aaaaaaaaaaaaaaaaaaaaaa"},"placement":"feed","shownAt":{"$date":"2026-10-20T09:00:00Z"},"cost":{"$numberDecimal":"0.0042"},"clicked":false}
+{"_id":{"$oid":"caaaaaaaaaaaaaaaaaaaaaaa"},"campaignId":{"$oid":"12eaaaaaaaaaaaaaaaaaaaaa"},"userId":{"$oid":"67aaaaaaaaaaaaaaaaaaaaaa"},"placement":"story","shownAt":{"$date":"2026-10-20T09:00:05Z"},"cost":{"$numberDecimal":"0.0061"},"clicked":true,"clickAt":{"$date":"2026-10-20T09:00:09Z"}}
+{"_id":{"$oid":"daaaaaaaaaaaaaaaaaaaaaaa"},"campaignId":{"$oid":"12daaaaaaaaaaaaaaaaaaaaa"},"placement":"feed","shownAt":{"$date":"2026-10-20T09:01:00Z"},"cost":{"$numberDecimal":"0.0042"},"clicked":false}

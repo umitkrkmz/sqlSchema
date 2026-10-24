@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Testler · Tests
+        run: node tests/run.js
+      - name: Örnekler güncel mi · Are generated samples up to date
+        run: |
+          node tools/gen-samples.js
+          git diff --exit-code -- samples

@@ -1,0 +1,18 @@
+{
+  "name": "sqlschema",
+  "version": "0.1.0",
+  "description": "Draws database schemas as a star map in the browser · Veritabanı şemalarını tarayıcıda yıldız haritası olarak çizer",
+  "private": true,
+  "license": "MIT",
+  "author": "umitkrkmz",
+  "keywords": ["database", "schema", "er-diagram", "visualization", "oracle", "sql", "mongodb", "cassandra", "crows-foot"],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node tests/run.js",
+    "samples": "node tools/gen-samples.js",
+    "screenshots": "node tools/screenshots.js",
+    "start": "python -m http.server 8000"
+  }
+}

@@ -1,0 +1,332 @@
+/*
+ * sqlSchema · i18n.js
+ * Arayüz dili: Türkçe ve İngilizce.
+ *   Seçim sırası: URL'deki ?lang=  →  kaydedilmiş tercih  →  sistem dili (Türkçe ise tr, değilse en)
+ * HTML'de:  data-i18n="anahtar" (metin), data-i18n-html="anahtar" (işaretlemeli metin),
+ *           data-i18n-attr="placeholder:anahtar;title:anahtar2" (öznitelikler)
+ * Yeni bir arayüz metni eklerken iki dile de anahtar eklenmelidir.
+ */
+(function (NS) {
+'use strict';
+
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+const DICT = {
+  tr: {
+    docTitle: 'sqlSchema · SQL şema takımyıldızı',
+    docDesc: 'Şema dosyalarını tarayıcıda okuyup tabloları ve ilişkileri takımyıldız haritası olarak çizer.',
+    tagline: 'şema takımyıldızı',
+    language: 'Dil',
+    open: 'Dosya aç', openTitle: 'Bir ya da birden fazla dosya seç',
+    folder: 'Klasör', folderTitle: 'Bir klasördeki bütün şema dosyalarını oku',
+    paste: 'Yapıştır',
+    samples: 'Örnekler',
+    searchPh: 'Tablo ya da kolon ara', searchLabel: 'Tablo ya da kolon ara',
+    implicit: 'Tahmini ilişkiler', implicitShort: 'tahmin',
+    grid: 'Izgara', gridShort: 'ızgara',
+    fit: 'Sığdır', fitTitle: 'Tümünü sığdır (F)',
+    pngTitle: 'Görünümü PNG olarak indir',
+
+    emptyEyebrow: 'CREATE TABLE → gökyüzü haritası',
+    emptyTitle: 'Şema dosyalarını ya da klasörü buraya bırakın',
+    emptyText: 'Tabloları, yabancı anahtarları ve kolon adlarından tahmin edilen ilişkileri çıkarır; her tabloyu bir yıldız, her şemayı bir gökyüzü bölgesi, her veritabanını bir galaksi olarak çizer. Yaklaştıkça kolonlar ve karga ayağı notasyonu görünür.',
+    chooseFiles: 'Dosya seç', chooseFolder: 'Klasör seç', openSample: 'Örneği aç',
+    emptyFine: 'Oracle, SQL Server, MySQL, MariaDB, PostgreSQL, SQLite, Cassandra ve MongoDB. Bölünmüş dökümler ve migration klasörleri (Flyway, golang-migrate) birlikte okunur. Dosyalar tarayıcıdan çıkmaz, hiçbir sunucuya gönderilmez.',
+    dropHere: 'Bırakın, çizelim',
+
+    legend: 'Lejant',
+    lgEnds: 'İlişki uçları', lgCrow: 'karga ayağı',
+    endOne: 'Tam olarak bir', endOneHint: 'FK kolonu NOT NULL',
+    endZeroOne: 'Sıfır ya da bir', endZeroOneHint: 'FK kolonu NULL olabilir · 1:1 çocuk',
+    endZeroMany: 'Sıfır ya da çok', endZeroManyHint: "FK'yi taşıyan tablo",
+    endOneMany: 'Bir ya da çok', endOneManyHint: 'DDL bunu zorlayamaz; haritada çıkmaz',
+    lgExample: '<b>SİPARİŞ</b> ↔ <b>MÜŞTERİ</b>: her sipariş tam olarak bir müşteriye bağlı, bir müşterinin sıfır ya da çok siparişi olabilir.',
+    lgLines: 'Çizgiler',
+    lineFk: 'Tanımlı yabancı anahtar ya da Mongoose <code>ref</code>',
+    lineImp: "Tahmini: kolon adı başka tablonun PK'siyle aynı",
+    lineOff: 'Devre dışı FK (DISABLE / NOCHECK)',
+    lineEmb: 'Gömülü belge (MongoDB, aynı belgenin içinde)',
+    lgStars: 'Yıldızlar',
+    starTable: 'Tablo; büyüklük = bağlantı sayısı, renk = şema',
+    starJunction: 'Ara tablo (M:N)',
+    starMoon: 'Uydu: gömülü alt belge',
+    starGhost: 'Başvurulan ama dosyada tanımı olmayan tablo',
+    keyTags: '<b class="k-pk">PK</b> birincil anahtar · <b class="k-fk">FK</b> yabancı anahtar · <b class="k-pk">CK</b> Cassandra sıralama anahtarı · soluk ad = NULL olabilir',
+    keysHelp: '<kbd>Tık</kbd> seç · <kbd>Çift tık</kbd> yaklaş · <kbd>/</kbd> ara · <kbd>F</kbd> sığdır · <kbd>Esc</kbd> bırak',
+    report: 'rapor',
+
+    pasteTitle: 'Şema yapıştır',
+    pasteText: 'DDL metni (CREATE TABLE, ALTER TABLE), MongoDB doğrulayıcısı, Mongoose modeli ya da JSON belgeleri.',
+    cancel: 'Vazgeç', draw: 'Çiz',
+
+    levels: ['Galaksi', 'Takımyıldız', 'Yakın plan'],
+    database: 'veritabanı',
+    schemaSub: v => `${v.t} tablo · ${v.g} takımyıldız`,
+    defaultSchema: 'varsayılan',
+    looseGroup: 'Bağımsız yıldızlar',
+    looseStar: 'bağımsız yıldız',
+    notDefined: 'dosyada tanımı yok',
+    satelliteOf: v => `uydu · ${v.o}`,
+    embeddedDoc: 'gömülü belge',
+    moreCols: v => `+${v.n} kolon daha`,
+    noCols: 'kolon bilgisi yok',
+    badgeExt: 'DIŞ', badgeSat: 'UYDU',
+    nTables: v => `${v.n} tablo`,
+    nCollections: v => `${v.n} koleksiyon`,
+    nInferred: v => `${v.n} tahmini`,
+    nSatellites: v => `${v.n} uydu`,
+    nFiles: v => `${v.n} dosya`,
+
+    parsing: 'Ayrıştırılıyor…',
+    readingFiles: v => `${v.n} dosya okunuyor…`,
+    loadingSample: v => `${v.s} yükleniyor…`,
+    loadedSummary: v => `${v.files > 1 ? v.files + ' dosya · ' : ''}${v.tables} tablo, ${v.rels} ilişki, ${v.inferred} tahmini${v.sats ? ', ' + v.sats + ' uydu' : ''} · ${v.ms} ms`,
+    noSchemaFound: 'Bu dosyalarda tablo ya da koleksiyon tanımı bulunamadı. CREATE TABLE ifadeleri, MongoDB doğrulayıcıları, Mongoose modelleri ya da JSON belgeleri içeren dosyaları seçin.',
+    noTablesLeft: 'Seçili dosyalarda tablo kalmadı.',
+    readError: v => `Dosya okunamadı: ${v.m}`,
+    dropError: v => `Dosyalar okunamadı: ${v.m}`,
+    folderBlockedFile: 'Sayfa doğrudan dosyadan (file://) açıldığı için tarayıcı sürüklenen klasörün içini okumaya izin vermiyor. "Klasör" düğmesiyle seçin, klasörün içindeki dosyaları sürükleyin ya da sayfayı yerel bir sunucuyla açın.',
+    folderBlocked: v => `Sürüklenen klasör okunamadı (${v.m}). "Klasör" düğmesiyle seçmeyi deneyin.`,
+    sampleFileProtocol: v => `Tarayıcı file:// altında örnek dosyaları okumaya izin vermiyor. "Klasör" ile samples/${v.id} klasörünü seçin ya da sayfayı yerel bir sunucuyla açın.`,
+    sampleError: v => `Örnek yüklenemedi: ${v.m}`,
+    files: v => `${v.n} dosya`,
+    embedded: 'gömülü',
+
+    filesTitle: 'Dosyalar',
+    migrationApplied: v => `${v.tool} migration sırası uygulandı: tablolar son sürümdeki hâliyle çizildi.`,
+    separateFolders: 'Her klasör ayrı veritabanı',
+    separateFiles: 'Her dosya ayrı veritabanı',
+    collectionsWord: 'koleksiyon', tablesWord: 'tablo',
+    nErrors: v => `${v.n} hata`,
+    noSchemaFiles: v => `Şema içermeyen ${v.n} dosya`,
+    skippedFiles: v => `Atlanan ${v.n} dosya`,
+    addFiles: 'Dosya ekle',
+    skip_config: 'yapılandırma dosyası',
+    skip_ext: 'desteklenmeyen uzantı',
+    skip_down: 'geri alma (down) betiği',
+    skip_undo: 'Flyway geri alma betiği',
+    skip_tooBig: '60 MB sınırını aşıyor',
+    skip_total: 'toplam 250 MB sınırı',
+    tool_timestamp: 'Zaman damgalı',
+
+    reportTitle: 'Ayrıştırma raporu',
+    rFiles: 'Dosya', rStatements: 'İfade', rTables: 'Tablo / koleksiyon', rExternal: v => `+${v.n} dış`,
+    rEmbedded: 'Gömülü belge (uydu)', rColumns: 'Kolon / alan', rFk: 'Tanımlı ilişki', rDisabled: v => `(${v.n} devre dışı)`,
+    rImplicit: 'Tahmini ilişki', rJunctions: 'Ara tablo (M:N)', rIndexes: 'İndeks / açıklama', rTime: 'Süre',
+    rWarnings: 'Uyarılar', rOrphans: 'Tablosu bulunamayan ifadeler', rSkipped: 'Çizime girmeyen ifadeler', rErrors: 'Hatalar',
+    warnDup: v => `${v.name} birden fazla kez tanımlanmış (${v.a} ve ${v.b}); sonraki tanım geçerli.`,
+    line: 'satır',
+
+    panelClose: 'Paneli kapat',
+    focus: ['Odak: kapalı', 'Odak: 1 adım', 'Odak: 2 adım'],
+    focusTitle: 'Yalnızca bu tabloyu ve komşularını göster',
+    showColumns: 'Kolonlarıyla göster', showFields: 'Alanlarıyla göster',
+    columns: 'Kolonlar', fields: 'Alanlar',
+    outgoing: 'Bağlı olduğu tablolar', incoming: 'Ona bağlanan tablolar',
+    noOutgoing: 'Başka bir tabloya başvurmuyor.', noIncoming: 'Bu tabloya başvuran yok.',
+    noColumnInfo: 'Kolon bilgisi yok',
+    tagJunction: 'ara tablo (M:N)', tagEmbedded: 'gömülü belge', tagExternal: 'dosyada tanımı yok', tagNoPk: 'PK yok',
+    tagInferred: 'tahmini', tagEmbed: 'gömülü', tagDisabled: 'devre dışı', tagSelf: 'kendine',
+    externalRef: 'dış başvuru',
+    field: 'alan',
+    seenInFiles: v => `${v.n} dosyada geçiyor: ${v.list}`,
+    reqTitle: 'zorunlu alan',
+    sEmbedMany: v => `Her ${v.p} belgesi "${v.f}" alanında sıfır ya da çok ${v.f} öğesini kendi içinde taşır.`,
+    sEmbedOne: v => `Her ${v.p} belgesi "${v.f}" alanında en fazla bir alt belgeyi kendi içinde taşır.`,
+    sMany: v => `${v.c} belgesindeki "${v.f}" dizisi sıfır ya da çok ${v.p} kaydını gösterir.`,
+    sOne: v => `Her ${v.c} kaydı mutlaka bir ${v.p} kaydına bağlı.`,
+    sZeroOne: v => `${v.c} kaydı en fazla bir ${v.p} kaydına bağlı, boş da olabilir.`,
+    s1to1: v => `Bir ${v.p} kaydının en fazla bir ${v.c} kaydı olur (1:1).`,
+    s1toN: v => `Bir ${v.p} kaydının sıfır ya da çok ${v.c} kaydı olabilir.`,
+    guess: 'Tahmin: ',
+
+    noMatch: 'Eşleşme yok',
+    column: 'kolon',
+  },
+
+  en: {
+    docTitle: 'sqlSchema · SQL schema constellation',
+    docDesc: 'Reads schema files in the browser and draws tables and relationships as a constellation map.',
+    tagline: 'schema constellation',
+    language: 'Language',
+    open: 'Open files', openTitle: 'Select one or more files',
+    folder: 'Folder', folderTitle: 'Read every schema file in a folder',
+    paste: 'Paste',
+    samples: 'Samples',
+    searchPh: 'Search tables or columns', searchLabel: 'Search tables or columns',
+    implicit: 'Inferred relations', implicitShort: 'inferred',
+    grid: 'Grid', gridShort: 'grid',
+    fit: 'Fit', fitTitle: 'Fit all (F)',
+    pngTitle: 'Download the view as PNG',
+
+    emptyEyebrow: 'CREATE TABLE → star map',
+    emptyTitle: 'Drop schema files or a folder here',
+    emptyText: 'Extracts tables, foreign keys and relationships inferred from column names; draws every table as a star, every schema as a region of sky and every database as a galaxy. Zoom in to see columns and crow\'s foot notation.',
+    chooseFiles: 'Choose files', chooseFolder: 'Choose folder', openSample: 'Open sample',
+    emptyFine: 'Oracle, SQL Server, MySQL, MariaDB, PostgreSQL, SQLite, Cassandra and MongoDB. Split dumps and migration folders (Flyway, golang-migrate) are read together. Files never leave the browser and are not sent to any server.',
+    dropHere: 'Drop to draw',
+
+    legend: 'Legend',
+    lgEnds: 'Relationship ends', lgCrow: 'crow\'s foot',
+    endOne: 'Exactly one', endOneHint: 'FK column is NOT NULL',
+    endZeroOne: 'Zero or one', endZeroOneHint: 'FK column is nullable · 1:1 child',
+    endZeroMany: 'Zero or many', endZeroManyHint: 'The table holding the FK',
+    endOneMany: 'One or many', endOneManyHint: 'DDL cannot enforce it; never drawn',
+    lgExample: '<b>ORDER</b> ↔ <b>CUSTOMER</b>: every order belongs to exactly one customer; a customer can have zero or many orders.',
+    lgLines: 'Lines',
+    lineFk: 'Declared foreign key or Mongoose <code>ref</code>',
+    lineImp: 'Inferred: column name matches another table\'s PK',
+    lineOff: 'Disabled FK (DISABLE / NOCHECK)',
+    lineEmb: 'Embedded document (MongoDB, inside the same document)',
+    lgStars: 'Stars',
+    starTable: 'Table; size = number of links, color = schema',
+    starJunction: 'Junction table (M:N)',
+    starMoon: 'Satellite: embedded sub-document',
+    starGhost: 'Referenced but not defined in the files',
+    keyTags: '<b class="k-pk">PK</b> primary key · <b class="k-fk">FK</b> foreign key · <b class="k-pk">CK</b> Cassandra clustering key · faded name = nullable',
+    keysHelp: '<kbd>Click</kbd> select · <kbd>Double-click</kbd> zoom in · <kbd>/</kbd> search · <kbd>F</kbd> fit · <kbd>Esc</kbd> clear',
+    report: 'report',
+
+    pasteTitle: 'Paste a schema',
+    pasteText: 'DDL text (CREATE TABLE, ALTER TABLE), a MongoDB validator, a Mongoose model or JSON documents.',
+    cancel: 'Cancel', draw: 'Draw',
+
+    levels: ['Galaxy', 'Constellation', 'Close-up'],
+    database: 'database',
+    schemaSub: v => `${plural(v.t, 'table', 'tables')} · ${plural(v.g, 'constellation', 'constellations')}`,
+    defaultSchema: 'default',
+    looseGroup: 'Lone stars',
+    looseStar: 'lone star',
+    notDefined: 'not defined in files',
+    satelliteOf: v => `satellite · ${v.o}`,
+    embeddedDoc: 'embedded document',
+    moreCols: v => `+${v.n} more ${v.n === 1 ? 'column' : 'columns'}`,
+    noCols: 'no column info',
+    badgeExt: 'EXT', badgeSat: 'SAT',
+    nTables: v => plural(v.n, 'table', 'tables'),
+    nCollections: v => plural(v.n, 'collection', 'collections'),
+    nInferred: v => `${v.n} inferred`,
+    nSatellites: v => plural(v.n, 'satellite', 'satellites'),
+    nFiles: v => plural(v.n, 'file', 'files'),
+
+    parsing: 'Parsing…',
+    readingFiles: v => `Reading ${plural(v.n, 'file', 'files')}…`,
+    loadingSample: v => `Loading ${v.s}…`,
+    loadedSummary: v => `${v.files > 1 ? v.files + ' files · ' : ''}${plural(v.tables, 'table', 'tables')}, ${plural(v.rels, 'relationship', 'relationships')}, ${v.inferred} inferred${v.sats ? ', ' + plural(v.sats, 'satellite', 'satellites') : ''} · ${v.ms} ms`,
+    noSchemaFound: 'No table or collection definitions were found. Choose files that contain CREATE TABLE statements, MongoDB validators, Mongoose models or JSON documents.',
+    noTablesLeft: 'No tables left in the selected files.',
+    readError: v => `Could not read the file: ${v.m}`,
+    dropError: v => `Could not read the files: ${v.m}`,
+    folderBlockedFile: 'The page was opened directly from disk (file://), so the browser does not let it read inside a dropped folder. Use the "Folder" button, drag the files inside the folder instead, or serve the page from a local server.',
+    folderBlocked: v => `The dropped folder could not be read (${v.m}). Try choosing it with the "Folder" button.`,
+    sampleFileProtocol: v => `Under file:// the browser does not allow reading the sample files. Choose the samples/${v.id} folder with "Folder", or serve the page from a local server.`,
+    sampleError: v => `Could not load the sample: ${v.m}`,
+    files: v => plural(v.n, 'file', 'files'),
+    embedded: 'embedded',
+
+    filesTitle: 'Files',
+    migrationApplied: v => `${v.tool} migration order applied: tables are drawn as of the latest version.`,
+    separateFolders: 'Each folder is a separate database',
+    separateFiles: 'Each file is a separate database',
+    collectionsWord: 'collections', tablesWord: 'tables',
+    nErrors: v => plural(v.n, 'error', 'errors'),
+    noSchemaFiles: v => `${plural(v.n, 'file', 'files')} without a schema`,
+    skippedFiles: v => `${plural(v.n, 'skipped file', 'skipped files')}`,
+    addFiles: 'Add files',
+    skip_config: 'configuration file',
+    skip_ext: 'unsupported extension',
+    skip_down: 'rollback (down) script',
+    skip_undo: 'Flyway undo script',
+    skip_tooBig: 'larger than 60 MB',
+    skip_total: 'total 250 MB limit',
+    tool_timestamp: 'Timestamped',
+
+    reportTitle: 'Parse report',
+    rFiles: 'Files', rStatements: 'Statements', rTables: 'Tables / collections', rExternal: v => `+${v.n} external`,
+    rEmbedded: 'Embedded documents (satellites)', rColumns: 'Columns / fields', rFk: 'Declared relationships', rDisabled: v => `(${v.n} disabled)`,
+    rImplicit: 'Inferred relationships', rJunctions: 'Junction tables (M:N)', rIndexes: 'Indexes / comments', rTime: 'Time',
+    rWarnings: 'Warnings', rOrphans: 'Statements whose table was not found', rSkipped: 'Statements not drawn', rErrors: 'Errors',
+    warnDup: v => `${v.name} is defined more than once (${v.a} and ${v.b}); the later definition wins.`,
+    line: 'line',
+
+    panelClose: 'Close panel',
+    focus: ['Focus: off', 'Focus: 1 step', 'Focus: 2 steps'],
+    focusTitle: 'Show only this table and its neighbours',
+    showColumns: 'Show with columns', showFields: 'Show with fields',
+    columns: 'Columns', fields: 'Fields',
+    outgoing: 'References', incoming: 'Referenced by',
+    noOutgoing: 'Does not reference another table.', noIncoming: 'No table references this one.',
+    noColumnInfo: 'No column info',
+    tagJunction: 'junction table (M:N)', tagEmbedded: 'embedded document', tagExternal: 'not defined in files', tagNoPk: 'no PK',
+    tagInferred: 'inferred', tagEmbed: 'embedded', tagDisabled: 'disabled', tagSelf: 'self',
+    externalRef: 'external reference',
+    field: 'field',
+    seenInFiles: v => `appears in ${v.n} files: ${v.list}`,
+    reqTitle: 'required field',
+    sEmbedMany: v => `Every ${v.p} document carries zero or many ${v.f} items inside its "${v.f}" field.`,
+    sEmbedOne: v => `Every ${v.p} document carries at most one sub-document in its "${v.f}" field.`,
+    sMany: v => `The "${v.f}" array in a ${v.c} document points to zero or many ${v.p} records.`,
+    sOne: v => `Every ${v.c} record belongs to exactly one ${v.p} record.`,
+    sZeroOne: v => `A ${v.c} record belongs to at most one ${v.p} record and may have none.`,
+    s1to1: v => `A ${v.p} record has at most one ${v.c} record (1:1).`,
+    s1toN: v => `A ${v.p} record can have zero or many ${v.c} records.`,
+    guess: 'Inferred: ',
+
+    noMatch: 'No matches',
+    column: 'column',
+  },
+};
+
+const LANGS = ['tr', 'en'];
+const KEY = 'sqlschema.lang';
+
+function detect() {
+  try {
+    const q = new URLSearchParams(location.search).get('lang');
+    if (LANGS.includes(q)) return q;
+  } catch (err) { /* location yok (Node) */ }
+  try {
+    const saved = localStorage.getItem(KEY);
+    if (LANGS.includes(saved)) return saved;
+  } catch (err) { /* depolama kapalı */ }
+  const list = (typeof navigator !== 'undefined' && (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language])) || [];
+  // yalnızca birincil sistem dili belirleyicidir: tr-TR, tr → Türkçe; diğer her şey → İngilizce
+  return String(list[0] || '').toLowerCase().startsWith('tr') ? 'tr' : 'en';
+}
+
+let lang = detect();
+
+function t(key, vars) {
+  const v = DICT[lang][key] !== undefined ? DICT[lang][key] : DICT.en[key];
+  if (v === undefined) return key;
+  return typeof v === 'function' ? v(vars || {}) : v;
+}
+
+// Belgedeki data-i18n işaretli öğeleri günceller
+function applyDom(root) {
+  const doc = root || document;
+  doc.documentElement && (doc.documentElement.lang = lang);
+  for (const el of doc.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
+  for (const el of doc.querySelectorAll('[data-i18n-html]')) el.innerHTML = t(el.dataset.i18nHtml);
+  for (const el of doc.querySelectorAll('[data-i18n-attr]')) {
+    for (const pair of el.dataset.i18nAttr.split(';')) {
+      const [attr, key] = pair.split(':');
+      el.setAttribute(attr, t(key));
+    }
+  }
+  if (doc.title !== undefined) doc.title = t('docTitle');
+  const desc = doc.querySelector && doc.querySelector('meta[name="description"]');
+  if (desc) desc.setAttribute('content', t('docDesc'));
+}
+
+const listeners = [];
+function setLang(next, persist = true) {
+  if (!LANGS.includes(next) || next === lang) return;
+  lang = next;
+  if (persist) { try { localStorage.setItem(KEY, next); } catch (err) { /* depolama kapalı */ } }
+  applyDom();
+  for (const fn of listeners) fn(lang);
+}
+
+Object.assign(NS, { t, LANGS, getLang: () => lang, setLang, onLangChange: fn => listeners.push(fn), applyI18n: applyDom, i18nKeys: l => Object.keys(DICT[l]) });
+})(globalThis.sqlSchema = globalThis.sqlSchema || {});

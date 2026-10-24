@@ -1,0 +1,21 @@
+name: Özellik önerisi · Feature request
+description: Yeni bir özellik, lehçe ya da örnek önerin · Suggest a feature, a dialect or a sample
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Hangi sorunu çözüyor? · What problem does it solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Öneri · Proposal
+      description: Yeni bir lehçe ya da dışa aktarma biçimi istiyorsanız kısa, sentetik bir örnek ekleyin · For a new dialect or export format, include a short synthetic example
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Düşündüğünüz alternatifler · Alternatives considered

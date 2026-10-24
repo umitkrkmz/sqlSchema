@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sqlSchema · SQL schema constellation</title>
+<meta name="description" content="Reads schema files in the browser and draws tables and relationships as a constellation map.">
+<meta name="theme-color" content="#060a18">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23060a18'/%3E%3Cpath d='M7 22 L14 9 L25 13 L20 24 Z' fill='none' stroke='%238a96b8' stroke-width='1.2'/%3E%3Ccircle cx='7' cy='22' r='2.4' fill='%236cc6dc'/%3E%3Ccircle cx='14' cy='9' r='3' fill='%23f2b45a'/%3E%3Ccircle cx='25' cy='13' r='2' fill='%23a58cf2'/%3E%3Ccircle cx='20' cy='24' r='2' fill='%23ef7b86'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M7 22 L14 9 L25 13 L20 24 Z" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/>
+      <circle cx="7" cy="22" r="2.4" fill="#6cc6dc"/><circle cx="14" cy="9" r="3" fill="#f2b45a"/>
+      <circle cx="25" cy="13" r="2" fill="#a58cf2"/><circle cx="20" cy="24" r="2" fill="#ef7b86"/>
+    </svg>
+    <div class="brand-text"><strong>sqlSchema</strong><span data-i18n="tagline"></span></div>
+  </div>
+
+  <div class="actions">
+    <button class="btn" data-act="open" data-i18n="open" data-i18n-attr="title:openTitle"></button>
+    <button class="btn ghost" data-act="open-folder" data-i18n="folder" data-i18n-attr="title:folderTitle"></button>
+    <button class="btn ghost" data-act="paste" data-i18n="paste"></button>
+    <div class="menu">
+      <button class="btn ghost" data-act="samples" aria-haspopup="true"><span data-i18n="samples"></span> <span aria-hidden="true">▾</span></button>
+      <div class="menu-list samples-menu pop" id="sampleMenu" hidden></div>
+    </div>
+    <span class="file-name" id="fileName"></span>
+  </div>
+
+  <div class="search">
+    <input id="q" type="search" autocomplete="off" spellcheck="false" data-i18n-attr="placeholder:searchPh;aria-label:searchLabel">
+    <kbd>/</kbd>
+    <ul id="results" class="results" role="listbox" hidden></ul>
+  </div>
+
+  <div class="tools">
+    <label class="toggle" data-i18n-attr="data-short:implicitShort"><input type="checkbox" id="tImplicit" checked><span data-i18n="implicit"></span></label>
+    <label class="toggle" data-i18n-attr="data-short:gridShort"><input type="checkbox" id="tGrid" checked><span data-i18n="grid"></span></label>
+    <button class="btn ghost" data-act="fit" data-i18n="fit" data-i18n-attr="title:fitTitle"></button>
+    <button class="btn ghost" data-act="png" data-i18n-attr="title:pngTitle">PNG</button>
+    <div class="lang" role="group" data-i18n-attr="aria-label:language;title:language">
+      <button data-lang="tr" aria-pressed="false">TR</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+</header>
+
+<main class="stage">
+  <canvas id="sky"></canvas>
+
+  <section id="empty" class="empty">
+    <div class="empty-card">
+      <p class="eyebrow" data-i18n="emptyEyebrow"></p>
+      <h1 data-i18n="emptyTitle"></h1>
+      <p data-i18n="emptyText"></p>
+      <div class="row">
+        <button class="btn" data-act="open" data-i18n="chooseFiles"></button>
+        <button class="btn ghost" data-act="open-folder" data-i18n="chooseFolder"></button>
+        <button class="btn ghost" data-act="paste" data-i18n="paste"></button>
+        <button class="btn ghost" data-act="sample-first" data-i18n="openSample"></button>
+      </div>
+      <p class="fine" data-i18n="emptyFine"></p>
+    </div>
+  </section>
+
+  <div id="dropOverlay" class="drop-overlay" hidden><span data-i18n="dropHere"></span></div>
+
+  <aside id="panel" class="panel" hidden></aside>
+
+  <section id="legend" class="legend" data-i18n-attr="aria-label:legend">
+    <button class="legend-toggle" data-act="legend" data-i18n="legend"></button>
+    <div class="legend-body">
+      <h4><span data-i18n="lgEnds"></span> <small data-i18n="lgCrow"></small></h4>
+      <ul class="ends">
+        <li><canvas data-end="one"></canvas><div><b data-i18n="endOne"></b><span data-i18n="endOneHint"></span></div></li>
+        <li><canvas data-end="zeroOne"></canvas><div><b data-i18n="endZeroOne"></b><span data-i18n="endZeroOneHint"></span></div></li>
+        <li><canvas data-end="zeroMany"></canvas><div><b data-i18n="endZeroMany"></b><span data-i18n="endZeroManyHint"></span></div></li>
+        <li class="muted"><canvas data-end="oneMany"></canvas><div><b data-i18n="endOneMany"></b><span data-i18n="endOneManyHint"></span></div></li>
+      </ul>
+      <div class="example">
+        <canvas data-pair="zeroMany,one"></canvas>
+        <p data-i18n-html="lgExample"></p>
+      </div>
+      <h4 data-i18n="lgLines"></h4>
+      <ul class="lines">
+        <li><canvas data-line="fk"></canvas><span data-i18n-html="lineFk"></span></li>
+        <li><canvas data-line="imp"></canvas><span data-i18n="lineImp"></span></li>
+        <li><canvas data-line="off"></canvas><span data-i18n="lineOff"></span></li>
+        <li><canvas data-line="emb"></canvas><span data-i18n="lineEmb"></span></li>
+      </ul>
+      <h4 data-i18n="lgStars"></h4>
+      <ul class="stars">
+        <li><i class="s-star"></i><span data-i18n="starTable"></span></li>
+        <li><i class="s-ring"></i><span data-i18n="starJunction"></span></li>
+        <li><i class="s-moon"></i><span data-i18n="starMoon"></span></li>
+        <li><i class="s-ghost"></i><span data-i18n="starGhost"></span></li>
+      </ul>
+      <p class="keys-tags" data-i18n-html="keyTags"></p>
+      <p class="keys" data-i18n-html="keysHelp"></p>
+    </div>
+  </section>
+
+  <div class="hud">
+    <span id="hudView"></span>
+    <span id="hudStats"></span>
+    <button class="link" id="hudFiles" data-act="files" hidden></button>
+    <button class="link" data-act="report" data-i18n="report"></button>
+  </div>
+  <div id="report" class="report pop" hidden></div>
+  <div id="filesPop" class="report files-pop pop" hidden></div>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+</main>
+
+<dialog id="pasteDlg" class="paste">
+  <form method="dialog">
+    <h3 data-i18n="pasteTitle"></h3>
+    <p data-i18n="pasteText"></p>
+    <textarea id="pasteText" spellcheck="false" placeholder="CREATE TABLE ..."></textarea>
+    <div class="row">
+      <button class="btn ghost" value="cancel" data-i18n="cancel"></button>
+      <button class="btn" value="ok" data-i18n="draw"></button>
+    </div>
+  </form>
+</dialog>
+
+<input type="file" id="file" multiple accept=".sql,.ddl,.txt,.pls,.pks,.pkb,.tab,.cql,.js,.mjs,.cjs,.ts,.json,.jsonl,.ndjson" hidden>
+<input type="file" id="folder" webkitdirectory multiple hidden>
+
+<!-- Sıra önemli: her dosya globalThis.sqlSchema ad alanına ekler, sonrakiler öncekileri kullanır -->
+<script src="js/i18n.js"></script>
+<script src="js/lexer.js"></script>
+<script src="js/sql-parser.js"></script>
+<script src="js/mongo.js"></script>
+<script src="js/files.js"></script>
+<script src="js/model.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/sample-small.js"></script>
+<script src="samples/catalog.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>

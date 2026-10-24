@@ -1,0 +1,9 @@
+-- Ekip kararı: tablo adları çoğul
+ALTER TABLE customer RENAME TO customers;
+ALTER TABLE address RENAME TO addresses;
+ALTER TABLE shipment RENAME TO shipments;
+ALTER TABLE parcel RENAME TO parcels;
+ALTER TABLE courier RENAME TO couriers;
+ALTER TABLE warehouse RENAME TO warehouses;
+ALTER TABLE hub RENAME TO hubs;
+ALTER TABLE hub_transfer RENAME TO hub_transfers;

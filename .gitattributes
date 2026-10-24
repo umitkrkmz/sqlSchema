@@ -1,0 +1,7 @@
+* text=auto eol=lf
+
+*.png binary
+
+# SSMS çıktısını taklit eden örnek UTF-16'dır; git dokunmamalı
+# Imitates SSMS output (UTF-16); git must not touch it
+samples/banka/*.sql binary

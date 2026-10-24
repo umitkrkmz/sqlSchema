@@ -1,0 +1,48 @@
+[
+  {
+    "_id": {
+      "$oid": "12daaaaaaaaaaaaaaaaaaaaa"
+    },
+    "advertiserName": "Örnek Kahve",
+    "budget": {
+      "daily": 500,
+      "currency": "TRY"
+    },
+    "targeting": {
+      "cities": [
+        "İstanbul",
+        "İzmir"
+      ],
+      "ageMin": 18,
+      "interests": [
+        "kahve",
+        "kitap"
+      ]
+    },
+    "status": "active",
+    "startsAt": {
+      "$date": "2026-10-01T00:00:00Z"
+    }
+  },
+  {
+    "_id": {
+      "$oid": "12eaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "advertiserName": "Örnek Spor",
+    "budget": {
+      "daily": 1200,
+      "currency": "TRY"
+    },
+    "targeting": {
+      "ageMin": 16,
+      "ageMax": 35
+    },
+    "status": "paused",
+    "startsAt": {
+      "$date": "2026-09-15T00:00:00Z"
+    },
+    "endsAt": {
+      "$date": "2026-12-31T00:00:00Z"
+    }
+  }
+]

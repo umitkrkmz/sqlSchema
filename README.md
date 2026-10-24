@@ -1,0 +1,678 @@
+<div align="center">
+
+# sqlSchema
+
+**Şema dosyalarını bir yıldız haritası olarak çizen, tarayıcıda çalışan açık kaynak görselleştirici.**<br>
+**An open-source, in-browser viewer that draws database schemas as a star map.**
+
+![MIT](https://img.shields.io/badge/lisans%20%2F%20license-MIT-f2b45a)
+![Bağımlılık yok](https://img.shields.io/badge/ba%C4%9F%C4%B1ml%C4%B1l%C4%B1k%20%2F%20dependencies-0-6cc6dc)
+![Derleme yok](https://img.shields.io/badge/derleme%20%2F%20build-yok%20%2F%20none-a58cf2)
+
+[**Türkçe**](#tr) · [**English**](#en)
+
+<img src="docs/images/tr/genel-bakis.png" alt="sqlSchema: 318 tablolu bir telekom şemasının galaksi görünümü" width="900">
+
+</div>
+
+---
+
+<a id="tr"></a>
+
+## Türkçe
+
+sqlSchema, veritabanı şema dosyalarını tarayıcıda okur ve bir gökyüzü haritası olarak çizer:
+- Her tablo bir yıldızdır.
+- Her ilişki iki yıldız arasında bir çizgidir.
+- Her şema bir gökyüzü bölgesi, her veritabanı bir galaksidir.
+
+Yaklaştıkça yıldızlar kolon listeli tablo kartlarına dönüşür ve ilişkiler karga ayağı (crow's foot) notasyonuyla okunur.
+
+draw.io kadar elle uğraştırmaz, veri modelleme aracı kadar ağır değildir. Amaç, şemaya ilk kez bakan birinin "hangi tablo neye bağlı?" sorusunun cevabını birkaç saniyede görmesi.
+
+### İçindekiler
+
+1. [Öne çıkanlar](#tr-one-cikanlar)
+2. [Hızlı başlangıç](#tr-hizli-baslangic)
+3. [Haritayı okumak](#tr-haritayi-okumak)
+4. [Birden fazla dosya ve migration](#tr-coklu-dosya)
+5. [Desteklenen veritabanları](#tr-veritabanlari)
+6. [MongoDB](#tr-mongodb)
+7. [Örnekler](#tr-ornekler)
+8. [Şemayı dışa aktarmak](#tr-disa-aktarma)
+9. [Dil](#tr-dil)
+10. [Proje yapısı ve geliştirme](#tr-gelistirme)
+11. [Sınırlar](#tr-sinirlar)
+12. [Katkı, güvenlik, lisans](#tr-katki)
+
+<a id="tr-one-cikanlar"></a>
+
+### Öne çıkanlar
+
+- **Saf HTML, CSS ve JavaScript.** Bağımlılık yok, derleme adımı yok; klasörü açmanız yeterli.
+- **Gizlilik:** dosyalar tarayıcıdan çıkmaz, hiçbir sunucuya gönderilmez.
+- **Sekiz veritabanı:** Oracle, SQL Server, MySQL, MariaDB, PostgreSQL, SQLite, Cassandra ve MongoDB.
+- **Tek dosya, birden fazla dosya ya da bütün bir klasör:** bölünmüş dökümler, migration klasörleri (Flyway, golang-migrate), çok veritabanlı projeler.
+- **Karga ayağı notasyonu:** kardinalite `NOT NULL`, `UNIQUE` ve PK bilgisinden çıkarılır.
+- **Tahmini ilişkiler:** FK tanımlı olmayan eski sistemlerde, Cassandra'da ve MongoDB'de bağlantılar kolon adlarından bulunur.
+- **Ölçek:** 2 862 tabloluk 4,7 MB'lık bir döküm yaklaşık 0,6 saniyede açılır, bir karenin çizimi 10 ms'nin altında kalır.
+- **Türkçe ve İngilizce arayüz.**
+
+<a id="tr-hizli-baslangic"></a>
+
+### Hızlı başlangıç
+
+1. Depoyu indirin ya da klonlayın.
+2. `index.html` dosyasını tarayıcıda açın.
+3. Şema dosyalarınızı ya da klasörü sayfaya sürükleyin. Alternatifler: **Dosya aç** (birden fazla dosya seçilebilir), **Klasör**, **Yapıştır**, **Örnekler**.
+
+Örnek dosyaları ve sürüklenen klasörleri tarayıcı yalnızca sayfa bir sunucu üzerinden açıldığında okuyabilir. Bunun için proje klasöründe şu komutu çalıştırıp `http://localhost:8000` adresine gidin:
+
+```bash
+python -m http.server 8000
+```
+
+> `index.html` doğrudan dosyadan (`file://`) açıldığında da uygulama çalışır. Klasörleri sürüklemek yerine **Klasör** düğmesiyle seçin. Gömülü küçük örnek her durumda açılır.
+
+| Hareket | Sonuç |
+|---|---|
+| Tekerlek / iki parmak | Yakınlaştır |
+| Sürükle | Kaydır |
+| Tık | Tabloyu seç, ayrıntı panelini aç |
+| Çift tık | Tabloya yaklaş, kolonları göster |
+| `/` | Tablo ya da kolon ara |
+| `F` | Tümünü sığdır |
+| `Esc` | Odak modunu kapat / seçimi bırak |
+
+<a id="tr-haritayi-okumak"></a>
+
+### Haritayı okumak
+
+Yakınlaştırma düzeyine göre üç görünüm vardır:
+
+| Görünüm | Ne görünür |
+|---|---|
+| Galaksi | Veritabanları, şemalar ve şemalar arası ilişki demetleri (çizgi üstündeki sayı = ilişki adedi) |
+| Takımyıldız | Tablolar yıldız olur: boyut = bağlantı sayısı, renk = şema. Seçili tablonun çizgilerinde karga ayağı ve kolon adı yazar. |
+| Yakın plan | Tablolar kart olur; çizgiler doğrudan FK ve PK kolon satırlarına bağlanır. |
+
+<img src="docs/images/tr/secim-ve-panel.png" alt="Seçili tablo, vurgulu ilişkileri ve ayrıntı paneli" width="900">
+
+Ayrıntı panelinde kolonlar, açıklamalar, tanımın geçtiği dosya ve satır ile her ilişkinin Türkçe okunuşu yer alır:
+*"Her INVOICE kaydı mutlaka bir BILLING_ACCOUNT kaydına bağlı. Bir BILLING_ACCOUNT kaydının sıfır ya da çok INVOICE kaydı olabilir."*
+
+**Odak modu**, seçili tablonun yalnızca 1 ya da 2 adım uzaklıktaki komşularını bırakır, gerisini söndürür.
+
+<img src="docs/images/tr/yakin-plan.png" alt="Yakın plan: kolon satırlarına bağlanan çizgiler ve karga ayağı uçları" width="900">
+
+#### Karga ayağı
+
+Çizginin bir ucundaki işaret, o uçtaki tablodan kaç kayıt olabileceğini söyler. Tabloya yakın işaret üst sınırdır, dıştaki alt sınırdır.
+
+| İşaret | Anlamı | Şemadan nasıl çıkarılıyor |
+|---|---|---|
+| `──‖` | tam olarak bir | FK kolonu `NOT NULL`; gömülü belgenin sahibi |
+| `──○┼` | sıfır ya da bir | FK kolonu `NULL` olabilir, ya da FK aynı zamanda PK/UNIQUE (1:1) |
+| `──○<` | sıfır ya da çok | FK'yi taşıyan tablonun varsayılanı; ObjectId dizileri |
+| `──┼<` | bir ya da çok | DDL ile zorlanamaz (trigger ya da uygulama kuralı gerekir), bu yüzden haritada çıkmaz |
+
+#### Çizgiler, yıldızlar, etiketler
+
+| Çizgi | Anlamı |
+|---|---|
+| Düz | Tanımlı yabancı anahtar ya da Mongoose `ref` |
+| Kesikli | Tahmini ilişki (aşağıya bakın); üst çubuktan kapatılabilir |
+| Noktalı | Devre dışı FK (`DISABLE`, `RELY DISABLE NOVALIDATE`, T-SQL `NOCHECK`) |
+| Kesik-noktalı | MongoDB gömülü belge: alt belge sahibinin içinde yaşar |
+
+| Yıldız | Anlamı |
+|---|---|
+| Dolu yıldız | Tablo; büyüklük = bağlantı sayısı, renk = şema |
+| Halka | Ara tablo (M:N): PK'si iki FK'den oluşur ya da saf bağlantı tablosudur |
+| Küçük, soluk yıldız | Uydu: MongoDB gömülü alt belgesi, sahibinin yanında durur |
+| Kesikli halka | Bir FK'nin başvurduğu ama dosyalarda tanımı olmayan tablo |
+
+Kartlarda **PK** birincil anahtarı, **FK** yabancı anahtarı, **CK** Cassandra sıralama (clustering) anahtarını gösterir. Soluk kolon adı, kolonun NULL olabileceği anlamına gelir.
+
+**Takımyıldızlar.** Küçük şemalar tek bir takımyıldızdır. Büyük şemalar, tablo adı öneklerine (`CUSTOMER_*`, `INVOICE_*`) ve bağlantılara göre takımyıldızlara bölünür. Her yıldız, takımyıldızındaki parlaklık sırasına göre Bayer usulü bir ad alır (`α Billing`, `β Billing`). Yerleşim deterministiktir: aynı dosyalar her açılışta aynı haritayı verir.
+
+**Tahmini ilişkiler.** Şu iki durumda kesikli çizgiyle çizilir:
+- FK tanımlı değil ama kolon adı başka bir tablonun PK'siyle aynı: `CDR.SUBSCRIPTION_ID` → `SUBSCRIPTION.SUBSCRIPTION_ID`.
+- `X_ID` / `xId` kolonu, PK'si `ID` ya da `_id` olan X tablosunu gösteriyor: `orders.customerId` → `customers._id`.
+
+Tipler uyuşmuyorsa ya da birden fazla aday varsa çizilmez.
+
+<a id="tr-coklu-dosya"></a>
+
+### Birden fazla dosya ve migration
+
+Dosyalar tek bir modelde birleşir; ad çözümleme en sonda yapılır. Bu yüzden şu durumlar sorun çıkarmaz:
+- Bir dosyadaki FK'nin başka bir dosyadaki tabloyu göstermesi.
+- `constraints.sql` dosyasının alfabetik sırada `ddl.sql`'den önce gelmesi.
+
+Sağ alttaki **N dosya** bağlantısı dosya listesini açar. Burada:
+- Dosyaları tek tek çizime katabilir ya da çıkarabilirsiniz.
+- Her dosyanın lehçesini ve kaç tablo içerdiğini görürsünüz.
+- "Ayrı veritabanı" seçeneğini açabilirsiniz.
+
+**Okuma sırası** migration araçlarının kurallarını izler:
+
+| Araç | Dosyalar | Davranış |
+|---|---|---|
+| Flyway | `V1__init.sql`, `V1_1__x.sql`, `V2__y.sql` | Sürüm numarasına göre (V10, V2'den sonra). `R__*.sql` en sonda, `U*__` geri alma betikleri atlanır. |
+| golang-migrate, dbmate | `000001_x.up.sql` | `.down.sql` atlanır. |
+| Zaman damgalı | `20240115093000_x.sql` | Zaman sırasına göre. |
+| Numaralı / diğer | `01_tables.sql`, `a2.sql < a10.sql` | Doğal ad sırası. |
+
+Migration'lar baştan sona uygulanır ve harita şemanın **son hâlini** gösterir. Bunun için şu ifadeler işlenir:
+- `RENAME TO`, `RENAME COLUMN`
+- `DROP TABLE`, `DROP COLUMN`, `DROP CONSTRAINT`
+- `ALTER COLUMN … TYPE`, `MODIFY`, `CHANGE`
+- T-SQL `sp_rename`, MySQL `RENAME TABLE`
+
+**Ayrı veritabanları.** Farklı lehçelerden dosyalar birlikte açılırsa (örneğin MySQL siparişler, MongoDB katalog, PostgreSQL raporlama) her klasör kendi galaksisi olarak çizilir.
+
+<img src="docs/images/tr/coklu-veritabani.png" alt="Üç veritabanı üç ayrı galaksi olarak" width="900">
+
+<a id="tr-veritabanlari"></a>
+
+### Desteklenen veritabanları
+
+| | Oracle | SQL Server | MySQL / MariaDB | PostgreSQL | SQLite | Cassandra |
+|---|---|---|---|---|---|---|
+| `CREATE TABLE`, satır içi ve tablo seviyesi kısıtlar | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ `PRIMARY KEY ((a, b), c)` |
+| `ALTER TABLE … ADD CONSTRAINT` | ✓ | ✓ `WITH CHECK/NOCHECK` | ✓ | ✓ `ONLY` | | |
+| Kolon değişiklikleri | `MODIFY` | `ALTER COLUMN` | `MODIFY`, `CHANGE` | `ALTER COLUMN … TYPE` | | |
+| Yeniden adlandırma, silme | `RENAME`, `DROP` | `sp_rename`, `DROP` | `RENAME TABLE`, `DROP` | `RENAME`, `DROP` | `RENAME`, `DROP` | |
+| `CREATE UNIQUE INDEX` (1:1 tespiti) | ✓ | ✓ | ✓ | ✓ | ✓ | |
+| Tablo / kolon açıklamaları | `COMMENT ON` | `sp_addextendedproperty` | `COMMENT '…'` | `COMMENT ON` | | |
+
+**Çizime girmeyenler.** View, sequence, trigger, package, procedure, function, type, grant ve `INSERT` raporda sayılır ama çizilmez. Ayrıştırıcı bunların içindeki `;` işaretlerine takılmaz:
+- PL/SQL blokları `/` satırına kadar bütün tutulur.
+- T-SQL blokları `GO` satırına kadar bütün tutulur.
+- MySQL blokları `DELIMITER` ayracına kadar bütün tutulur.
+
+**Sorun çıkarmayanlar:**
+- SQL\*Plus komutları
+- Oracle depolama ve partition ifadeleri
+- PostgreSQL `$$` gövdeleri ve `PARTITION OF` parçaları
+- CQL `//` yorumları ve `map<text, int>` tipleri
+
+**Kodlama.** Dosya UTF-8, UTF-16 (SSMS'in varsayılanı) ya da Windows-1254 olabilir; kodlama otomatik seçilir.
+
+<a id="tr-mongodb"></a>
+
+### MongoDB
+
+MongoDB'de DDL yoktur. Şema üç kaynaktan çıkarılır; aynı koleksiyon birden fazla kaynakta geçiyorsa tek tabloda birleşir.
+
+| Kaynak | Örnek | Okunan |
+|---|---|---|
+| mongosh betikleri (`.js`) | `db.createCollection('x', { validator: { $jsonSchema } })`, `collMod`, `createIndex(…, { unique })` | Alanlar, tipler, zorunlu alanlar, açıklamalar, `enum` değerleri |
+| Mongoose modelleri (`.js`, `.ts`) | `new Schema({ author: { type: ObjectId, ref: 'User' } })` | Alanlar ve `ref` ilişkileri. Koleksiyon adları Mongoose'un çoğul kurallarıyla türetilir. |
+| Örnek belgeler (`.json`, `.jsonl`, `.ndjson`) | `mongoexport` çıktısı | İlk 5 000 belgeden alan birleşimi; Extended JSON (`$oid`, `$date`) |
+
+Gömülü nesneler ve nesne dizileri, sahibinin yanında duran **uydu** tablolara (`users.profile`, `orders.items`) dönüşür.
+
+<img src="docs/images/tr/mongodb-uydular.png" alt="MongoDB: koleksiyonlar, uydu alt belgeler ve tahmini ilişkiler" width="900">
+
+<a id="tr-ornekler"></a>
+
+### Örnekler
+
+`samples/` altındaki örnekler **sentetiktir**: gerçek bir kuruma ait değildir. Her biri bir sektörün tipik yapısını ve bir aracın gerçek dışa aktarım biçimini taklit eder. **Örnekler** menüsünden açılırlar.
+
+| Örnek | Veritabanı | Senaryo |
+|---|---|---|
+| Küçük telekom | Oracle | 20 tablo, uygulamaya gömülü |
+| Telekom BSS/OSS | Oracle | SQL Developer dökümü tek dosyada: 318 tablo, 16 şema, partition, trigger, paket |
+| Telekom, şema başına dosya | Oracle | Aynı şema 16 dosyaya bölünmüş; bütün FK'ler en sondaki dosyada |
+| Çekirdek bankacılık | SQL Server | SSMS "Generate Scripts": UTF-16, `GO`, `IDENTITY`, açıklamalar |
+| Sigorta (eski sistem) | Oracle | Modül başına klasör, Türkçe adlar, hiç FK yok |
+| Pazaryeri e-ticaret | MySQL | `mysqldump --no-data`, `DELIMITER`'lı yordam |
+| Hastane bilgi sistemi | PostgreSQL | OMOP CDM biçimi: tablolar, PK, FK, indeks ve açıklamalar ayrı dosyalarda |
+| Lojistik / kargo | PostgreSQL | Flyway, 14 sürüm: adı değişen ve silinen tablolar, partition |
+| IoT telemetri | Cassandra | İki keyspace, sorgu başına tablo |
+| Sosyal medya | MongoDB | `$jsonSchema` + Mongoose + `mongoexport` |
+| Saha servisi mobil uygulaması | SQLite | `sqlite3 .dump`, çevrimdışı önbellek |
+| Çok veritabanlı e-ticaret | MySQL + MongoDB + PostgreSQL | Mikroservisler, her klasör ayrı galaksi |
+
+<a id="tr-disa-aktarma"></a>
+
+### Şemayı dışa aktarmak
+
+| Veritabanı | Nasıl |
+|---|---|
+| Oracle, SQL Developer | *Araçlar → Veritabanı Dışa Aktarma*, yalnızca DDL. "Nesne türüne göre ayrı dosyalar" çıktısı klasör olarak açılabilir. |
+| Oracle, SQL\*Plus / SQLcl | Aşağıdaki `DBMS_METADATA` betiği |
+| SQL Server | SSMS → veritabanı → *Tasks → Generate Scripts* (yalnızca şema) |
+| MySQL / MariaDB | `mysqldump --no-data veritabani > sema.sql` |
+| PostgreSQL | `pg_dump --schema-only veritabani > sema.sql` |
+| SQLite | `sqlite3 app.db .schema > sema.sql` |
+| Cassandra | `cqlsh -e "DESCRIBE KEYSPACE telemetry" > sema.cql` |
+| MongoDB | Doğrulayıcı betikleri, Mongoose model klasörü ya da `mongoexport --limit 1000` çıktıları |
+
+Migration kullanan projelerde `db/migration` klasörünü olduğu gibi açmanız yeterlidir.
+
+```sql
+-- Oracle: veri sözlüğünden DDL ve açıklamalar
+SET LONG 20000000 LONGCHUNKSIZE 20000000 PAGESIZE 0 LINESIZE 32767 TRIMSPOOL ON FEEDBACK OFF
+EXEC DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM, 'SQLTERMINATOR', TRUE);
+EXEC DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM, 'SEGMENT_ATTRIBUTES', FALSE);
+SPOOL sema.sql
+SELECT DBMS_METADATA.GET_DDL('TABLE', table_name, owner) FROM all_tables WHERE owner IN ('CRM', 'BILLING');
+SELECT DBMS_METADATA.GET_DEPENDENT_DDL('COMMENT', table_name, owner) FROM all_tables t
+ WHERE owner IN ('CRM', 'BILLING')
+   AND (EXISTS (SELECT 1 FROM all_tab_comments c WHERE c.owner = t.owner AND c.table_name = t.table_name AND c.comments IS NOT NULL)
+     OR EXISTS (SELECT 1 FROM all_col_comments c WHERE c.owner = t.owner AND c.table_name = t.table_name AND c.comments IS NOT NULL));
+SPOOL OFF
+```
+
+<a id="tr-dil"></a>
+
+### Dil
+
+Arayüz Türkçe ve İngilizcedir. İlk açılışta sistem dili Türkçe ise Türkçe, değilse İngilizce seçilir. Sağ üstteki **TR / EN** düğmeleriyle değiştirilebilir; seçim tarayıcıda hatırlanır. Bir bağlantıda dili sabitlemek için `?lang=tr` ya da `?lang=en` kullanılabilir.
+
+**Paylaşılabilir bağlantılar.** URL parametreleriyle bir örnek, bir tablo ve yakınlaştırma düzeyi doğrudan açılabilir:
+
+```
+index.html?lang=tr&sample=telekom&select=BILLING_ACCOUNT&zoom=0.9&legend=0
+```
+
+<a id="tr-gelistirme"></a>
+
+### Proje yapısı ve geliştirme
+
+```
+index.html          sayfa iskeleti, lejant
+style.css           görünüm
+js/                 tarayıcıda bu sırayla yüklenir; hepsi globalThis.sqlSchema ad alanına ekler
+  i18n.js           Türkçe / İngilizce sözlükler, dil seçimi
+  lexer.js          tokenizer, ifade ayırıcı, lehçe tahmini
+  sql-parser.js     DDL → sıralı işlem listesi (create, fk, rename, drop ...)
+  mongo.js          $jsonSchema, Mongoose ve JSON belgelerinden aynı işlem listesi
+  files.js          dosya sıralama (Flyway, golang-migrate), ayrıştırıcı seçimi
+  model.js          işlemleri uygular: tablolar, ilişkiler, kardinalite, ara tablo, tahmini ilişki
+  layout.js         veritabanı → şema → takımyıldız → yıldız, hiyerarşik kuvvet yerleşimi
+  sample-small.js   gömülü küçük örnek
+  render.js         canvas çizimi, kamera, karga ayağı
+  ui.js             yükleme, dosya listesi, arama, panel, rapor, URL parametreleri
+samples/            sentetik örnekler ve catalog.js (üretilir)
+tools/              örnek ve ekran görüntüsü üreticileri, sektör tanımları
+tests/run.js        bütün örnekleri, ayrıştırıcı kenar durumlarını ve çevirileri denetler
+docs/images/        README görüntüleri (tr/ ve en/)
+```
+
+Geliştirme komutları (Node 18+, bağımlılık yok):
+
+```bash
+node tests/run.js                                  # testler
+node tools/gen-samples.js                          # samples/ klasörünü yeniden üretir
+node tools/screenshots.js http://localhost:8000/   # README görüntülerini yeniler (Chrome gerekir)
+```
+
+Ayrıştırıcı, model ve yerleşim DOM'a dokunmaz; Node'da `require` edilebilir. Konsoldan inceleme için `window.sqlSchema` açıktır:
+
+```js
+sqlSchema.S.model.tables.filter(t => t.junction).map(t => t.name)
+sqlSchema.loadText('CREATE TABLE a (id int PRIMARY KEY);', 'deneme.sql')
+```
+
+<a id="tr-sinirlar"></a>
+
+### Sınırlar
+
+- View'lar ve view'lar üzerinden kurulan ilişkiler çizilmez.
+- Tahmini ilişkiler yalnızca kolon adlarına dayanır; adlandırma kuralı tutarsız şemalarda eksik ya da fazla çıkabilir. MongoDB'de `authorId` gibi koleksiyon adıyla eşleşmeyen alanlar bağlanmaz.
+- `CREATE TABLE … AS SELECT` tabloları kolonsuz görünür.
+- MongoDB şeması örnek belgelerden çıkarılıyorsa yalnızca o belgelerde görülen alanlar listelenir.
+- Değişkenle kurulan dinamik Mongoose şemaları (`new Schema(buildFields())`) okunmaz.
+
+<a id="tr-katki"></a>
+
+### Katkı, güvenlik, lisans
+
+- Katkı rehberi: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Davranış kuralları: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- Güvenlik açığı bildirimi: [SECURITY.md](SECURITY.md)
+- Değişiklik geçmişi: [CHANGELOG.md](CHANGELOG.md)
+- Yapay zekâ kodlama ajanları için proje rehberi: [AGENTS.md](AGENTS.md)
+
+Lütfen hata bildirirken gerçek bir kuruma ait şema paylaşmayın; tablo adlarını değiştirmek yeterlidir.
+
+[MIT](LICENSE) lisansı ile dağıtılır.
+
+<p align="right"><a href="#tr">↑ başa dön</a></p>
+
+---
+
+<a id="en"></a>
+
+## English
+
+sqlSchema reads database schema files in the browser and draws them as a star map:
+- Every table is a star.
+- Every relationship is a line between two stars.
+- Every schema is a region of sky, and every database is a galaxy.
+
+Zoom in and the stars turn into table cards with columns, and relationships read in crow's foot notation.
+
+It is less manual than draw.io and lighter than a data-modelling tool. The goal is that someone seeing a schema for the first time can answer "what is connected to what?" in seconds.
+
+### Contents
+
+1. [Highlights](#en-highlights)
+2. [Quick start](#en-quick-start)
+3. [Reading the map](#en-reading)
+4. [Multiple files and migrations](#en-multi-file)
+5. [Supported databases](#en-databases)
+6. [MongoDB](#en-mongodb)
+7. [Samples](#en-samples)
+8. [Exporting a schema](#en-export)
+9. [Language](#en-language)
+10. [Project layout and development](#en-development)
+11. [Limitations](#en-limitations)
+12. [Contributing, security, license](#en-contributing)
+
+<a id="en-highlights"></a>
+
+### Highlights
+
+- **Plain HTML, CSS and JavaScript.** No dependencies, no build step; just open the folder.
+- **Privacy:** files never leave the browser and are not sent to any server.
+- **Eight databases:** Oracle, SQL Server, MySQL, MariaDB, PostgreSQL, SQLite, Cassandra and MongoDB.
+- **One file, many files or a whole folder:** split dumps, migration folders (Flyway, golang-migrate), multi-database projects.
+- **Crow's foot notation:** cardinality is derived from `NOT NULL`, `UNIQUE` and primary keys.
+- **Inferred relationships:** links are found from column names in legacy systems without FKs, in Cassandra and in MongoDB.
+- **Scale:** a 4.7 MB dump with 2,862 tables opens in about 0.6 s, and a frame draws in under 10 ms.
+- **Turkish and English interface.**
+
+<a id="en-quick-start"></a>
+
+### Quick start
+
+1. Download or clone the repository.
+2. Open `index.html` in a browser.
+3. Drag your schema files or a folder onto the page. Alternatively use **Open files** (multiple selection allowed), **Folder**, **Paste** or **Samples**.
+
+The browser can read the sample files and dropped folders only when the page is served. Run this in the project folder and open `http://localhost:8000`:
+
+```bash
+python -m http.server 8000
+```
+
+> The app also works when `index.html` is opened directly from disk (`file://`). In that case choose folders with the **Folder** button instead of dragging them. The embedded small sample always opens.
+
+| Gesture | Result |
+|---|---|
+| Wheel / pinch | Zoom |
+| Drag | Pan |
+| Click | Select a table, open the detail panel |
+| Double-click | Zoom into a table, show its columns |
+| `/` | Search tables or columns |
+| `F` | Fit everything |
+| `Esc` | Leave focus mode / clear the selection |
+
+<a id="en-reading"></a>
+
+### Reading the map
+
+The view changes with the zoom level:
+
+| View | What you see |
+|---|---|
+| Galaxy | Databases, schemas and bundles of relationships between schemas (the number on a line = relationship count) |
+| Constellation | Tables become stars: size = number of links, colour = schema. The lines of the selected table show crow's feet and column names. |
+| Close-up | Tables become cards; lines attach directly to the FK and PK column rows. |
+
+<img src="docs/images/en/secim-ve-panel.png" alt="A selected table, its highlighted relationships and the detail panel" width="900">
+
+The detail panel lists:
+- the columns and their comments
+- the file and line where the table is defined
+- a plain-language reading of every relationship, such as *"Every INVOICE record belongs to exactly one BILLING_ACCOUNT record. A BILLING_ACCOUNT record can have zero or many INVOICE records."*
+
+**Focus mode** keeps only the neighbours one or two steps away from the selected table and dims everything else.
+
+<img src="docs/images/en/yakin-plan.png" alt="Close-up: lines attached to column rows, with crow's foot ends" width="900">
+
+#### Crow's foot
+
+The mark at the end of a line tells how many records can exist on that side. The mark next to the table is the upper bound; the outer one is the lower bound.
+
+| Mark | Meaning | How it is derived from the schema |
+|---|---|---|
+| `──‖` | exactly one | FK column is `NOT NULL`; owner of an embedded document |
+| `──○┼` | zero or one | FK column is nullable, or the FK is also a PK/UNIQUE (1:1) |
+| `──○<` | zero or many | default for the table holding the FK; arrays of ObjectIds |
+| `──┼<` | one or many | DDL cannot enforce it (it needs a trigger or application rule), so it is never drawn |
+
+#### Lines, stars and tags
+
+| Line | Meaning |
+|---|---|
+| Solid | Declared foreign key or Mongoose `ref` |
+| Dashed | Inferred relationship (see below); can be turned off in the toolbar |
+| Dotted | Disabled FK (`DISABLE`, `RELY DISABLE NOVALIDATE`, T-SQL `NOCHECK`) |
+| Dash-dot | MongoDB embedded document: the sub-document lives inside its owner |
+
+| Star | Meaning |
+|---|---|
+| Filled star | Table; size = number of links, colour = schema |
+| Ring | Junction table (M:N): its PK is made of two FKs, or it is a pure link table |
+| Small faded star | Satellite: an embedded MongoDB sub-document, placed next to its owner |
+| Dashed ring | Referenced by an FK but not defined in the files |
+
+On cards, **PK** marks a primary key, **FK** a foreign key and **CK** a Cassandra clustering key. A faded column name means the column is nullable.
+
+**Constellations.** A small schema is one constellation. Large schemas are split by table-name prefix (`CUSTOMER_*`, `INVOICE_*`) and by links. Each star gets a Bayer-style designation by brightness within its constellation (`α Billing`, `β Billing`). The layout is deterministic: the same files always give the same map.
+
+**Inferred relationships** are drawn dashed in two cases:
+- No FK is declared, but the column name equals another table's primary key: `CDR.SUBSCRIPTION_ID` → `SUBSCRIPTION.SUBSCRIPTION_ID`.
+- An `X_ID` / `xId` column points to a table X whose key is `ID` or `_id`: `orders.customerId` → `customers._id`.
+
+They are not drawn when the types disagree or when there is more than one candidate.
+
+<a id="en-multi-file"></a>
+
+### Multiple files and migrations
+
+All files are merged into one model and names are resolved at the end. So these cases just work:
+- an FK in one file pointing to a table in another
+- `constraints.sql` sorting before `ddl.sql`
+
+The **N files** link in the bottom-right corner opens the file list. There you can:
+- include or exclude individual files
+- see each file's dialect and table count
+- turn on "separate database"
+
+**Reading order** follows the conventions of migration tools:
+
+| Tool | Files | Behaviour |
+|---|---|---|
+| Flyway | `V1__init.sql`, `V1_1__x.sql`, `V2__y.sql` | By version number (V10 after V2). `R__*.sql` last, `U*__` undo scripts skipped. |
+| golang-migrate, dbmate | `000001_x.up.sql` | `.down.sql` skipped. |
+| Timestamped | `20240115093000_x.sql` | By time. |
+| Numbered / other | `01_tables.sql`, `a2.sql < a10.sql` | Natural name order. |
+
+Migrations are applied from first to last, and the map shows the **final state** of the schema. These statements are applied:
+- `RENAME TO`, `RENAME COLUMN`
+- `DROP TABLE`, `DROP COLUMN`, `DROP CONSTRAINT`
+- `ALTER COLUMN … TYPE`, `MODIFY`, `CHANGE`
+- T-SQL `sp_rename`, MySQL `RENAME TABLE`
+
+**Separate databases.** When files of different dialects are opened together (for example orders in MySQL, a catalogue in MongoDB and reporting in PostgreSQL), each folder is drawn as its own galaxy.
+
+<img src="docs/images/en/coklu-veritabani.png" alt="Three databases drawn as three galaxies" width="900">
+
+<a id="en-databases"></a>
+
+### Supported databases
+
+| | Oracle | SQL Server | MySQL / MariaDB | PostgreSQL | SQLite | Cassandra |
+|---|---|---|---|---|---|---|
+| `CREATE TABLE`, inline and table-level constraints | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ `PRIMARY KEY ((a, b), c)` |
+| `ALTER TABLE … ADD CONSTRAINT` | ✓ | ✓ `WITH CHECK/NOCHECK` | ✓ | ✓ `ONLY` | | |
+| Column changes | `MODIFY` | `ALTER COLUMN` | `MODIFY`, `CHANGE` | `ALTER COLUMN … TYPE` | | |
+| Renames and drops | `RENAME`, `DROP` | `sp_rename`, `DROP` | `RENAME TABLE`, `DROP` | `RENAME`, `DROP` | `RENAME`, `DROP` | |
+| `CREATE UNIQUE INDEX` (1:1 detection) | ✓ | ✓ | ✓ | ✓ | ✓ | |
+| Table / column comments | `COMMENT ON` | `sp_addextendedproperty` | `COMMENT '…'` | `COMMENT ON` | | |
+
+**Not drawn.** Views, sequences, triggers, packages, procedures, functions, types, grants and `INSERT`s are counted in the report but not drawn. The parser does not trip over the `;` inside them:
+- PL/SQL blocks are kept whole up to the `/` line.
+- T-SQL blocks are kept whole up to the `GO` line.
+- MySQL blocks are kept whole up to the `DELIMITER` mark.
+
+**Also handled:**
+- SQL\*Plus commands
+- Oracle storage and partition clauses
+- PostgreSQL `$$` bodies and `PARTITION OF` children
+- CQL `//` comments and `map<text, int>` types
+
+**Encoding.** Files may be UTF-8, UTF-16 (the SSMS default) or Windows-1254; the encoding is detected automatically.
+
+<a id="en-mongodb"></a>
+
+### MongoDB
+
+MongoDB has no DDL. The schema is taken from three sources; a collection that appears in several of them is merged into one table.
+
+| Source | Example | What is read |
+|---|---|---|
+| mongosh scripts (`.js`) | `db.createCollection('x', { validator: { $jsonSchema } })`, `collMod`, `createIndex(…, { unique })` | Fields, types, required fields, descriptions, `enum` values |
+| Mongoose models (`.js`, `.ts`) | `new Schema({ author: { type: ObjectId, ref: 'User' } })` | Fields and `ref` relationships. Collection names follow Mongoose's pluralisation rules. |
+| Sample documents (`.json`, `.jsonl`, `.ndjson`) | `mongoexport` output | Union of fields across the first 5,000 documents; Extended JSON (`$oid`, `$date`) |
+
+Embedded objects and arrays of objects become **satellite** tables (`users.profile`, `orders.items`) placed next to their owner.
+
+<img src="docs/images/en/mongodb-uydular.png" alt="MongoDB: collections, satellite sub-documents and inferred relationships" width="900">
+
+<a id="en-samples"></a>
+
+### Samples
+
+The samples under `samples/` are **synthetic**: they do not belong to any real organisation. Each imitates the typical structure of a sector and the real export format of a tool. Open them from the **Samples** menu.
+
+| Sample | Database | Scenario |
+|---|---|---|
+| Small telecom | Oracle | 20 tables, embedded in the app |
+| Telecom BSS/OSS | Oracle | SQL Developer dump in one file: 318 tables, 16 schemas, partitions, triggers, packages |
+| Telecom, one file per schema | Oracle | The same schema split into 16 files; all FKs in the final file |
+| Core banking | SQL Server | SSMS "Generate Scripts": UTF-16, `GO`, `IDENTITY`, descriptions |
+| Insurance (legacy system) | Oracle | A folder per module, Turkish names, no FKs at all |
+| Marketplace e-commerce | MySQL | `mysqldump --no-data`, a `DELIMITER` procedure |
+| Hospital information system | PostgreSQL | OMOP CDM layout: tables, PKs, FKs, indexes and comments in separate files |
+| Logistics / parcel delivery | PostgreSQL | Flyway, 14 versions: renamed and dropped tables, partitioning |
+| IoT telemetry | Cassandra | Two keyspaces, table-per-query design |
+| Social network | MongoDB | `$jsonSchema` + Mongoose + `mongoexport` |
+| Field service mobile app | SQLite | `sqlite3 .dump`, offline cache |
+| Polyglot e-commerce | MySQL + MongoDB + PostgreSQL | Microservices, one galaxy per folder |
+
+<a id="en-export"></a>
+
+### Exporting a schema
+
+| Database | How |
+|---|---|
+| Oracle, SQL Developer | *Tools → Database Export*, DDL only. The "separate files per object type" output can be opened as a folder. |
+| Oracle, SQL\*Plus / SQLcl | The `DBMS_METADATA` script below |
+| SQL Server | SSMS → database → *Tasks → Generate Scripts* (schema only) |
+| MySQL / MariaDB | `mysqldump --no-data mydb > schema.sql` |
+| PostgreSQL | `pg_dump --schema-only mydb > schema.sql` |
+| SQLite | `sqlite3 app.db .schema > schema.sql` |
+| Cassandra | `cqlsh -e "DESCRIBE KEYSPACE telemetry" > schema.cql` |
+| MongoDB | Validator scripts, the Mongoose models folder, or `mongoexport --limit 1000` output |
+
+For projects that use migrations, open the `db/migration` folder as it is.
+
+```sql
+-- Oracle: DDL and comments from the data dictionary
+SET LONG 20000000 LONGCHUNKSIZE 20000000 PAGESIZE 0 LINESIZE 32767 TRIMSPOOL ON FEEDBACK OFF
+EXEC DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM, 'SQLTERMINATOR', TRUE);
+EXEC DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM, 'SEGMENT_ATTRIBUTES', FALSE);
+SPOOL schema.sql
+SELECT DBMS_METADATA.GET_DDL('TABLE', table_name, owner) FROM all_tables WHERE owner IN ('CRM', 'BILLING');
+SELECT DBMS_METADATA.GET_DEPENDENT_DDL('COMMENT', table_name, owner) FROM all_tables t
+ WHERE owner IN ('CRM', 'BILLING')
+   AND (EXISTS (SELECT 1 FROM all_tab_comments c WHERE c.owner = t.owner AND c.table_name = t.table_name AND c.comments IS NOT NULL)
+     OR EXISTS (SELECT 1 FROM all_col_comments c WHERE c.owner = t.owner AND c.table_name = t.table_name AND c.comments IS NOT NULL));
+SPOOL OFF
+```
+
+<a id="en-language"></a>
+
+### Language
+
+The interface is available in Turkish and English. On first visit Turkish is chosen if the system language is Turkish, English otherwise. Switch with the **TR / EN** buttons in the top-right corner; the choice is remembered in the browser. Use `?lang=tr` or `?lang=en` to pin the language in a link.
+
+**Shareable links.** URL parameters open a sample, a table and a zoom level directly:
+
+```
+index.html?lang=en&sample=telekom&select=BILLING_ACCOUNT&zoom=0.9&legend=0
+```
+
+<a id="en-development"></a>
+
+### Project layout and development
+
+```
+index.html          page shell, legend
+style.css           styles
+js/                 loaded in this order; each file adds to the globalThis.sqlSchema namespace
+  i18n.js           Turkish / English dictionaries, language selection
+  lexer.js          tokenizer, statement splitter, dialect detection
+  sql-parser.js     DDL → ordered operation list (create, fk, rename, drop ...)
+  mongo.js          the same operation list from $jsonSchema, Mongoose and JSON documents
+  files.js          file ordering (Flyway, golang-migrate), parser selection
+  model.js          applies operations: tables, relationships, cardinality, junctions, inference
+  layout.js         database → schema → constellation → star, hierarchical force layout
+  sample-small.js   embedded small sample
+  render.js         canvas drawing, camera, crow's feet
+  ui.js             loading, file list, search, panel, report, URL parameters
+samples/            synthetic samples and catalog.js (generated)
+tools/              sample and screenshot generators, sector definitions
+tests/run.js        checks every sample, parser edge cases and translations
+docs/images/        README images (tr/ and en/)
+```
+
+Development commands (Node 18+, no dependencies):
+
+```bash
+node tests/run.js                                  # tests
+node tools/gen-samples.js                          # regenerate samples/
+node tools/screenshots.js http://localhost:8000/   # refresh README images (needs Chrome)
+```
+
+The parser, model and layout never touch the DOM and can be `require`d in Node. `window.sqlSchema` is exposed for inspection in the console:
+
+```js
+sqlSchema.S.model.tables.filter(t => t.junction).map(t => t.name)
+sqlSchema.loadText('CREATE TABLE a (id int PRIMARY KEY);', 'test.sql')
+```
+
+<a id="en-limitations"></a>
+
+### Limitations
+
+- Views and relationships expressed only through views are not drawn.
+- Inferred relationships rely on column names only; schemas with inconsistent naming can produce missing or extra links. In MongoDB, fields such as `authorId` that do not match a collection name are not linked.
+- `CREATE TABLE … AS SELECT` tables appear without columns.
+- When a MongoDB schema comes from sample documents, only fields seen in those documents are listed.
+- Dynamic Mongoose schemas built from variables (`new Schema(buildFields())`) are not read.
+
+<a id="en-contributing"></a>
+
+### Contributing, security, license
+
+- Contribution guide: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Code of conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- Reporting a vulnerability: [SECURITY.md](SECURITY.md)
+- Changelog: [CHANGELOG.md](CHANGELOG.md)
+- Project guide for AI coding agents: [AGENTS.md](AGENTS.md)
+
+When reporting a bug, please do not share a schema that belongs to a real organisation; renaming the tables is enough.
+
+Released under the [MIT](LICENSE) license.
+
+<p align="right"><a href="#en">↑ back to top</a></p>
