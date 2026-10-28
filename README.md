@@ -38,12 +38,13 @@ draw.io kadar elle uğraştırmaz, veri modelleme aracı kadar ağır değildir.
 4. [Birden fazla dosya ve migration](#tr-coklu-dosya)
 5. [Desteklenen veritabanları](#tr-veritabanlari)
 6. [MongoDB](#tr-mongodb)
-7. [Örnekler](#tr-ornekler)
-8. [Şemayı dışa aktarmak](#tr-disa-aktarma)
-9. [Dil](#tr-dil)
-10. [Proje yapısı ve geliştirme](#tr-gelistirme)
-11. [Sınırlar](#tr-sinirlar)
-12. [Katkı, güvenlik, lisans](#tr-katki)
+7. [Adlandırma profili](#tr-adlandirma)
+8. [Örnekler](#tr-ornekler)
+9. [Şemayı dışa aktarmak](#tr-disa-aktarma)
+10. [Dil](#tr-dil)
+11. [Proje yapısı ve geliştirme](#tr-gelistirme)
+12. [Sınırlar](#tr-sinirlar)
+13. [Katkı, güvenlik, lisans](#tr-katki)
 
 <a id="tr-one-cikanlar"></a>
 
@@ -55,6 +56,7 @@ draw.io kadar elle uğraştırmaz, veri modelleme aracı kadar ağır değildir.
 - **Tek dosya, birden fazla dosya ya da bütün bir klasör:** bölünmüş dökümler, migration klasörleri (Flyway, golang-migrate), çok veritabanlı projeler.
 - **Karga ayağı notasyonu:** kardinalite `NOT NULL`, `UNIQUE` ve PK bilgisinden çıkarılır.
 - **Tahmini ilişkiler:** FK tanımlı olmayan eski sistemlerde, Cassandra'da ve MongoDB'de bağlantılar kolon adlarından bulunur.
+- **Adlandırma profili:** şemada hangi adlandırma kalıplarının ne oranda kullanıldığını ve baskın kalıba uymayan tabloları gösterir.
 - **Ölçek:** 2 862 tabloluk 4,7 MB'lık bir döküm yaklaşık 0,6 saniyede açılır, bir karenin çizimi 10 ms'nin altında kalır.
 - **Türkçe ve İngilizce arayüz.**
 
@@ -216,6 +218,36 @@ Gömülü nesneler ve nesne dizileri, sahibinin yanında duran **uydu** tablolar
 
 <img src="docs/images/tr/mongodb-uydular.png" alt="MongoDB: koleksiyonlar, uydu alt belgeler ve tahmini ilişkiler" width="900">
 
+<a id="tr-adlandirma"></a>
+
+### Adlandırma profili
+
+Ekipte yazılı bir adlandırma standardı yoksa ilk adım, şemada fiilen ne kullanıldığını görmektir. Sağ alttaki **adlandırma** bağlantısı adları şu boyutlarda sayar ve oranlarıyla gösterir:
+
+| Boyut | Kalıplar |
+|---|---|
+| Tablo ve kolon adı harf düzeni | `BÜYÜK_HARF`, `küçük_harf`, `PascalCase`, `camelCase` |
+| Birincil anahtar adı | `ID`, `<TABLO>_ID`, `<TABLO>_NO / _KOD`, tablo adıyla ilgisiz |
+| Yabancı anahtar kolonu | `<HEDEF>_ID`, `<HEDEF>_NO / _KOD`, rol önekli (`GONDEREN_MUSTERI_ID`), hedefin PK adıyla aynı, kuralsız (`CHZ_REF`) |
+| Tablo adı | tekil / çoğul (tahmini), `TBL_` gibi önekler |
+| Karakterler ve uzunluk | Türkçe / ASCII dışı karakter, 30 karakteri aşan adlar |
+
+- Her boyutta **baskın kalıp** ve ona **uymayanlar** listelenir. Listedeki bir ada tıklamak tabloyu seçer.
+- **Kapsam** seçimiyle profil tek bir şema için hesaplanır. Böylece hangi modülün hangi alışkanlıkla yazıldığı ayrılır.
+- **Tutarlılık** puanı, her boyutta baskın kalıba uyan adların ortalama oranıdır.
+- **Markdown indir** profili ekiple paylaşmak için bir dosyaya yazar.
+
+Araç bir kural dayatmaz: `ID` mi `<TABLO>_ID` mi doğru, buna ekip karar verir.
+
+**Orana katılmayanlar:**
+- Bileşik PK'ler, PK'si üst tablodan gelen 1:1 tablolar ve PK'siz tablolar. Bunlar ayrıca gösterilir.
+- Tahmini ilişkiler: zaten ada dayandıkları için yalnızca tanımlı FK'ler sayılır.
+- MongoDB koleksiyonlarının `_id` ve `ref` alanları.
+
+<img src="docs/images/tr/adlandirma-profili.png" alt="Adlandırma profili: PK, FK ve harf düzeni kalıpları, oranları ve baskın kalıba uymayanlar" width="900">
+
+**Karışık adlandırma** örneği bu özellik için hazırlanmıştır: iki ekibin farklı alışkanlıklarla tablo eklediği bir Oracle şeması.
+
 <a id="tr-ornekler"></a>
 
 ### Örnekler
@@ -236,6 +268,7 @@ Gömülü nesneler ve nesne dizileri, sahibinin yanında duran **uydu** tablolar
 | Sosyal medya | MongoDB | `$jsonSchema` + Mongoose + `mongoexport` |
 | Saha servisi mobil uygulaması | SQLite | `sqlite3 .dump`, çevrimdışı önbellek |
 | Çok veritabanlı e-ticaret | MySQL + MongoDB + PostgreSQL | Mikroservisler, her klasör ayrı galaksi |
+| Karışık adlandırma | Oracle | İki ekip, iki alışkanlık: PK `ID` ve `<TABLO>_ID`, kuralsız FK'ler, ORM tabloları |
 
 <a id="tr-disa-aktarma"></a>
 
@@ -280,6 +313,8 @@ Arayüz Türkçe ve İngilizcedir. İlk açılışta sistem dili Türkçe ise T�
 index.html?lang=tr&sample=telekom&select=BILLING_ACCOUNT&zoom=0.9&legend=0
 ```
 
+Açılışta bir pencere göstermek için `pop=naming`, `pop=report` ya da `pop=files` eklenir.
+
 <a id="tr-gelistirme"></a>
 
 ### Proje yapısı ve geliştirme
@@ -295,6 +330,7 @@ js/                 tarayıcıda bu sırayla yüklenir; hepsi globalThis.sqlSche
   files.js          dosya sıralama (Flyway, golang-migrate), ayrıştırıcı seçimi
   model.js          işlemleri uygular: tablolar, ilişkiler, kardinalite, ara tablo, tahmini ilişki
   layout.js         veritabanı → şema → takımyıldız → yıldız, hiyerarşik kuvvet yerleşimi
+  conventions.js    adlandırma profili: kalıplar, oranlar, baskın kalıba uymayanlar
   sample-small.js   gömülü küçük örnek
   render.js         canvas çizimi, kamera, karga ayağı
   ui.js             yükleme, dosya listesi, arama, panel, rapor, URL parametreleri
@@ -312,7 +348,7 @@ node tools/gen-samples.js                          # samples/ klasörünü yenid
 node tools/screenshots.js http://localhost:8000/   # README görüntülerini yeniler (Chrome gerekir)
 ```
 
-Ayrıştırıcı, model ve yerleşim DOM'a dokunmaz; Node'da `require` edilebilir. Konsoldan inceleme için `window.sqlSchema` açıktır:
+Ayrıştırıcı, model, yerleşim ve adlandırma profili DOM'a dokunmaz; Node'da `require` edilebilir. Konsoldan inceleme için `window.sqlSchema` açıktır:
 
 ```js
 sqlSchema.S.model.tables.filter(t => t.junction).map(t => t.name)
@@ -368,12 +404,13 @@ It is less manual than draw.io and lighter than a data-modelling tool. The goal 
 4. [Multiple files and migrations](#en-multi-file)
 5. [Supported databases](#en-databases)
 6. [MongoDB](#en-mongodb)
-7. [Samples](#en-samples)
-8. [Exporting a schema](#en-export)
-9. [Language](#en-language)
-10. [Project layout and development](#en-development)
-11. [Limitations](#en-limitations)
-12. [Contributing, security, license](#en-contributing)
+7. [Naming profile](#en-naming)
+8. [Samples](#en-samples)
+9. [Exporting a schema](#en-export)
+10. [Language](#en-language)
+11. [Project layout and development](#en-development)
+12. [Limitations](#en-limitations)
+13. [Contributing, security, license](#en-contributing)
 
 <a id="en-highlights"></a>
 
@@ -385,6 +422,7 @@ It is less manual than draw.io and lighter than a data-modelling tool. The goal 
 - **One file, many files or a whole folder:** split dumps, migration folders (Flyway, golang-migrate), multi-database projects.
 - **Crow's foot notation:** cardinality is derived from `NOT NULL`, `UNIQUE` and primary keys.
 - **Inferred relationships:** links are found from column names in legacy systems without FKs, in Cassandra and in MongoDB.
+- **Naming profile:** shows which naming patterns the schema uses, in what proportion, and which tables depart from the dominant pattern.
 - **Scale:** a 4.7 MB dump with 2,862 tables opens in about 0.6 s, and a frame draws in under 10 ms.
 - **Turkish and English interface.**
 
@@ -548,6 +586,36 @@ Embedded objects and arrays of objects become **satellite** tables (`users.profi
 
 <img src="docs/images/en/mongodb-uydular.png" alt="MongoDB: collections, satellite sub-documents and inferred relationships" width="900">
 
+<a id="en-naming"></a>
+
+### Naming profile
+
+When a team has no written naming standard, the first step is to see what the schema actually uses. The **naming** link in the bottom-right corner counts names along these dimensions and shows their shares:
+
+| Dimension | Patterns |
+|---|---|
+| Table and column name case | `UPPER_SNAKE`, `lower_snake`, `PascalCase`, `camelCase` |
+| Primary key name | `ID`, `<TABLE>_ID`, `<TABLE>_NO / _CODE`, unrelated to the table name |
+| Foreign key column | `<TARGET>_ID`, `<TARGET>_NO / _CODE`, role prefix (`SENDER_CUSTOMER_ID`), same as the target PK, irregular (`CHZ_REF`) |
+| Table name | singular / plural (estimated), prefixes such as `TBL_` |
+| Characters and length | Turkish / non-ASCII characters, names longer than 30 characters |
+
+- Each dimension lists the **dominant pattern** and the names that **do not follow it**. Clicking a name selects its table.
+- **Scope** computes the profile for a single schema, which separates the habits of different modules.
+- The **consistency** score is the average share of names that follow the dominant pattern in each dimension.
+- **Download Markdown** writes the profile to a file to share with the team.
+
+The tool imposes no rule: whether `ID` or `<TABLE>_ID` is right is the team's decision.
+
+**Not counted in the shares:**
+- Composite PKs, 1:1 tables whose PK comes from the parent, and tables without a PK. These are shown separately.
+- Inferred relationships: only declared FKs are counted, because inferred ones are already based on names.
+- The `_id` and `ref` fields of MongoDB collections.
+
+<img src="docs/images/en/adlandirma-profili.png" alt="Naming profile: PK, FK and case patterns with their shares and the names that depart from the dominant pattern" width="900">
+
+The **Mixed naming** sample was made for this feature: an Oracle schema to which two teams added tables with different habits.
+
 <a id="en-samples"></a>
 
 ### Samples
@@ -568,6 +636,7 @@ The samples under `samples/` are **synthetic**: they do not belong to any real o
 | Social network | MongoDB | `$jsonSchema` + Mongoose + `mongoexport` |
 | Field service mobile app | SQLite | `sqlite3 .dump`, offline cache |
 | Polyglot e-commerce | MySQL + MongoDB + PostgreSQL | Microservices, one galaxy per folder |
+| Mixed naming | Oracle | Two teams, two habits: PK `ID` and `<TABLE>_ID`, irregular FKs, ORM tables |
 
 <a id="en-export"></a>
 
@@ -612,6 +681,8 @@ The interface is available in Turkish and English. On first visit Turkish is cho
 index.html?lang=en&sample=telekom&select=BILLING_ACCOUNT&zoom=0.9&legend=0
 ```
 
+Add `pop=naming`, `pop=report` or `pop=files` to open a window on load.
+
 <a id="en-development"></a>
 
 ### Project layout and development
@@ -627,6 +698,7 @@ js/                 loaded in this order; each file adds to the globalThis.sqlSc
   files.js          file ordering (Flyway, golang-migrate), parser selection
   model.js          applies operations: tables, relationships, cardinality, junctions, inference
   layout.js         database → schema → constellation → star, hierarchical force layout
+  conventions.js    naming profile: patterns, shares, names that depart from the dominant pattern
   sample-small.js   embedded small sample
   render.js         canvas drawing, camera, crow's feet
   ui.js             loading, file list, search, panel, report, URL parameters
@@ -644,7 +716,7 @@ node tools/gen-samples.js                          # regenerate samples/
 node tools/screenshots.js http://localhost:8000/   # refresh README images (needs Chrome)
 ```
 
-The parser, model and layout never touch the DOM and can be `require`d in Node. `window.sqlSchema` is exposed for inspection in the console:
+The parser, model, layout and naming profile never touch the DOM and can be `require`d in Node. `window.sqlSchema` is exposed for inspection in the console:
 
 ```js
 sqlSchema.S.model.tables.filter(t => t.junction).map(t => t.name)

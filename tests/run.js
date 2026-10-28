@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'files', 'model', 'layout', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
+for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'files', 'model', 'layout', 'conventions', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
 require(path.join(ROOT, 'samples', 'catalog.js'));
 const NS = globalThis.sqlSchema;
 
@@ -47,6 +47,9 @@ function loadSample(s) {
 }
 
 const find = (m, name) => m.tables.find(t => t.name === name);
+// Adlandırma profilinde bir boyutun kova sayıları: { id: 11, tableId: 9 } (sıfırlar atlanır)
+const dim = (p, id) => Object.fromEntries(p.dims.find(d => d.id === id).buckets.filter(b => b.n).map(b => [b.key, b.n]));
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const rel = (m, child, col, parent, kind) => m.rels.find(r => r.child.name === child && r.cols.includes(col) && (!parent || r.parent.name === parent) && (!kind || r.kind === kind));
 const cols = t => t.columns.map(c => c.name);
 
@@ -94,6 +97,9 @@ const EXPECT = {
     check('banka: AML alarmı → işlem (tahmini)', rel(m, 'Alert', 'TransactionId', 'Transaction', 'implicit'));
     check('banka: ara tablo RolePermission', find(m, 'RolePermission').junction);
     check('banka: görünüm ve yordam atlandı', m.stats.skipped.some(([k]) => k === 'CREATE VIEW') && m.stats.skipped.some(([k]) => k === 'CREATE PROCEDURE'));
+    const p = NS.namingProfile(m);
+    check('banka: adlandırma tek stil (PascalCase, <Tablo>Id)', p.dims.find(d => d.id === 'tableCase').share === 1 && p.dims.find(d => d.id === 'pkStyle').dominant === 'tableId', p.dims.map(d => d.dominant));
+    check('banka: 1:1 alt tabloların PK\'si sapma sayılmaz', dim(p, 'pkStyle').shared === 6 && !dim(p, 'pkStyle').other, dim(p, 'pkStyle'));
   },
   sigorta({ model: m }) {
     check('sigorta: hiç FK yok', m.stats.fk === 0, m.stats.fk);
@@ -108,6 +114,8 @@ const EXPECT = {
     check('eticaret: arama kaydı → kullanıcı (tahmini)', rel(m, 'search_logs', 'user_id', 'users', 'implicit'));
     check('eticaret: kategori kendine bağlı', rel(m, 'categories', 'parent_id', 'categories').self);
     check('eticaret: satıcı 1:1 kullanıcı', rel(m, 'sellers', 'user_id', 'users').childEnd === 'zeroOne');
+    const p = NS.namingProfile(m);
+    check('eticaret: adlandırma snake_case, PK id, çoğul', same(dim(p, 'pkStyle'), { id: 35, composite: 5 }) && p.dims.find(d => d.id === 'tableNumber').dominant === 'plural' && p.dims.find(d => d.id === 'columnCase').share === 1);
   },
   saglik({ model: m }) {
     check('saglik: PostgreSQL tanındı', m.stats.dialects.includes('postgres'), m.stats.dialects);
@@ -163,6 +171,21 @@ const EXPECT = {
     check('polyglot: üç lehçe', m.stats.dialects.length === 3, m.stats.dialects);
     check('polyglot: veritabanları arası ilişki yok', !m.rels.some(r => r.child.db !== r.parent.db));
   },
+  karisik({ model: m }) {
+    const p = NS.namingProfile(m);
+    check('karisik: 24 tablo, 26 FK', p.tables === 24 && p.fks === 26, [p.tables, p.fks]);
+    check('karisik: PK %50 ID, %40.9 <TABLO>_ID', same(dim(p, 'pkStyle'), { id: 11, tableId: 9, tableOther: 1, other: 1, composite: 2 }), dim(p, 'pkStyle'));
+    check('karisik: PK baskın stil ID', p.dims.find(d => d.id === 'pkStyle').dominant === 'id');
+    check('karisik: FK stilleri', same(dim(p, 'fkStyle'), { targetId: 19, targetOther: 2, role: 2, other: 3 }), dim(p, 'fkStyle'));
+    const irregular = p.dims.find(d => d.id === 'fkStyle').buckets.find(b => b.key === 'other').items.map(i => i.c).sort();
+    check('karisik: kuralsız FK\'ler bulundu', same(irregular, ['CHZ_REF', 'DEVICE_REF', 'SAHIBI']), irregular);
+    check('karisik: ORM tabloları PascalCase', same(dim(p, 'tableCase'), { upperSnake: 22, pascal: 2 }) && dim(p, 'columnCase').pascal === 7, [dim(p, 'tableCase'), dim(p, 'columnCase')]);
+    check('karisik: Türkçe çoğul, TBL_ öneki', same(dim(p, 'tableNumber'), { singular: 23, plural: 1 }) && same(dim(p, 'prefix'), { plain: 23, prefixed: 1 }));
+    check('karisik: ASCII dışı ve 30+ karakter adlar', dim(p, 'charset').nonAscii === 3 && dim(p, 'length').long === 1, [dim(p, 'charset'), dim(p, 'length')]);
+    const env = NS.namingProfile(m, { filter: t => t.schema === 'ENVANTER' }), saha = NS.namingProfile(m, { filter: t => t.schema === 'SAHA' });
+    check('karisik: şema bazında ENVANTER <TABLO>_ID, SAHA ID', env.dims.find(d => d.id === 'pkStyle').dominant === 'tableId' && saha.dims.find(d => d.id === 'pkStyle').dominant === 'id');
+    check('karisik: SAHA\'da eski alışkanlıkla açılan tablo', same(saha.dims.find(d => d.id === 'pkStyle').outliers.map(i => i.t.name), ['ABONE']));
+  },
 };
 
 const all = {};
@@ -191,6 +214,17 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   check('sp_rename tabloyu yeniden adlandırır', !!find(m4, 'New') && !find(m4, 'Old'));
 }
 
+// Adlandırma sınıflandırıcıları
+{
+  const cases = { CUSTOMER_ORDER: 'upperSnake', ID: 'upperSnake', 'SÖZLEŞME': 'upperSnake', order_lines: 'lowerSnake', OrderLine: 'pascal', Id: 'pascal', orderLine: 'camel', Order_Line: 'mixed', 'Order Line': 'mixed' };
+  const wrong = Object.entries(cases).filter(([n, c]) => NS.caseOf(n) !== c).map(([n]) => [n, NS.caseOf(n)]);
+  check('harf düzeni sınıflandırması', !wrong.length, wrong);
+  const plural = ['users', 'categories', 'addresses', 'RANDEVULAR', 'KALEMLER', 'OrderItems', 'AYARLAR'];
+  const single = ['STATUS', 'ADDRESS', 'ANALYSIS', 'SMS', 'Biller', 'SELLER', 'HANDLER', 'DEALER', 'CUSTOMER', 'MALZEME'];
+  const bad = plural.filter(n => !NS.isPlural(n)).concat(single.filter(n => NS.isPlural(n)));
+  check('çoğul tahmini', !bad.length, bad);
+}
+
 // Dil desteği: iki sözlük aynı anahtarlara sahip, HTML ve kodda kullanılan her anahtar tanımlı
 {
   const tr = new Set(NS.i18nKeys('tr')), en = new Set(NS.i18nKeys('en'));
@@ -207,6 +241,13 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   // 'skip_' + kod biçimindeki dinamik anahtarlar: files.js ve ui.js'teki bütün atlama kodları
   used.delete('skip_');
   for (const code of ['config', 'ext', 'down', 'undo', 'tooBig', 'total']) used.add('skip_' + code);
+  // adlandırma profilinin boyut ('nd_' + boyut) ve kova ('nk_' + boyut + '_' + kova) anahtarları
+  used.delete('nd_');
+  used.delete('nk_');
+  for (const d of NS.namingProfile(all.kucuk.model).dims) {
+    used.add('nd_' + d.id);
+    for (const b of d.buckets) used.add('nk_' + d.id + '_' + b.key);
+  }
   const missing = [...used].filter(k => !en.has(k) || !tr.has(k));
   check('i18n: kullanılan her anahtar iki dilde de var', !missing.length, missing);
   check('i18n: Node ortamında varsayılan dil seçildi', NS.LANGS.includes(NS.getLang()), NS.getLang());

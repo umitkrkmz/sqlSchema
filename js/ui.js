@@ -5,6 +5,7 @@
  *
  * URL parametreleri (paylaşılabilir bağlantılar ve belge görüntüleri için):
  *   ?lang=tr|en   ?sample=<örnek kimliği>   ?select=<tablo adı>   ?zoom=<1.6>   ?legend=0|1
+ *   ?pop=naming|report|files   (örnekle birlikte: açılışta gösterilecek pencere)
  */
 (function (NS) {
 'use strict';
@@ -13,7 +14,7 @@ const {
   S, $, canvas, CARD, DIALECTS, t,
   levelOf, wx, wy, starR, cardRows, keyTag, schemaColor, schemaLabel, groupLabel, relStyle, relVisible,
   drawGlyph, refreshEmphasis, invalidate, draw, resetHud, resize, fitView, zoomAt, flyToTable,
-  classify, orderFiles, parseFile, databaseNames, harmonizeDialects, buildModel, layoutModel,
+  classify, orderFiles, parseFile, databaseNames, harmonizeDialects, buildModel, layoutModel, namingProfile,
 } = NS;
 
 const MAX_FILE = 60 * 1024 * 1024;
@@ -77,6 +78,7 @@ function rebuild() {
   refreshEmphasis();
   renderPanel();
   renderReport();
+  renderNaming();
   renderFiles();
   resetHud();
   document.body.classList.add('loaded');
@@ -296,6 +298,107 @@ function renderReport() {
     ${list('rOrphans', st.orphans.slice(0, 30).map(o => `<li><span>${esc(o.text)}</span><b>${esc(o.where)}</b></li>`))}
     ${list('rSkipped', st.skipped.map(([k, v]) => `<li><span>${esc(k)}</span><b>${v}</b></li>`))}
     ${list('rErrors', st.errors.slice(0, 20).map(e => `<li><span>${esc(e.file ? baseName(e.file) + ':' : t('line') + ' ')}${e.line}</span><b>${esc(e.message)}</b></li>`))}`;
+}
+
+/* ─── Adlandırma profili ─── */
+
+const schemaKey = s => s.db.name + '|' + s.name;
+const scopeLabel = s => (S.lay.dbs.length > 1 ? s.db.label + ' / ' : '') + schemaLabel(s);
+const fmtPct = n => t('pct', { n: n.toLocaleString(NS.getLang(), { maximumFractionDigits: 1 }) });
+const bucketLabel = (d, b, lim) => t('nk_' + d.id + '_' + b.key, { n: lim });
+// Örnek ve sapan adlar: TABLO.KOLON, FK'de hedefle birlikte; şema yalnızca birden fazla şema varsa yazılır
+function itemName(it) {
+  const tb = it.t;
+  const base = (S.lay.schemas.length > 1 && tb.schema ? tb.schema + '.' : '') + tb.name + (it.c ? '.' + it.c : '');
+  return it.ref ? base + ' → ' + it.ref.name : base;
+}
+
+function currentProfile() {
+  const scope = S.lay.schemas.find(s => schemaKey(s) === S.namingScope);
+  if (!scope) S.namingScope = '';
+  return { scope, profile: namingProfile(S.model, scope ? { filter: tb => tb.schemaRef === scope } : {}) };
+}
+
+function renderNaming() {
+  const el = $('#namingPop');
+  const { profile: p } = currentProfile();
+  const scopes = S.lay.schemas.filter(s => s.tables.some(tb => !tb.external && !tb.embedded));
+  const scopeSel = scopes.length > 1 ? `<label class="scope">${esc(t('namingScope'))}
+    <select id="namingScope"><option value="">${esc(t('namingAll'))}</option>${scopes.map(s => `<option value="${esc(schemaKey(s))}" ${schemaKey(s) === S.namingScope ? 'selected' : ''}>${esc(scopeLabel(s))} (${s.tables.length})</option>`).join('')}</select></label>` : '';
+  const dims = p.dims.map(d => {
+    const counted = d.buckets.filter(b => !b.neutral && b.n);
+    const neutral = d.buckets.filter(b => b.neutral && b.n);
+    if (!d.total) {
+      const why = d.id === 'fkStyle' ? 'namingNoFk' : d.id === 'pkStyle' ? 'namingNoPk' : 'namingEmpty';
+      return `<section class="nd"><h5>${esc(t('nd_' + d.id))}</h5><p class="nn">${esc(t(why))}</p></section>`;
+    }
+    const color = new Map(d.buckets.filter(b => !b.neutral).map((b, i) => [b.key, i]));
+    const bar = counted.map(b => `<i class="c${color.get(b.key)}" style="width:${b.n * 100 / d.total}%"></i>`).join('');
+    const rows = counted.map(b => {
+      const dom = b.key === d.dominant;
+      return `<li class="${dom ? 'dom' : ''}" ${b.items[0] ? `data-go="${esc(b.items[0].t.key)}" data-col="${esc(b.items[0].c || '')}"` : ''}>
+        <i class="sw c${color.get(b.key)}"></i><span class="nl">${esc(bucketLabel(d, b, p.nameLimit))}${dom && counted.length > 1 ? ` <em>${esc(t('namingDominant'))}</em>` : ''}</span>
+        <span class="ex" title="${esc(itemName(b.items[0]))}">${esc(itemName(b.items[0]))}</span><b>${esc(fmtPct(b.pct))}</b><b>${b.n}</b></li>`;
+    }).join('');
+    const extra = neutral.length ? `<p class="nn">${esc(t('namingNotCounted'))}: ${neutral.map(b => `${esc(bucketLabel(d, b, p.nameLimit))} ${b.n}`).join(' · ')}</p>` : '';
+    const MAX = 60;
+    const outs = d.outliers.length ? `<details><summary>${esc(t('namingOutliers', { n: d.outliers.length }))}</summary><ul class="no">${d.outliers.slice(0, MAX).map(it => `<li data-go="${esc(it.t.key)}" data-col="${esc(it.c || '')}" tabindex="0">${esc(itemName(it))}</li>`).join('')}${d.outliers.length > MAX ? `<li class="more">${esc(t('namingMore', { n: d.outliers.length - MAX }))}</li>` : ''}</ul></details>` : '';
+    return `<section class="nd"><h5>${esc(t('nd_' + d.id))}</h5><div class="nbar">${bar}</div><ul class="nb">${rows}</ul>${extra}${outs}</section>`;
+  }).join('');
+  el.innerHTML = `
+    <h4>${esc(t('namingTitle'))}</h4>
+    <p class="intro">${esc(t('namingIntro'))}</p>
+    ${scopeSel}
+    <div class="nscore" title="${esc(t('namingScoreTitle'))}"><span>${esc(t('namingScore'))}</span><strong>${p.score == null ? '–' : esc(fmtPct(p.score))}</strong><small>${esc(t('namingCounts', p))}</small></div>
+    ${p.tables ? dims : `<p class="nn">${esc(t('namingEmpty'))}</p>`}
+    <button class="btn sm ghost" data-act="naming-md" title="${esc(t('namingMdTitle'))}">${esc(t('namingMd'))}</button>`;
+}
+
+$('#namingPop').addEventListener('change', e => {
+  if (e.target.id !== 'namingScope') return;
+  S.namingScope = e.target.value;
+  renderNaming();
+});
+$('#namingPop').addEventListener('click', e => {
+  const li = e.target.closest('li[data-go]');
+  if (!li) return;
+  const tb = S.model.tables.find(x => x.key === li.dataset.go);
+  if (tb) select(tb, { fly: true, col: li.dataset.col || null });
+});
+$('#namingPop').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.matches('li[data-go]')) e.target.click();
+});
+
+// Ekiple paylaşmak için: standart tartışmasının başlangıç belgesi
+function namingMarkdown() {
+  const { scope, profile: p } = currentProfile();
+  // <TABLO>_ID gibi etiketler kaçışlanmazsa GitHub onları HTML etiketi sanıp gizler
+  const cell = s => String(s).replace(/\|/g, '\\|').replace(/</g, '\\<');
+  const code = s => '`' + String(s).replace(/`/g, "'") + '`';
+  const out = [`# ${t('namingTitle')} · ${S.title || ''}${scope ? ' · ' + scopeLabel(scope) : ''}`, ''];
+  out.push(`**${t('namingScore')}:** ${p.score == null ? '–' : fmtPct(p.score)} · ${t('namingCounts', p)}`, '', `> ${t('namingIntro')}`, '');
+  for (const d of p.dims) {
+    out.push(`## ${t('nd_' + d.id)}`, '');
+    if (!d.total) { out.push(t(d.id === 'fkStyle' ? 'namingNoFk' : d.id === 'pkStyle' ? 'namingNoPk' : 'namingEmpty'), ''); continue; }
+    out.push(`| ${t('namingPattern')} | ${t('namingShare')} | ${t('namingCount')} | ${t('namingExample')} |`, '|---|---:|---:|---|');
+    for (const b of d.buckets.filter(x => !x.neutral && x.n)) {
+      const dom = b.key === d.dominant && d.buckets.filter(x => !x.neutral && x.n).length > 1 ? ` (${t('namingDominant')})` : '';
+      out.push(`| ${cell(bucketLabel(d, b, p.nameLimit))}${dom} | ${fmtPct(b.pct)} | ${b.n} | ${code(itemName(b.items[0]))} |`);
+    }
+    out.push('');
+    const neutral = d.buckets.filter(b => b.neutral && b.n);
+    if (neutral.length) out.push(`${t('namingNotCounted')}: ${neutral.map(b => `${bucketLabel(d, b, p.nameLimit)} ${b.n}`).join(' · ')}`, '');
+    if (d.outliers.length) out.push(`**${t('namingOutliers', { n: d.outliers.length })}:** ${d.outliers.map(it => code(itemName(it))).join(', ')}`, '');
+  }
+  return out.join('\n');
+}
+
+function downloadText(text, name, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
 /* ─── Seçim ve vurgu ─── */
@@ -607,7 +710,7 @@ let appendNext = false;
 fileInput.addEventListener('change', () => { loadEntries(fromInput(fileInput), appendNext); appendNext = false; fileInput.value = ''; });
 folderInput.addEventListener('change', () => { loadEntries(fromInput(folderInput), false); folderInput.value = ''; });
 
-const popovers = ['#sampleMenu', '#report', '#filesPop'];
+const popovers = ['#sampleMenu', '#report', '#filesPop', '#namingPop'];
 function togglePop(sel) {
   for (const p of popovers) $(p).hidden = p === sel ? !$(p).hidden : true;
 }
@@ -629,6 +732,8 @@ document.addEventListener('click', e => {
     case 'png': exportPng(); break;
     case 'report': togglePop('#report'); break;
     case 'files': togglePop('#filesPop'); break;
+    case 'naming': togglePop('#namingPop'); break;
+    case 'naming-md': if (S.model) downloadText(namingMarkdown(), fileStem() + '-' + t('namingFile') + '.md', 'text/markdown;charset=utf-8'); break;
     case 'legend':
       document.body.classList.toggle('legend-closed');
       try { localStorage.setItem('sqlschema.legend', document.body.classList.contains('legend-closed') ? '0' : '1'); } catch (err) { /* depolama kapalı */ }
@@ -659,6 +764,8 @@ window.addEventListener('drop', e => {
   dropEntries(e.dataTransfer).then(list => loadEntries(list, false)).catch(dropFailed);
 });
 
+const fileStem = () => (S.title || 'schema').replace(/[\\/]+$/, '').replace(/\.[^.]+$/, '').replace(/[^\w\-\u{C0}-\u{24F}]+/gu, '_');
+
 function exportPng() {
   if (!S.model) return;
   draw();
@@ -666,7 +773,7 @@ function exportPng() {
     if (!blob) return;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = (S.title || 'schema').replace(/[\\/]+$/, '').replace(/\.[^.]+$/, '').replace(/[^\w\-\u{C0}-\u{24F}]+/gu, '_') + '.png';
+    a.download = fileStem() + '.png';
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }, 'image/png');
@@ -694,6 +801,7 @@ NS.onLangChange(() => {
     for (const tb of S.model.tables) tb._lw = 0;   // etiket genişlikleri yeniden ölçülür
     renderPanel();
     renderReport();
+    renderNaming();
     renderFiles();
     resetHud();
   }
@@ -742,6 +850,8 @@ if (params.get('sample')) {
     } else if (zoom > 0) {
       S.cam.k = zoom;
     }
+    const pop = { naming: '#namingPop', report: '#report', files: '#filesPop' }[params.get('pop')];
+    if (pop) togglePop(pop);
     invalidate();
   });
 }

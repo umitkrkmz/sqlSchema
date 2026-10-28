@@ -241,5 +241,22 @@
       "sector": "E-commerce",
       "scenario": "Microservices: each folder is a separate database (galaxy). Orders in MySQL, catalog in MongoDB, reporting in a PostgreSQL star schema."
     }
+  },
+  {
+    "id": "karisik",
+    "title": "Karışık adlandırma",
+    "sector": "Telekom saha ve envanter",
+    "dialect": "Oracle",
+    "scenario": "İki ekip, iki alışkanlık: ENVANTER'de PK <TABLO>_ID, SAHA'da ID. Kısaltılmış ve kuralsız FK'ler, ORM tabloları, Türkçe karakterli adlar. Adlandırma profilini denemek için.",
+    "files": [
+      "01_ENVANTER.sql",
+      "02_SAHA.sql",
+      "99_ref_constraints.sql"
+    ],
+    "en": {
+      "title": "Mixed naming",
+      "sector": "Telecom field service and inventory",
+      "scenario": "Two teams, two habits: PK <TABLE>_ID in ENVANTER, ID in SAHA. Abbreviated and irregular FKs, ORM tables, names with Turkish characters. For trying the naming profile."
+    }
   }
 ];

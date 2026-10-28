@@ -5,6 +5,15 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Eklendi · Added
+
+- **Adlandırma profili:** harf düzeni, PK ve FK adı kalıpları, tekil/çoğul, önek, ASCII dışı karakter ve ad uzunluğu için oranlar; baskın kalıp ve ona uymayanlar, şema bazında kapsam, tutarlılık puanı, Markdown olarak indirme.
+  Naming profile: shares of case, PK and FK name patterns, singular/plural, prefixes, non-ASCII characters and name length; the dominant pattern and the names that depart from it, per-schema scope, a consistency score and Markdown download.
+- **Örnek:** "Karışık adlandırma" (Oracle, iki ekibin farklı alışkanlıkları).
+  Sample: "Mixed naming" (Oracle, two teams with different habits).
+- **URL parametresi:** `pop=naming|report|files` açılışta bir pencere gösterir.
+  URL parameter: `pop=naming|report|files` opens a window on load.
+
 ## [0.1.0] - 2026-10-24
 
 İlk açık kaynak sürüm · First open-source release.
