@@ -258,5 +258,23 @@
       "sector": "Telecom field service and inventory",
       "scenario": "Two teams, two habits: PK <TABLE>_ID in ENVANTER, ID in SAHA. Abbreviated and irregular FKs, ORM tables, names with Turkish characters. For trying the naming profile."
     }
+  },
+  {
+    "id": "sozluk",
+    "title": "Sözlük ağırlıklı (genel kod tablosu)",
+    "sector": "Telekom CRM",
+    "dialect": "Oracle",
+    "scenario": "Bütün durum ve tip kodları tek bir SOZLUK tablosunda; 30'dan fazla kolon ona açıklamadaki @ref ... (TIP_ID = n) etiketiyle bağlı. Haritada çizgi yerine rozet olarak görünür.",
+    "files": [
+      "01_ORTAK.sql",
+      "02_CRM.sql",
+      "80_sozluk_tipleri.sql",
+      "99_ref_constraints.sql"
+    ],
+    "en": {
+      "title": "Lookup-heavy (generic code table)",
+      "sector": "Telecom CRM",
+      "scenario": "Every status and type code lives in a single SOZLUK table; more than 30 columns point to it through @ref ... (TIP_ID = n) tags in their comments. On the map they appear as badges instead of lines."
+    }
   }
 ];

@@ -4,7 +4,7 @@
  * URL parametreleri, işaretçi ve klavye.
  *
  * URL parametreleri (paylaşılabilir bağlantılar ve belge görüntüleri için):
- *   ?lang=tr|en   ?sample=<örnek kimliği>   ?select=<tablo adı>   ?zoom=<1.6>   ?legend=0|1
+ *   ?lang=tr|en   ?sample=<örnek kimliği>   ?select=<tablo adı>   ?center=<tablo adı>   ?zoom=<1.6>   ?legend=0|1
  *   ?pop=naming|report|files   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
  *   ?grouping=auto|file|name
  */
@@ -1002,11 +1002,12 @@ if (document.fonts && document.fonts.ready) {
 if (params.get('sample')) {
   loadSample(params.get('sample')).then(ok => {
     if (!ok || !S.model) return;
-    const name = (params.get('select') || '').toUpperCase();
-    const tb = name && S.model.tables.find(x => x.name.toUpperCase() === name);
+    const byName = p => { const n = (params.get(p) || '').toUpperCase(); return n && S.model.tables.find(x => x.name.toUpperCase() === n); };
+    const tb = byName('select') || byName('center');
     const zoom = Number(params.get('zoom'));
     if (tb) {
-      select(tb);
+      // ?center= seçmeden ortalar: vurgu ve panel olmadan bir bölgeyi göstermek için
+      if (params.get('select')) select(tb);
       const k = zoom > 0 ? zoom : Math.max(S.cam.k, 0.85);
       const offset = !$('#panel').hidden && S.w > 820 ? 190 : 0;
       S.anim = null;

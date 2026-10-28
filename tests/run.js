@@ -187,6 +187,18 @@ const EXPECT = {
     check('polyglot: üç lehçe', m.stats.dialects.length === 3, m.stats.dialects);
     check('polyglot: veritabanları arası ilişki yok', !m.rels.some(r => r.child.db !== r.parent.db));
   },
+  sozluk({ model: m }) {
+    const sz = find(m, 'SOZLUK');
+    check('sozluk: SOZLUK sözlük, SOZLUK_TIP değil', sz.dictionary && !find(m, 'SOZLUK_TIP').dictionary && m.stats.dictionaries === 1);
+    check('sozluk: 29 @ref, uyarı yok', m.stats.refs === 29 && !m.stats.warnings.length, [m.stats.refs, m.stats.warnings]);
+    check('sozluk: sözlüğe 31 bağlantı', m.rels.filter(r => r.dict).length === 31, m.rels.filter(r => r.dict).length);
+    const yontem = rel(m, 'ODEME', 'YONTEM_ID', 'SOZLUK');
+    check('sozluk: FK + @ref → koşullu FK', yontem && yontem.kind === 'fk' && yontem.filter === 'TIP_ID = 11' && yontem.dict, yontem && [yontem.kind, yontem.filter]);
+    const adres = rel(m, 'ADRES', 'ADRES_TIP_ID', 'SOZLUK');
+    check('sozluk: koşulsuz FK da sözlük bağlantısı', adres && adres.kind === 'fk' && !adres.filter && adres.dict);
+    check('sozluk: şemalı ve şemasız @ref aynı tabloya', rel(m, 'ABONE', 'DURUM_ID', 'SOZLUK', 'ref') && rel(m, 'ABONE', 'TIP_ID', 'SOZLUK', 'ref'));
+    check('sozluk: TIP_ID kolonları SOZLUK_TIP\'e tahmin edilmez', !m.rels.some(r => r.kind === 'implicit'), m.rels.filter(r => r.kind === 'implicit').map(r => r.child.name + '.' + r.cols[0]));
+  },
   karisik({ model: m }) {
     const p = NS.namingProfile(m);
     check('karisik: 25 tablo, 29 FK', p.tables === 25 && p.fks === 29, [p.tables, p.fks]);

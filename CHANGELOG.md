@@ -9,6 +9,10 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 - **Sözlük tabloları:** en az iki koşullu ilişkinin hedefi olan tablo (genel kod tablosu) sözlük sayılır. Ona giden çizgiler yerine kartta `→ SÖZLÜK` rozeti görünür, yerleşimi çekmez; panelde koşul başına kullanan kolonlar listelenir. Panelden elle açılıp kapatılır; **Görünüm → Sözlük bağlantılarını çiz** ile çizgiler geri gelir.
   Lookup tables: a table that is the target of at least two conditional relationships (a generic code table) counts as a lookup. Lines to it are replaced by a `→ LOOKUP` badge on the card and do not pull the layout; the panel lists the referencing columns per condition. Toggle it by hand in the panel; **View → Draw lookup links** brings the lines back.
+- **Örnek:** "Sözlük ağırlıklı (genel kod tablosu)": 30'dan fazla kolon tek bir SOZLUK tablosuna `@ref` ile bağlı.
+  Sample: "Lookup-heavy (generic code table)": more than 30 columns point to a single SOZLUK table with `@ref`.
+- **URL parametresi:** `center=TABLO` bir tabloyu seçmeden ortalar.
+  URL parameter: `center=TABLE` centres a table without selecting it.
 
 ## [0.3.1] - 2026-10-29
 

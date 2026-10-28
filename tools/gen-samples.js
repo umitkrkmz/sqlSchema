@@ -21,7 +21,7 @@ const fs = require('fs');
 const path = require('path');
 
 const OUT = path.join(__dirname, '..', 'samples');
-const SPECS = ['telekom', 'telekom-bolunmus', 'banka', 'sigorta', 'eticaret', 'saglik', 'lojistik', 'iot', 'sosyal', 'saha', 'polyglot', 'karisik'];
+const SPECS = ['telekom', 'telekom-bolunmus', 'banka', 'sigorta', 'eticaret', 'saglik', 'lojistik', 'iot', 'sosyal', 'saha', 'polyglot', 'karisik', 'sozluk'];
 
 /* ─── Tipler ─── */
 

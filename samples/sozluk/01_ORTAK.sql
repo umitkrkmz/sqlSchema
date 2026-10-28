@@ -1,0 +1,65 @@
+--------------------------------------------------------
+--  Dosya oluşturuldu - sqlSchema sentetik örneği
+--  Biçim: Oracle SQL Developer / DBMS_METADATA dışa aktarımı
+--  Gerçek bir kuruma ait değildir.
+--------------------------------------------------------
+SET DEFINE OFF;
+
+--------------------------------------------------------
+--  DDL for Table SOZLUK_TIP
+--------------------------------------------------------
+
+  CREATE TABLE "ORTAK"."SOZLUK_TIP"
+   (	"ID" NUMBER(5,0),
+	"AD" VARCHAR2(200 CHAR),
+	"ACIKLAMA" VARCHAR2(400 CHAR)
+   ) SEGMENT CREATION IMMEDIATE
+  PCTFREE 10 PCTUSED 40 INITRANS 1 MAXTRANS 255
+ NOCOMPRESS LOGGING
+  STORAGE(INITIAL 65536 NEXT 1048576 MINEXTENTS 1 MAXEXTENTS 2147483645
+  PCTINCREASE 0 FREELISTS 1 FREELIST GROUPS 1
+  BUFFER_POOL DEFAULT FLASH_CACHE DEFAULT CELL_FLASH_CACHE DEFAULT)
+  TABLESPACE "ORTAK_DATA" ;
+
+   COMMENT ON TABLE "ORTAK"."SOZLUK_TIP"  IS 'Sözlük tipleri (abone durumu, hat tipi, kanal...)';
+--------------------------------------------------------
+--  Constraints for Table SOZLUK_TIP
+--------------------------------------------------------
+  ALTER TABLE "ORTAK"."SOZLUK_TIP" MODIFY ("ID" NOT NULL ENABLE);
+  ALTER TABLE "ORTAK"."SOZLUK_TIP" MODIFY ("AD" NOT NULL ENABLE);
+  ALTER TABLE "ORTAK"."SOZLUK_TIP" ADD CONSTRAINT "PK_SOZLUK_TIP" PRIMARY KEY ("ID")
+  USING INDEX PCTFREE 10 INITRANS 2 MAXTRANS 255 COMPUTE STATISTICS
+  TABLESPACE "ORTAK_IDX"  ENABLE;
+
+--------------------------------------------------------
+--  DDL for Table SOZLUK
+--------------------------------------------------------
+
+  CREATE TABLE "ORTAK"."SOZLUK"
+   (	"ID" NUMBER(10,0),
+	"TIP_ID" NUMBER(5,0),
+	"KOD" VARCHAR2(30 CHAR),
+	"AD" VARCHAR2(200 CHAR),
+	"SIRA" NUMBER(5,0),
+	"AKTIF" CHAR(1 CHAR)
+   ) SEGMENT CREATION IMMEDIATE
+  PCTFREE 10 PCTUSED 40 INITRANS 1 MAXTRANS 255
+ NOCOMPRESS LOGGING
+  STORAGE(INITIAL 65536 NEXT 1048576 MINEXTENTS 1 MAXEXTENTS 2147483645
+  PCTINCREASE 0 FREELISTS 1 FREELIST GROUPS 1
+  BUFFER_POOL DEFAULT FLASH_CACHE DEFAULT CELL_FLASH_CACHE DEFAULT)
+  TABLESPACE "ORTAK_DATA" ;
+
+   COMMENT ON TABLE "ORTAK"."SOZLUK"  IS 'Genel kod tablosu: bütün durum ve tip kodları';
+--------------------------------------------------------
+--  Constraints for Table SOZLUK
+--------------------------------------------------------
+  ALTER TABLE "ORTAK"."SOZLUK" MODIFY ("ID" NOT NULL ENABLE);
+  ALTER TABLE "ORTAK"."SOZLUK" MODIFY ("TIP_ID" NOT NULL ENABLE);
+  ALTER TABLE "ORTAK"."SOZLUK" MODIFY ("KOD" NOT NULL ENABLE);
+  ALTER TABLE "ORTAK"."SOZLUK" MODIFY ("AD" NOT NULL ENABLE);
+  ALTER TABLE "ORTAK"."SOZLUK" MODIFY ("AKTIF" NOT NULL ENABLE);
+  ALTER TABLE "ORTAK"."SOZLUK" ADD CONSTRAINT "PK_SOZLUK" PRIMARY KEY ("ID")
+  USING INDEX PCTFREE 10 INITRANS 2 MAXTRANS 255 COMPUTE STATISTICS
+  TABLESPACE "ORTAK_IDX"  ENABLE;
+

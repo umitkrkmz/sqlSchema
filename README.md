@@ -180,6 +180,10 @@ Sigorta örneğinde durum kolonları genel kod tablosuna (`KOD_TABLO`) bu yolla 
 - **Elle seçim:** paneldeki **Sözlük olarak göster** / **Sözlük değil** düğmesi otomatik kararı değiştirir; seçim tarayıcıda hatırlanır.
 - **Çizgi olarak:** **Görünüm → Sözlük bağlantılarını çiz** ile çizgiler her zaman çizilir.
 
+<img src="docs/images/tr/sozluk-rozetleri.png" alt="Sözlük ağırlıklı örnek: SOZLUK tablosuna giden bağlantılar çizgi yerine kartlarda rozet olarak" width="900">
+
+**Sözlük ağırlıklı** örneğinde 30'dan fazla kolon tek bir `SOZLUK` tablosuna bağlıdır.
+
 <a id="tr-coklu-dosya"></a>
 
 ### Birden fazla dosya ve migration
@@ -316,6 +320,7 @@ Araç bir kural dayatmaz: `ID` mi `<TABLO>_ID` mi doğru, buna ekip karar verir.
 | Saha servisi mobil uygulaması | SQLite | `sqlite3 .dump`, çevrimdışı önbellek |
 | Çok veritabanlı e-ticaret | MySQL + MongoDB + PostgreSQL | Mikroservisler, her klasör ayrı galaksi |
 | Karışık adlandırma | Oracle | İki ekip, iki alışkanlık: PK `ID` ve `<TABLO>_ID`, kuralsız FK'ler, ORM tabloları |
+| Sözlük ağırlıklı | Oracle | Bütün kodlar tek bir `SOZLUK` tablosunda; 30'dan fazla kolon ona `@ref` ile bağlı |
 
 <a id="tr-disa-aktarma"></a>
 
@@ -360,7 +365,7 @@ Arayüz Türkçe ve İngilizcedir. İlk açılışta sistem dili Türkçe ise T�
 index.html?lang=tr&sample=telekom&select=BILLING_ACCOUNT&zoom=0.9&legend=0
 ```
 
-Açılışta bir pencere göstermek için `pop=naming`, `pop=report` ya da `pop=files` eklenir.
+Açılışta bir pencere göstermek için `pop=naming`, `pop=report` ya da `pop=files` eklenir. `center=TABLO` bir tabloyu seçmeden ortalar.
 
 <a id="tr-gelistirme"></a>
 
@@ -595,6 +600,10 @@ In the insurance sample, status columns point to the generic code table (`KOD_TA
 - **By hand:** the **Show as lookup table** / **Not a lookup table** button in the panel overrides the automatic choice; it is remembered in the browser.
 - **As lines:** **View → Draw lookup links** always draws the lines.
 
+<img src="docs/images/en/sozluk-rozetleri.png" alt="Lookup-heavy sample: links to the SOZLUK table shown as badges on the cards instead of lines" width="900">
+
+In the **Lookup-heavy** sample, more than 30 columns point to a single `SOZLUK` table.
+
 <a id="en-multi-file"></a>
 
 ### Multiple files and migrations
@@ -731,6 +740,7 @@ The samples under `samples/` are **synthetic**: they do not belong to any real o
 | Field service mobile app | SQLite | `sqlite3 .dump`, offline cache |
 | Polyglot e-commerce | MySQL + MongoDB + PostgreSQL | Microservices, one galaxy per folder |
 | Mixed naming | Oracle | Two teams, two habits: PK `ID` and `<TABLE>_ID`, irregular FKs, ORM tables |
+| Lookup-heavy | Oracle | Every code lives in a single `SOZLUK` table; more than 30 columns point to it with `@ref` |
 
 <a id="en-export"></a>
 
@@ -775,7 +785,7 @@ The interface is available in Turkish and English. On first visit Turkish is cho
 index.html?lang=en&sample=telekom&select=BILLING_ACCOUNT&zoom=0.9&legend=0
 ```
 
-Add `pop=naming`, `pop=report` or `pop=files` to open a window on load.
+Add `pop=naming`, `pop=report` or `pop=files` to open a window on load. `center=TABLE` centres a table without selecting it.
 
 <a id="en-development"></a>
 
