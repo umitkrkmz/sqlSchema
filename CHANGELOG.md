@@ -5,6 +5,11 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Değişti · Changed
+
+- **Dosya takımyıldızları daha belirgin:** aralarındaki boşluk büyüdü, her biri ince bir daireyle sınırlanır ve adı sınırın üstünde, yakın planda da görünür.
+  File constellations are more distinct: wider gaps between them, each outlined with a thin circle and named above the outline, also in the close-up.
+
 ## [0.3.0] - 2026-10-29
 
 ### Eklendi · Added

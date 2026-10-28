@@ -17,7 +17,9 @@ const L = {
   groupSmall: 40,   // bu sayıdan küçük şemalar tek takımyıldızdır
   groupMax: 70,     // bir takımyıldızdaki en fazla tablo
   groupPad: 110,
-  filePad: 300,     // dosya takımyıldızları arası: aralarında ilişki olsa da ayrı durmaları istenir
+  // Dosya takımyıldızları arası: aralarında ilişki olsa da ayrı durmaları istenir. Çakışma gidermeden sonra
+  // en az 0.6 × filePad boşluk kalır; bu, takımyıldız içindeki tablo aralığından (2 × nodeR) belirgin büyüktür.
+  filePad: 560,
   schemaPad: 240,
   dbPad: 700,
   // kat başına kuvvet ayarları (bkz. relax)

@@ -390,6 +390,18 @@ function drawRegions(lv, labels) {
         ctx.stroke();
         ctx.setLineDash([]);
       }
+      // dosya takımyıldızları: hangi tablonun hangi dosyadan geldiği bir bakışta görünsün
+      for (const g of s.groups) {
+        const gr = g.r * k;
+        if (!g.file || gr < 14) continue;
+        ctx.fillStyle = rgba(col, 0.03 * faded);
+        ctx.strokeStyle = rgba(col, 0.22 * faded);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(sx(g.x), sy(g.y), gr, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
       continue;
     }
     ctx.textAlign = 'center';
@@ -428,7 +440,22 @@ function drawRegions(lv, labels) {
       spaced(1.5);
       ctx.fillStyle = rgba('#b8c2e0', 0.32 * faded);
       ctx.textBaseline = 'bottom';
-      for (const g of s.groups) if (g.r * k > 60) ctx.fillText(groupLabel(g).toUpperCase(), sx(g.x), sy(g.y - g.r) + 4);
+      for (const g of s.groups) if (!g.file && g.r * k > 60) ctx.fillText(groupLabel(g).toUpperCase(), sx(g.x), sy(g.y - g.r) + 4);
+      spaced(0);
+    }
+    // dosya takımyıldızının adı sınırının üstünde, yakın planda da kalır
+    if (lv >= 1) {
+      ctx.font = `600 11px ${FONT_COND}`;
+      spaced(1.5);
+      ctx.textBaseline = 'bottom';
+      for (const g of s.groups) {
+        if (!g.file || g.r * k < 40) continue;
+        const name = groupLabel(g);
+        const gx = sx(g.x), gy = sy(g.y - g.r) - 5;
+        if (!grid.claim(gx, gy - 7, ctx.measureText(name).width + 8, 14)) continue;
+        ctx.fillStyle = rgba(col, 0.75 * faded);
+        ctx.fillText(name, gx, gy);
+      }
       spaced(0);
     }
   }

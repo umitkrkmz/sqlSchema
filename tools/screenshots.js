@@ -19,6 +19,7 @@ const SCENES = {
   'secim-ve-panel': 'sample=telekom&select=BILLING_ACCOUNT&zoom=0.9&legend=0',
   'yakin-plan': 'sample=kucuk&select=SUBSCRIPTION&zoom=1.7&legend=0',
   'coklu-veritabani': 'sample=polyglot&legend=0',
+  'dosya-takimyildizlari': 'sample=sigorta&legend=0',
   'mongodb-uydular': 'sample=sosyal&select=posts&zoom=0.75&legend=0',
   'adlandirma-profili': 'sample=karisik&pop=naming&legend=0',
 };

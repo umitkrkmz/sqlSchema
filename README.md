@@ -186,7 +186,12 @@ Sağ alttaki **N dosya** bağlantısı dosya listesini açar. Burada:
 - Her dosyanın lehçesini ve kaç tablo içerdiğini görürsünüz.
 - "Ayrı veritabanı" seçeneğini açabilirsiniz.
 
-**Dosya başına takımyıldız.** Bir şemanın tabloları birden fazla dosyadan geliyorsa, her dosyanın tabloları kendi takımyıldızında toplanır. Aralarında ilişki olsa da farklı dosyaların takımyıldızları birbirinden uzak durur. Ekipler modülleri çoğunlukla dosyalara ayırdığı için harita da bu ayrımı korur. Takımyıldızın adı dosya yolundan gelir; aynı adlı dosyalar klasörleriyle ayrılır (`POLICE/tablolar`, `HASAR/tablolar`).
+**Dosya başına takımyıldız.** Bir şemanın tabloları birden fazla dosyadan geliyorsa, her dosyanın tabloları kendi takımyıldızında toplanır. Ekipler modülleri çoğunlukla dosyalara ayırdığı için harita da bu ayrımı korur.
+- **Ayrı dururlar:** farklı dosyaların takımyıldızları, aralarında ilişki olsa da birbirinden açıkça uzak durur.
+- **Sınır ve ad:** her takımyıldız ince bir daireyle sınırlanır ve adı sınırın üstüne yazılır.
+- **Ad:** dosya yolundan gelir; aynı adlı dosyalar klasörleriyle ayrılır (`POLICE/tablolar`, `HASAR/tablolar`).
+
+<img src="docs/images/tr/dosya-takimyildizlari.png" alt="Sigorta örneği: tek şemada her modül dosyası kendi takımyıldızında" width="900">
 
 Migration klasörlerinde dosya bir modülü değil bir sürümü gösterir; orada ve MongoDB'de tablolar ad öneki ve ilişkiye göre gruplanır. **Görünüm → Takımyıldızlar** ile seçim elle değiştirilebilir: *Otomatik*, *Dosyaya göre* ya da *Ad ve ilişkiye göre*.
 
@@ -589,7 +594,12 @@ The **N files** link in the bottom-right corner opens the file list. There you c
 - see each file's dialect and table count
 - turn on "separate database"
 
-**One constellation per file.** When a schema's tables come from more than one file, each file's tables gather in their own constellation. Constellations of different files stay apart even when they are related. Teams usually split modules into files, so the map keeps that split. A constellation is named after its file path; files with the same name are told apart by their folders (`POLICE/tablolar`, `HASAR/tablolar`).
+**One constellation per file.** When a schema's tables come from more than one file, each file's tables gather in their own constellation. Teams usually split modules into files, so the map keeps that split.
+- **Kept apart:** constellations of different files stay clearly apart even when they are related.
+- **Boundary and name:** each constellation is outlined with a thin circle, with its name above the outline.
+- **Name:** taken from the file path; files with the same name are told apart by their folders (`POLICE/tablolar`, `HASAR/tablolar`).
+
+<img src="docs/images/en/dosya-takimyildizlari.png" alt="Insurance sample: each module file in its own constellation within one schema" width="900">
 
 In a migration folder a file is a version, not a module; there, and for MongoDB, tables are grouped by name prefix and relationships. **View → Constellations** changes the choice by hand: *Automatic*, *By file* or *By name and relationships*.
 
