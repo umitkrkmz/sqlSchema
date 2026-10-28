@@ -314,6 +314,13 @@ code, kbd { font-family: var(--mono); }
 .tag.t-off { color: var(--rose); border-color: rgba(239, 123, 134, 0.45); }
 .tag.t-ref { color: var(--accent); border-color: rgba(242, 180, 90, 0.5); }
 .rels .filter { color: var(--accent); }
+table.dict { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.dict td { padding: 5px 0; border-top: 1px solid var(--line); vertical-align: top; }
+table.dict tr:first-child td { border-top: 0; }
+table.dict td.df { width: 38%; padding-right: 8px; font: 11px var(--mono); color: var(--accent); overflow-wrap: anywhere; }
+table.dict td.df i { color: var(--dim); font-style: normal; }
+table.dict .dc { display: inline-block; margin: 0 4px 3px 0; padding: 1px 5px; border: 1px solid var(--line-2); border-radius: 4px; background: none; font: 10.5px var(--mono); color: #c3cbe2; cursor: pointer; }
+table.dict .dc:hover { border-color: var(--accent); color: var(--text); }
 .tag.t-emb { color: #a58cf2; border-color: rgba(165, 140, 242, 0.5); border-style: dashed; }
 .p-src { margin: 6px 0 0; font: 11px var(--mono); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .p-comment { margin: 8px 0 0; font-size: 13px; color: #c3cbe2; }

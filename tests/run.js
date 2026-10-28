@@ -114,6 +114,8 @@ const EXPECT = {
     check('sigorta: @ref ile sözlük tablosuna koşullu ilişki', pd && pd.refCols[0] === 'KOD' && pd.filter === "KOD_TIP = 'POLICE_DURUM'", pd && [pd.refCols, pd.filter]);
     check('sigorta: 4 @ref ilişkisi, uyarı yok', m.stats.refs === 4 && !m.stats.warnings.length, [m.stats.refs, m.stats.warnings]);
     check('sigorta: @ref PK\'ye (MUSTERI)', rel(m, 'HASAR_IHBAR', 'IHBAR_EDEN_MUSTERI_NO', 'MUSTERI', 'ref'));
+    check('sigorta: KOD_TABLO sözlük, MUSTERI değil', find(m, 'KOD_TABLO').dictionary && !find(m, 'MUSTERI').dictionary && m.stats.dictionaries === 1);
+    check('sigorta: sözlüğe giden ilişkiler işaretli', m.rels.filter(r => r.dict).length === 3 && !rel(m, 'HASAR_IHBAR', 'IHBAR_EDEN_MUSTERI_NO', 'MUSTERI', 'ref').dict);
     const labels = lay.schemas[0].groups.map(g => g.label).sort();
     check('sigorta: modül klasörü başına bir takımyıldız', same(labels, ['ACENTE/tablolar', 'HASAR/tablolar', 'ORTAK/tablolar', 'POLICE/tablolar', 'REASURANS/tablolar', 'TAHSILAT/tablolar', 'URUN/tablolar']), labels);
     check('sigorta: her tablo kendi dosyasının takımyıldızında', m.tables.every(t => t.group.file === t.src.file));
@@ -243,7 +245,16 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   check('FK varken @ref koşulu FK\'ye eklenir, çift ilişki olmaz', r2fk.length === 1 && r2fk[0].kind === 'fk' && r2fk[0].filter === 'grup = 3', r2fk.map(r => [r.kind, r.filter]));
   const r3 = one("CREATE TABLE ref.kod (id int PRIMARY KEY, deger varchar(10));\nCREATE TABLE app.x (id int PRIMARY KEY, kod_id int);\nCOMMENT ON COLUMN app.x.kod_id IS '@ref ref.kod.deger';");
   check('@ref ŞEMA.TABLO.KOLON', (rel(r3, 'x', 'kod_id', 'kod', 'ref') || {}).refCols + '' === 'deger');
-}
+
+  // Sözlük tablosu: en az iki koşullu ilişkinin hedefi; elle açılıp kapatılabilir
+  check('tek koşullu ilişki sözlük yapmaz', !find(r1, 'sozluk').dictionary);
+  const dsql = "CREATE TABLE sozluk (id int PRIMARY KEY, tip_id int);\nCREATE TABLE a (id int PRIMARY KEY, durum_id int, tur_id int, b_id int);\nCREATE TABLE b (id int PRIMARY KEY);\nCOMMENT ON COLUMN a.durum_id IS '@ref sozluk (tip_id = 1)';\nCOMMENT ON COLUMN a.tur_id IS '@ref sozluk (tip_id = 2)';";
+  const d1 = one(dsql);
+  check('iki koşullu ilişki sözlük yapar', find(d1, 'sozluk').dictionary && d1.rels.filter(r => r.dict).length === 2 && !rel(d1, 'a', 'b_id', 'b').dict);
+  const dm = (sql, map) => { const f = [{ path: 'x.sql', text: sql }]; return NS.buildModel(NS.orderFiles(f).files.map(x => ({ ...NS.parseFile(x.path, x.text), db: 'main' })), { dictionaries: map }); };
+  const off = dm(dsql, new Map([['main|.SOZLUK', false]]));
+  const on = dm(dsql, new Map([['main|.B', true]]));
+  check('sözlük elle kapatılır ve açılır', !find(off, 'sozluk').dictionary && !off.rels.some(r => r.dict) && find(on, 'b').dictionary && rel(on, 'a', 'b_id', 'b').dict, [find(off, 'sozluk').key]);}
 
 // Adlandırma sınıflandırıcıları
 {

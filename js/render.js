@@ -36,7 +36,7 @@ const S = {
   files: [], separate: false, model: null, lay: null, order: [], idx: null,
   cam: { x: 0, y: 0, k: 0.3 }, w: 0, h: 0, dpr: 1, kMin: 0.01,
   hover: null, sel: null, selCol: null, focus: 0,
-  implicit: true, grid: true, columns: true,
+  implicit: true, grid: true, columns: true, dictLines: false,
   em: { active: null, near: null, hiRels: null, focus: null },
   anim: null, frame: 0, title: '', parseMs: 0,
 };
@@ -101,6 +101,8 @@ function cardRows(t) {
   const ordered = t.columns.map((c, i) => [c, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(x => x[0]);
   t._rows = ordered.slice(0, CARD.maxRows);
   t._more = ordered.length - t._rows.length;
+  // kolon → bağlandığı sözlük tablosu (kartta tip yerine rozet)
+  t._dict = new Map(t.out.filter(r => r.dict && r.cols.length === 1).map(r => [r.cols[0].toUpperCase(), r.parent.name]));
   t._rowIdx = new Map(t._rows.map((c, i) => [c.name.toUpperCase(), i]));
   t._h = CARD.head + Math.max(1, t._rows.length) * CARD.row + (t._more > 0 ? CARD.row : 0) + CARD.pad;
   return t._rows;
@@ -505,6 +507,8 @@ function drawEdges(lv) {
     if (lv === 0 && r.child.schemaRef !== r.parent.schemaRef) continue;
     if (!relInView(r, v, m)) continue;
     const cls = relClass(r);
+    // sözlük bağlantıları rozetle gösterilir; çizgi yalnızca uçlardan biri seçili ya da üzerindeyken
+    if (r.dict && !S.dictLines && cls !== 'hi') continue;
     if (cls === 'hi') { hi.push(r); continue; }
     if (cls !== 'ghost') drawn.push(r);
     const key = relStyle(r) + '|' + cls;
@@ -573,7 +577,7 @@ function drawEdges(lv) {
 function drawBundles() {
   const pairs = new Map();
   for (const r of S.model.rels) {
-    if (!relVisible(r)) continue;
+    if (!relVisible(r) || (r.dict && !S.dictLines)) continue;
     const a = r.child.schemaRef, b = r.parent.schemaRef;
     if (a === b) continue;
     const key = a.index < b.index ? a.index + ',' + b.index : b.index + ',' + a.index;
@@ -805,8 +809,9 @@ function drawCards() {
       ctx.fillText(fitText(c.name, W * 0.54), x0 + 22 * k, y + 0.5);
       ctx.textAlign = 'right';
       ctx.font = `${7 * k}px ${FONT_MONO}`;
-      ctx.fillStyle = C.dim;
-      ctx.fillText(fitText(shortType(c.type), W * 0.3), x0 + W - 6 * k, y + 0.5);
+      const dict = !S.dictLines && t._dict.get(c.name.toUpperCase());
+      ctx.fillStyle = dict ? 'rgba(242,180,90,0.9)' : C.dim;
+      ctx.fillText(fitText(dict ? '→ ' + dict : shortType(c.type), W * 0.3), x0 + W - 6 * k, y + 0.5);
       y += rowH;
     }
     if (t._more > 0) {

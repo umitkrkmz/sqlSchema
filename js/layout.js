@@ -325,7 +325,8 @@ function packCircles(items, rels, keyOf, force, pad) {
 // opts.grouping: 'file' | 'name' (varsayılan 'name'; arayüz resolveGrouping ile seçer)
 function layoutModel(model, opts = {}) {
   const grouping = opts.grouping || 'name';
-  const rels = model.rels;
+  // Sözlük tablosuna giden ilişkiler yerleşimi çekmez: yoksa sözlük şemanın ortasına oturup öbürlerini sıkıştırır
+  const rels = model.rels.filter(r => !r.dict);
   const byDb = new Map();
   for (const t of model.tables) {
     if (!byDb.has(t.db)) byDb.set(t.db, new Map());

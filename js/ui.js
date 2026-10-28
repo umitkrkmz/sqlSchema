@@ -63,7 +63,7 @@ function rebuild() {
   const active = ordered.filter(f => f.include && f.result);
   const dbNames = databaseNames(active.map(f => f.path));
   const inputs = active.map(f => ({ ...f.result, db: S.separate ? dbNames.get(f.path) : 'main' }));
-  const model = buildModel(inputs);
+  const model = buildModel(inputs, { dictionaries: S.dictOverride });
   S.migration = migration;
   S.ordered = ordered;
   if (!model.tables.length) {
@@ -294,6 +294,7 @@ function renderReport() {
       ${row('rColumns', st.columns)}
       ${row('rFk', st.fk + (st.fkDisabled ? ` <span class="dim">${esc(t('rDisabled', { n: st.fkDisabled }))}</span>` : ''))}
       ${st.refs ? row('rRefs', st.refs) : ''}
+      ${st.dictionaries ? row('rDicts', st.dictionaries) : ''}
       ${row('rImplicit', st.implicit)}
       ${row('rJunctions', st.junctions)}
       ${row('rIndexes', `${st.indexes} / ${st.comments}`)}
@@ -533,6 +534,32 @@ function relItem(r, dir) {
   </li>`;
 }
 
+// "Sözlük olarak göster" düğmesi yalnızca sözlüğe benzeyen tablolarda çıkar: az kolon, çok gelen ilişki,
+// kendisi pek bir yere bağlanmıyor (durum, tip, kod tabloları). Zaten sözlükse ya da elle seçildiyse her zaman.
+function dictCandidate(tb) {
+  if (tb.external || tb.embedded) return false;
+  if (tb.dictionary || S.dictOverride.has(tb.key)) return true;
+  return tb.inc.filter(r => !r.self).length >= 3 && tb.columns.length <= 8 && tb.out.filter(r => !r.self).length <= 1;
+}
+
+// Sözlük tablosunun hangi koşulla (TIP_ID = 7) hangi kolonlarca kullanıldığı
+function dictUsage(tb) {
+  const by = new Map();
+  for (const r of tb.inc) {
+    if (!r.dict || !relVisible(r)) continue;
+    const k = r.filter || '';
+    if (!by.has(k)) by.set(k, []);
+    by.get(k).push(r);
+  }
+  if (!by.size) return '';
+  const n = [...by.values()].reduce((s, rs) => s + rs.length, 0);
+  const rows = [...by.entries()].sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true })).map(([f, rs]) => `<tr>
+    <td class="df">${f ? esc(f) : `<i>${esc(t('dictNoFilter'))}</i>`}</td>
+    <td>${rs.map(r => `<button class="dc" data-go="${esc(r.child.key)}" data-col="${esc(r.cols[0])}">${esc(r.child.name)}.${esc(r.cols[0])}</button>`).join('')}</td>
+  </tr>`).join('');
+  return `<section><h3>${esc(t('dictUsage'))} <span>${n}</span></h3><table class="dict"><tbody>${rows}</tbody></table></section>`;
+}
+
 function renderPanel() {
   const p = $('#panel');
   const tb = S.sel;
@@ -549,6 +576,7 @@ function renderPanel() {
     tb.embedded ? tag('t-emb', 'tagEmbedded') : '',
     tb.external ? tag('t-off', 'tagExternal') : '',
     !tb.external && !tb.embedded && !tb.pk.length ? tag('t-off', 'tagNoPk') : '',
+    tb.dictionary ? tag('t-ref', 'tagDict') : '',
     tb.noColumns ? '<span class="tag">AS SELECT</span>' : '',
     tb.dialect ? `<span class="tag">${esc(dialectName(tb.dialect))}</span>` : '',
   ].join('');
@@ -572,6 +600,7 @@ function renderPanel() {
       <div class="p-actions">
         <button class="btn sm ${S.focus ? '' : 'ghost'}" data-act="focus" title="${esc(t('focusTitle'))}">${esc(t('focus')[S.focus])}</button>
         <button class="btn sm ghost" data-act="zoom">${esc(t(mongo ? 'showFields' : 'showColumns'))}</button>
+        ${!dictCandidate(tb) ? '' : `<button class="btn sm ghost" data-act="dict" title="${esc(t('dictMarkTitle'))}">${esc(t(tb.dictionary ? 'dictUnmark' : 'dictMark'))}</button>`}
       </div>
     </div>
     <div class="p-body">
@@ -579,6 +608,7 @@ function renderPanel() {
         <h3>${esc(t(mongo ? 'fields' : 'columns'))} <span>${tb.columns.length}</span></h3>
         <table class="cols"><tbody>${rows || `<tr><td class="empty-row">${esc(t('noColumnInfo'))}</td></tr>`}</tbody></table>
       </section>
+      ${tb.dictionary ? dictUsage(tb) : ''}
       <section>
         <h3>${esc(t('outgoing'))} <span>${outs.length}</span></h3>
         <ul class="rels">${outs.map(r => relItem(r, 'out')).join('') || `<li class="none">${esc(t('noOutgoing'))}</li>`}</ul>
@@ -603,16 +633,17 @@ $('#panel').addEventListener('click', e => {
     else if (a === 'back') goHistory(S.histPos - 1);
     else if (a === 'fwd') goHistory(S.histPos + 1);
     else if (a === 'focus') { S.focus = (S.focus + 1) % 3; refreshEmphasis(); renderPanel(); invalidate(); }
+    else if (a === 'dict' && S.sel) toggleDictionary(S.sel);
     else if (a === 'zoom' && S.sel) {
       if (!S.columns) setColumns(true);   // düğme açıkça kolonları istiyor
       flyToTable(S.sel, Math.max(1.5, S.cam.k));
     }
     return;
   }
-  const li = e.target.closest('li[data-go]');
-  if (li) {
-    const tb = S.model.tables.find(x => x.key === li.dataset.go);
-    if (tb) select(tb, { fly: true });
+  const go = e.target.closest('[data-go]');
+  if (go) {
+    const tb = S.byKey.get(go.dataset.go);
+    if (tb) select(tb, { fly: true, col: go.dataset.col || null });
   }
 });
 $('#panel').addEventListener('keydown', e => {
@@ -829,6 +860,25 @@ $('#pasteDlg').addEventListener('close', () => {
 $('#tImplicit').addEventListener('change', e => { S.implicit = e.target.checked; refreshEmphasis(); renderPanel(); invalidate(); });
 $('#tGrid').addEventListener('change', e => { S.grid = e.target.checked; invalidate(); });
 $('#tColumns').addEventListener('change', e => setColumns(e.target.checked));
+$('#tDictLines').addEventListener('change', e => {
+  S.dictLines = e.target.checked;
+  if (S.model) for (const tb of S.model.tables) tb._rows = null;
+  try { localStorage.setItem('sqlschema.dictLines', S.dictLines ? '1' : '0'); } catch (err) { /* depolama kapalı */ }
+  invalidate();
+});
+
+// Sözlük tablosu seçimi elle değiştirilebilir; tablo anahtarına göre tarayıcıda hatırlanır
+function toggleDictionary(tb) {
+  S.dictOverride.set(tb.key, !tb.dictionary);
+  try { localStorage.setItem('sqlschema.dicts', JSON.stringify([...S.dictOverride])); } catch (err) { /* depolama kapalı */ }
+  const key = tb.key, cam = { ...S.cam };
+  rebuild();
+  S.anim = null;
+  S.cam = cam;
+  const again = S.byKey.get(key);
+  if (again) select(again);
+  invalidate();
+}
 // Takımyıldız gruplaması: 'auto' migration'da ada, değilse dosyaya göre (layout.js resolveGrouping)
 $('#viewMenu').addEventListener('change', e => {
   if (e.target.name !== 'grouping') return;
@@ -922,6 +972,13 @@ try {
   if (!['auto', 'file', 'name'].includes(grouping)) { try { grouping = localStorage.getItem('sqlschema.grouping'); } catch (err) { grouping = null; } }
   S.grouping = ['auto', 'file', 'name'].includes(grouping) ? grouping : 'auto';
   markGrouping();
+  S.dictOverride = new Map();
+  try {
+    const saved = JSON.parse(localStorage.getItem('sqlschema.dicts') || '[]');
+    if (Array.isArray(saved)) S.dictOverride = new Map(saved.filter(e => Array.isArray(e) && typeof e[1] === 'boolean'));
+    S.dictLines = localStorage.getItem('sqlschema.dictLines') === '1';
+  } catch (err) { /* depolama kapalı */ }
+  $('#tDictLines').checked = S.dictLines;
 }
 
 // Konsoldan inceleme için: sqlSchema.S.model.tables, sqlSchema.loadText(metin, 'ad.sql')

@@ -18,6 +18,10 @@
  *   @ref TABLO.KOLON               belli bir kolona (TABLO.KOLON yoksa ŞEMA.TABLO sayılır)
  *   @ref ŞEMA.TABLO.KOLON
  *   @ref SOZLUK.ID (TIP_ID = 7)    parantez içi koşul ilişkinin üstüne yazılır
+ *
+ * Sözlük tablosu: en az iki koşullu ilişkinin hedefi olan tablo (genel kod tablosu). t.dictionary ve
+ * ona giden ilişkilerde r.dict işaretlenir; harita bu çizgileri rozetle gösterir, yerleşim onları
+ * ağırlık saymaz. opts.dictionaries (tablo anahtarı → boolean) kullanıcının elle seçimidir.
  */
 (function (NS) {
 'use strict';
@@ -40,7 +44,7 @@ function typeFamily(type) {
   return 'other';
 }
 
-function buildModel(inputs) {
+function buildModel(inputs, opts = {}) {
   const U = s => String(s == null ? '' : s).toUpperCase();
   const tables = new Map();   // anahtar → tablo
   const byName = new Map();   // db|AD → [tablo]
@@ -361,6 +365,12 @@ function buildModel(inputs) {
   }
 
   const all = alive();
+  const condRefs = new Map();
+  for (const r of rels) if (r.filter && !r.self) condRefs.set(r.parent, (condRefs.get(r.parent) || 0) + 1);
+  for (const t of all) {
+    const forced = opts.dictionaries && opts.dictionaries.get(t.key);
+    t.dictionary = typeof forced === 'boolean' ? forced : (condRefs.get(t) || 0) >= 2;
+  }
   inferImplicit(all, rels, getCol, U);
 
   // Kardinalite ve komşuluk
@@ -383,6 +393,7 @@ function buildModel(inputs) {
       r.childEnd = r.oneToOne ? 'zeroOne' : 'zeroMany';
     }
     r.self = r.child === r.parent;
+    r.dict = !!r.parent.dictionary && !r.self && r.kind !== 'embed';
     r.child.out.push(r);
     r.parent.inc.push(r);
     if (r.kind !== 'embed') for (const c of cols) if (c) c.fk = true;
@@ -438,6 +449,7 @@ function buildModel(inputs) {
       fkDisabled: fkRels.filter(r => r.disabled).length,
       implicit: rels.filter(r => r.kind === 'implicit').length,
       refs: rels.filter(r => r.kind === 'ref').length,
+      dictionaries: all.filter(t => t.dictionary).length,
       embeds: rels.filter(r => r.kind === 'embed').length,
       junctions: all.filter(t => t.junction).length,
       indexes: inputs.reduce((s, i) => s + i.stats.indexes, 0),

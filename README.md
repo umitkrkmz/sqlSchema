@@ -101,7 +101,7 @@ Yakınlaştırma düzeyine göre üç görünüm vardır:
 | Takımyıldız | Tablolar yıldız olur: boyut = bağlantı sayısı, renk = şema. Seçili tablonun çizgilerinde karga ayağı ve kolon adı yazar. |
 | Yakın plan | Tablolar kart olur; çizgiler doğrudan FK ve PK kolon satırlarına bağlanır. |
 
-**Görünüm** menüsünde üç seçenek var: kolon ayrıntıları, tahmini ilişkiler ve ızgara. **Kolon ayrıntıları** kapatılınca (kısayolu `C`) yakın planda kartlar yalnızca tablo adını gösterir ve çizgiler kartın başlığına bağlanır. Böylece yalnızca tablolar ve ilişkileri kalır. Ayrıntı paneli kolonları göstermeye devam eder. Seçim tarayıcıda hatırlanır.
+**Görünüm** menüsünde kolon ayrıntıları, tahmini ilişkiler, sözlük bağlantıları, ızgara ve takımyıldız gruplaması seçenekleri var. **Kolon ayrıntıları** kapatılınca (kısayolu `C`) yakın planda kartlar yalnızca tablo adını gösterir ve çizgiler kartın başlığına bağlanır. Böylece yalnızca tablolar ve ilişkileri kalır. Ayrıntı paneli kolonları göstermeye devam eder. Seçim tarayıcıda hatırlanır.
 
 <img src="docs/images/tr/secim-ve-panel.png" alt="Seçili tablo, vurgulu ilişkileri ve ayrıntı paneli" width="900">
 
@@ -172,6 +172,13 @@ COMMENT ON COLUMN SESSION_LOG.USERID IS 'The user ID. @ref USERS';
 - **Hata:** bulunamayan bir hedef ayrıştırma raporunda uyarı olarak listelenir.
 
 Sigorta örneğinde durum kolonları genel kod tablosuna (`KOD_TABLO`) bu yolla bağlanır.
+
+**Sözlük tabloları.** Genel kod tablosuna yüzlerce kolon bağlandığında çizgiler haritayı boğar ve sözlük dev bir merkez olur. Bu yüzden en az iki **koşullu** ilişkinin hedefi olan tablo sözlük sayılır:
+- **Haritada:** ona giden çizgiler çizilmez. Kartta kolonun tipi yerine `→ KOD_TABLO` rozeti görünür. Çizgi yalnızca sözlük ya da bağlanan tablo seçilince ya da üzerine gelinince çizilir.
+- **Yerleşimde:** sözlük ilişkileri tabloları birbirine çekmez; sözlük şemanın ortasına oturup öbürlerini sıkıştırmaz.
+- **Panelde:** sözlük seçilince **Sözlük kullanımı** bölümü hangi koşulun hangi kolonlarca kullanıldığını listeler (`KOD_TIP = 'POLICE_DURUM'` → `POLICE.POLICE_DURUM`).
+- **Elle seçim:** paneldeki **Sözlük olarak göster** / **Sözlük değil** düğmesi otomatik kararı değiştirir; seçim tarayıcıda hatırlanır.
+- **Çizgi olarak:** **Görünüm → Sözlük bağlantılarını çiz** ile çizgiler her zaman çizilir.
 
 <a id="tr-coklu-dosya"></a>
 
@@ -507,7 +514,7 @@ The view changes with the zoom level:
 | Constellation | Tables become stars: size = number of links, colour = schema. The lines of the selected table show crow's feet and column names. |
 | Close-up | Tables become cards; lines attach directly to the FK and PK column rows. |
 
-The **View** menu has three options: column details, inferred relations and the grid. With **column details** off (shortcut `C`), close-up cards show only the table name and lines attach to the card header, leaving just tables and their relationships. The detail panel still lists the columns. The choice is remembered in the browser.
+The **View** menu holds the column details, inferred relations, lookup links, grid and constellation grouping options. With **column details** off (shortcut `C`), close-up cards show only the table name and lines attach to the card header, leaving just tables and their relationships. The detail panel still lists the columns. The choice is remembered in the browser.
 
 <img src="docs/images/en/secim-ve-panel.png" alt="A selected table, its highlighted relationships and the detail panel" width="900">
 
@@ -580,6 +587,13 @@ COMMENT ON COLUMN SESSION_LOG.USERID IS 'The user ID. @ref USERS';
 - **Errors:** a target that cannot be found is listed as a warning in the parse report.
 
 In the insurance sample, status columns point to the generic code table (`KOD_TABLO`) this way.
+
+**Lookup tables.** When hundreds of columns point to a generic code table, the lines swamp the map and the lookup becomes a giant hub. So a table that is the target of at least two **conditional** relationships counts as a lookup table:
+- **On the map:** lines to it are not drawn. On the card, a `→ KOD_TABLO` badge replaces the column type. The line is drawn only while the lookup or the referencing table is selected or hovered.
+- **In the layout:** lookup relationships do not pull tables together, so the lookup does not sit in the middle of the schema and squeeze the rest.
+- **In the panel:** selecting the lookup shows a **Lookup usage** section listing which columns use which condition (`KOD_TIP = 'POLICE_DURUM'` → `POLICE.POLICE_DURUM`).
+- **By hand:** the **Show as lookup table** / **Not a lookup table** button in the panel overrides the automatic choice; it is remembered in the browser.
+- **As lines:** **View → Draw lookup links** always draws the lines.
 
 <a id="en-multi-file"></a>
 
