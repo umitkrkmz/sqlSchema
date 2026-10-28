@@ -9,7 +9,15 @@
  *   'zeroMany' o<   sıfır ya da çok     FK'yi taşıyan tarafın varsayılanı
  *   'oneMany'  |<   bir ya da çok       DDL ile zorlanamaz; yalnızca lejantta
  *
- * İlişki türleri: 'fk' tanımlı, 'implicit' kolon adından tahmin, 'embed' MongoDB gömülü belge.
+ * İlişki türleri: 'fk' tanımlı, 'ref' kolon açıklamasındaki @ref etiketiyle tanımlı,
+ * 'implicit' kolon adından tahmin, 'embed' MongoDB gömülü belge.
+ *
+ * @ref etiketi, FK ile ifade edilemeyen ilişkiler içindir; en sık örneği genel sözlük tablosunun
+ * yalnızca bir tipine bağlanan kolonlardır. Açıklamanın herhangi bir yerinde:
+ *   @ref TABLO                     hedefin PK'sine
+ *   @ref TABLO.KOLON               belli bir kolona (TABLO.KOLON yoksa ŞEMA.TABLO sayılır)
+ *   @ref ŞEMA.TABLO.KOLON
+ *   @ref SOZLUK.ID (TIP_ID = 7)    parantez içi koşul ilişkinin üstüne yazılır
  */
 (function (NS) {
 'use strict';
@@ -18,6 +26,9 @@ const AUDIT_COL = /^(CREATED|CREATE|UPDATED|UPDATE|MODIFIED|MODIFY|INSERTED|INSE
 const ID_SUFFIX = /^(.+?)_?(ID|NO|NUM|CODE|CD|KEY)$/i;
 const IDS_SUFFIX = /^(.+?)_?IDS$/i;
 const LOOKUP_NAME = /(STATUS|TYPE|REASON|CATEGORY|CLASS|KIND|LEVEL|PRIORITY)S?$/i;
+const REF_PART = '(?:"[^"]+"|[\\p{L}\\p{N}_$#]+)';
+const REF_TAG = new RegExp(`@ref\\s+(${REF_PART}(?:\\.${REF_PART}){0,2})(?:\\s*\\(([^)]*)\\))?`, 'iu');
+const refParts = s => s.match(new RegExp(REF_PART, 'gu')).map(p => p.replace(/^"|"$/g, ''));
 
 function typeFamily(type) {
   const t = String(type || '').toUpperCase();
@@ -305,10 +316,38 @@ function buildModel(inputs) {
       });
     }
   }
+  // Açıklamadaki @ref etiketleri. Kolonda zaten FK varsa yalnızca koşulu ona eklenir.
+  for (const t of alive()) {
+    if (t.external) continue;
+    for (const c of t.columns) {
+      const m = c.comment && REF_TAG.exec(c.comment);
+      if (!m) continue;
+      const parts = refParts(m[1]);
+      let parent = null, col = null;
+      if (parts.length === 3) { parent = find(t.db, parts.slice(0, 2), t.schema); col = parts[2]; }
+      else if (parts.length === 2) {
+        const asTable = find(t.db, [parts[0]], t.schema);
+        if (asTable && getCol(asTable, parts[1])) { parent = asTable; col = parts[1]; }
+        else parent = find(t.db, parts, t.schema);
+      } else parent = find(t.db, parts, t.schema);
+      if (!parent || parent.dropped || (col && !getCol(parent, col)) || (!col && parent.pk.length !== 1)) {
+        warnings.push({ kind: 'ref', name: t.name + '.' + c.name, target: m[1] });
+        continue;
+      }
+      const refCol = col ? getCol(parent, col).name : parent.pk[0];
+      const filter = m[2] ? m[2].trim() : null;
+      const ex = rels.find(r => r.child === t && r.cols.length === 1 && U(r.cols[0]) === U(c.name) && r.parent === parent);
+      if (ex) { ex.filter = filter; continue; }
+      rels.push({
+        id: rels.length, kind: 'ref', child: t, parent, cols: [c.name], refCols: [refCol], filter,
+        name: null, disabled: false, onDelete: null, many: false, label: null, src: t.src,
+      });
+    }
+  }
   for (const st of states) {
     const t = find(st.db, st.t);
     for (const r of rels) {
-      if (t && r.child !== t) continue;
+      if ((t && r.child !== t) || r.kind !== 'fk') continue;
       if ((r.name && U(r.name) === U(st.name)) || U(st.name) === 'ALL') r.disabled = st.disabled;
     }
   }
@@ -398,6 +437,7 @@ function buildModel(inputs) {
       fk: fkRels.length,
       fkDisabled: fkRels.filter(r => r.disabled).length,
       implicit: rels.filter(r => r.kind === 'implicit').length,
+      refs: rels.filter(r => r.kind === 'ref').length,
       embeds: rels.filter(r => r.kind === 'embed').length,
       junctions: all.filter(t => t.junction).length,
       indexes: inputs.reduce((s, i) => s + i.stats.indexes, 0),

@@ -83,7 +83,7 @@
     "title": "Sigorta (eski sistem)",
     "sector": "Sigorta",
     "dialect": "Oracle",
-    "scenario": "Modül başına klasör, Türkçe adlar, elle yazılmış betikler ve hiç FK yok: ilişkiler yalnızca kolon adlarından tahmin edilir.",
+    "scenario": "Modül başına klasör, Türkçe adlar, elle yazılmış betikler ve hiç FK yok: ilişkiler kolon adlarından tahmin edilir. Durum kolonları genel kod tablosuna açıklamadaki @ref etiketiyle bağlanır.",
     "files": [
       "ACENTE/tablolar.sql",
       "HASAR/indeksler.sql",
@@ -101,7 +101,7 @@
     "en": {
       "title": "Insurance (legacy system)",
       "sector": "Insurance",
-      "scenario": "A folder per module, Turkish names, hand-written scripts and no FKs at all: relationships are inferred from column names only."
+      "scenario": "A folder per module, Turkish names, hand-written scripts and no FKs at all: relationships are inferred from column names. Status columns point to the generic code table through @ref tags in their comments."
     }
   },
   {

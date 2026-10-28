@@ -378,7 +378,7 @@ function layoutModel(model, opts = {}) {
       const ia = idx.get(a), ib = idx.get(b);
       if (ia === undefined || ib === undefined || ia === ib) continue;
       const k = ia < ib ? ia + ',' + ib : ib + ',' + ia;
-      lk.set(k, (lk.get(k) || 0) + (r.kind === 'fk' ? 1 : 0.6));
+      lk.set(k, (lk.get(k) || 0) + (r.kind === 'fk' || r.kind === 'ref' ? 1 : 0.6));
     }
     const links = [...lk.entries()].map(([k, w]) => { const [a, b] = k.split(',').map(Number); return [a, b, w]; });
     const p = relax(main.length, new Float64Array(main.length).fill(L.nodeR), links, { ...L.tableForce, spread: L.nodeR * 1.4 });

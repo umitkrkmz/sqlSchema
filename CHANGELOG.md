@@ -15,6 +15,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
   One constellation per file: with several files open, each file's tables gather in their own constellation and different files stay apart. Migration folders and MongoDB are grouped by name and relationships; change it in the View menu or with `?grouping=`.
 - **Gezinme geçmişi ve klavyeyle ilişki izleme:** panelin üstünde gezilen tabloların izi, `‹ ›` ve `Alt` + `←` / `→` ile geri/ileri; `↑` / `↓` ve `Enter` ile ilişkiler arasında dolaşma.
   Navigation history and keyboard relationship following: a trail of visited tables at the top of the panel, back/forward with `‹ ›` and `Alt` + `←` / `→`; move through relationships with `↑` / `↓` and `Enter`.
+- **Açıklamadan ilişki (`@ref`):** kolon açıklamasına yazılan `@ref TABLO`, `@ref TABLO.KOLON (KOŞUL)` etiketi FK ile tanımlanamayan ilişkileri (ör. genel sözlük tablosunun bir tipi) haritaya ekler; uzun kesikli çizgi, panelde koşul ve okunuş, bulunamayan hedef için rapor uyarısı.
+  Relationships from comments (`@ref`): a `@ref TABLE` or `@ref TABLE.COLUMN (CONDITION)` tag in a column comment adds relationships that cannot be declared as FKs (such as one type in a generic lookup table); drawn long-dashed, with the condition and reading in the panel and a report warning for missing targets.
 
 ## [0.2.1] - 2026-10-28
 

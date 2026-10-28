@@ -130,6 +130,7 @@ Ayrıntı panelinde kolonlar, açıklamalar, tanımın geçtiği dosya ve satır
 | Çizgi | Anlamı |
 |---|---|
 | Düz | Tanımlı yabancı anahtar ya da Mongoose `ref` |
+| Uzun kesikli | Kolon açıklamasındaki `@ref` etiketiyle tanımlı ilişki (aşağıya bakın) |
 | Kesikli | Tahmini ilişki (aşağıya bakın); **Görünüm** menüsünden kapatılabilir |
 | Noktalı | Devre dışı FK (`DISABLE`, `RELY DISABLE NOVALIDATE`, T-SQL `NOCHECK`) |
 | Kesik-noktalı | MongoDB gömülü belge: alt belge sahibinin içinde yaşar |
@@ -150,6 +151,27 @@ Kartlarda **PK** birincil anahtarı, **FK** yabancı anahtarı, **CK** Cassandra
 - `X_ID` / `xId` kolonu, PK'si `ID` ya da `_id` olan X tablosunu gösteriyor: `orders.customerId` → `customers._id`.
 
 Tipler uyuşmuyorsa ya da birden fazla aday varsa çizilmez.
+
+**Açıklamadan ilişki: `@ref`.** Bazı ilişkiler FK ile tanımlanamaz. En sık örnek, genel bir sözlük tablosunun (`SOZLUK`: `ID`, `TIP_ID`, `AD`) yalnızca bir tipine bağlanan kolonlardır. Veritabanı "yalnızca `TIP_ID = 7` olan satırlar" diye bir kısıt koyamaz. Bu ilişkiler kolon açıklamasına yazılan bir etiketle haritaya eklenir:
+
+```sql
+COMMENT ON COLUMN ABONE.DURUM_ID IS 'Abone durumu. @ref SOZLUK.ID (TIP_ID = 7)';
+COMMENT ON COLUMN SESSION_LOG.USERID IS 'The user ID. @ref USERS';
+```
+
+| Yazım | Anlamı |
+|---|---|
+| `@ref TABLO` | Hedefin birincil anahtarına |
+| `@ref TABLO.KOLON` | Hedefin belli bir kolonuna (`TABLO.KOLON` yoksa `ŞEMA.TABLO` sayılır) |
+| `@ref ŞEMA.TABLO.KOLON` | Şemayla birlikte |
+| `… (KOŞUL)` | Parantez içi koşul çizginin ve panelin üstüne yazılır |
+
+- **Nereden okunur:** etiket açıklamanın herhangi bir yerinde olabilir. Oracle ve PostgreSQL `COMMENT ON COLUMN`, MySQL satır içi `COMMENT '…'` ve SQL Server `sp_addextendedproperty` açıklamaları okunur.
+- **Haritada:** bu ilişkiler tahmin değil, DBA'nın beyanıdır; uzun kesikli çizgiyle ve panelde "açıklamadan" etiketiyle gösterilir.
+- **FK ile birlikte:** kolonda zaten bir FK varsa yalnızca koşul ona eklenir.
+- **Hata:** bulunamayan bir hedef ayrıştırma raporunda uyarı olarak listelenir.
+
+Sigorta örneğinde durum kolonları genel kod tablosuna (`KOD_TABLO`) bu yolla bağlanır.
 
 <a id="tr-coklu-dosya"></a>
 
@@ -511,6 +533,7 @@ The mark at the end of a line tells how many records can exist on that side. The
 | Line | Meaning |
 |---|---|
 | Solid | Declared foreign key or Mongoose `ref` |
+| Long-dashed | Relationship declared with a `@ref` tag in the column comment (see below) |
 | Dashed | Inferred relationship (see below); can be turned off in the **View** menu |
 | Dotted | Disabled FK (`DISABLE`, `RELY DISABLE NOVALIDATE`, T-SQL `NOCHECK`) |
 | Dash-dot | MongoDB embedded document: the sub-document lives inside its owner |
@@ -531,6 +554,27 @@ On cards, **PK** marks a primary key, **FK** a foreign key and **CK** a Cassandr
 - An `X_ID` / `xId` column points to a table X whose key is `ID` or `_id`: `orders.customerId` → `customers._id`.
 
 They are not drawn when the types disagree or when there is more than one candidate.
+
+**Relationships from comments: `@ref`.** Some relationships cannot be declared as FKs. The most common case is columns that point to only one type in a generic lookup table (`SOZLUK`: `ID`, `TIP_ID`, `AD`). The database cannot express "only rows where `TIP_ID = 7`". Such relationships are added to the map with a tag in the column comment:
+
+```sql
+COMMENT ON COLUMN ABONE.DURUM_ID IS 'Subscriber status. @ref SOZLUK.ID (TIP_ID = 7)';
+COMMENT ON COLUMN SESSION_LOG.USERID IS 'The user ID. @ref USERS';
+```
+
+| Syntax | Meaning |
+|---|---|
+| `@ref TABLE` | To the target's primary key |
+| `@ref TABLE.COLUMN` | To a specific column of the target (read as `SCHEMA.TABLE` when `TABLE.COLUMN` does not exist) |
+| `@ref SCHEMA.TABLE.COLUMN` | With the schema |
+| `… (CONDITION)` | The condition in parentheses is written on the line and in the panel |
+
+- **Where it is read:** the tag can be anywhere in the comment. Oracle and PostgreSQL `COMMENT ON COLUMN`, MySQL inline `COMMENT '…'` and SQL Server `sp_addextendedproperty` descriptions are all read.
+- **On the map:** these relationships are not guesses but the DBA's statement; they are drawn long-dashed and tagged "from comment" in the panel.
+- **With an FK:** if the column already has an FK, only the condition is added to it.
+- **Errors:** a target that cannot be found is listed as a warning in the parse report.
+
+In the insurance sample, status columns point to the generic code table (`KOD_TABLO`) this way.
 
 <a id="en-multi-file"></a>
 

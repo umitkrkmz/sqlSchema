@@ -26,7 +26,7 @@ const FONT_SANS = '"IBM Plex Sans", "Segoe UI", system-ui, sans-serif';
 const FONT_COND = '"IBM Plex Sans Condensed", "Arial Narrow", "Segoe UI", sans-serif';
 const FONT_MONO = '"IBM Plex Mono", "Cascadia Mono", Consolas, ui-monospace, monospace';
 const { t: tr } = NS;   // 't' yerel değişkenlerde tablo için kullanılıyor; çeviri işlevi 'tr'
-const DASH = { fk: [], imp: [5, 4], off: [1.5, 3.5], emb: [8, 3, 2, 3] };
+const DASH = { fk: [], ref: [10, 3], imp: [5, 4], off: [1.5, 3.5], emb: [8, 3, 2, 3] };
 
 const $ = sel => document.querySelector(sel);
 const canvas = $('#sky');
@@ -47,7 +47,7 @@ const sy = y => (y - S.cam.y) * S.cam.k + S.h / 2;
 const wx = px => (px - S.w / 2) / S.cam.k + S.cam.x;
 const wy = py => (py - S.h / 2) / S.cam.k + S.cam.y;
 const relVisible = r => S.implicit || r.kind !== 'implicit';
-const relStyle = r => (r.kind === 'implicit' ? 'imp' : r.kind === 'embed' ? 'emb' : r.disabled ? 'off' : 'fk');
+const relStyle = r => (r.kind === 'implicit' ? 'imp' : r.kind === 'embed' ? 'emb' : r.kind === 'ref' ? 'ref' : r.disabled ? 'off' : 'fk');
 const schemaColor = t => (t.external ? '#8892ad' : PALETTE[t.schemaRef.index % PALETTE.length]);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 // Şemasız tablolar ve bağımsız yıldızlar için etiket arayüz dilinde yazılır
@@ -534,7 +534,7 @@ function drawEdges(lv) {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
         ctx.fillStyle = 'rgba(200,212,245,0.85)';
-        ctx.fillText(r.cols.join(', '), 0, -3);
+        ctx.fillText(r.cols.join(', ') + (r.filter ? ' · ' + r.filter : ''), 0, -3);
         ctx.restore();
       }
     }

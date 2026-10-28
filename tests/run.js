@@ -110,6 +110,10 @@ const EXPECT = {
     check('sigorta: hasar dosyası → poliçe', rel(m, 'HASAR_DOSYA', 'POLICE_NO', 'POLICE', 'implicit'));
     check('sigorta: poliçe aracı 1:1 poliçe', (rel(m, 'POLICE_ARAC', 'POLICE_NO', 'POLICE') || {}).childEnd === 'zeroOne');
     check('sigorta: tek şema', new Set(m.tables.map(t => t.schema)).size === 1);
+    const pd = rel(m, 'POLICE', 'POLICE_DURUM', 'KOD_TABLO', 'ref');
+    check('sigorta: @ref ile sözlük tablosuna koşullu ilişki', pd && pd.refCols[0] === 'KOD' && pd.filter === "KOD_TIP = 'POLICE_DURUM'", pd && [pd.refCols, pd.filter]);
+    check('sigorta: 4 @ref ilişkisi, uyarı yok', m.stats.refs === 4 && !m.stats.warnings.length, [m.stats.refs, m.stats.warnings]);
+    check('sigorta: @ref PK\'ye (MUSTERI)', rel(m, 'HASAR_IHBAR', 'IHBAR_EDEN_MUSTERI_NO', 'MUSTERI', 'ref'));
     const labels = lay.schemas[0].groups.map(g => g.label).sort();
     check('sigorta: modül klasörü başına bir takımyıldız', same(labels, ['ACENTE/tablolar', 'HASAR/tablolar', 'ORTAK/tablolar', 'POLICE/tablolar', 'REASURANS/tablolar', 'TAHSILAT/tablolar', 'URUN/tablolar']), labels);
     check('sigorta: her tablo kendi dosyasının takımyıldızında', m.tables.every(t => t.group.file === t.src.file));
@@ -226,6 +230,19 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   check('PL/SQL bloğu sonraki tabloyu yutmaz', m3.stats.tables === 2, m3.stats.tables);
   const m4 = one("EXEC sp_rename 'dbo.Old', 'New';\nGO\nCREATE TABLE [dbo].[Old] ([Id] int NOT NULL);\nGO\nEXEC sp_rename 'dbo.Old', 'New';\nGO");
   check('sp_rename tabloyu yeniden adlandırır', !!find(m4, 'New') && !find(m4, 'Old'));
+
+  // @ref açıklama etiketi
+  const r1 = one("CREATE TABLE sozluk (id int PRIMARY KEY, tip_id int, ad varchar(50));\nCREATE TABLE abone (id int PRIMARY KEY, durum_id int NOT NULL, segment_id int, kanal varchar(10));\nCOMMENT ON COLUMN abone.durum_id IS 'Abone durumu. @ref sozluk.id (tip_id = 7)';\nCOMMENT ON COLUMN abone.segment_id IS '@ref yok_tablo';\nCOMMENT ON COLUMN abone.kanal IS 'Satış kanalı @ref SOZLUK';");
+  const rr = rel(r1, 'abone', 'durum_id', 'sozluk', 'ref');
+  check('@ref TABLO.KOLON (koşul)', rr && rr.filter === 'tip_id = 7' && rr.parentEnd === 'one' && rr.childEnd === 'zeroMany', rr && [rr.filter, rr.parentEnd, rr.childEnd]);
+  check('@ref TABLO hedefin PK\'sine, büyük/küçük harf duyarsız', !!rel(r1, 'abone', 'kanal', 'sozluk', 'ref'));
+  check('bulunamayan @ref uyarı olur', r1.stats.warnings.some(w => w.kind === 'ref' && w.name === 'abone.segment_id'), r1.stats.warnings);
+  check('@ref kolonu FK olarak işaretlenir, tahmin edilmez', find(r1, 'abone').colIdx.get('DURUM_ID').fk && !r1.rels.some(r => r.kind === 'implicit' && r.cols[0] === 'durum_id'));
+  const r2 = one("CREATE TABLE s (k varchar(10) PRIMARY KEY);\nCREATE TABLE a (id int PRIMARY KEY, s_kod varchar(10) COMMENT 'Kod @ref s (grup = 3)', CONSTRAINT fk_a FOREIGN KEY (s_kod) REFERENCES s (k)) ENGINE=InnoDB;");
+  const r2fk = r2.rels.filter(r => r.child.name === 'a');
+  check('FK varken @ref koşulu FK\'ye eklenir, çift ilişki olmaz', r2fk.length === 1 && r2fk[0].kind === 'fk' && r2fk[0].filter === 'grup = 3', r2fk.map(r => [r.kind, r.filter]));
+  const r3 = one("CREATE TABLE ref.kod (id int PRIMARY KEY, deger varchar(10));\nCREATE TABLE app.x (id int PRIMARY KEY, kod_id int);\nCOMMENT ON COLUMN app.x.kod_id IS '@ref ref.kod.deger';");
+  check('@ref ŞEMA.TABLO.KOLON', (rel(r3, 'x', 'kod_id', 'kod', 'ref') || {}).refCols + '' === 'deger');
 }
 
 // Adlandırma sınıflandırıcıları

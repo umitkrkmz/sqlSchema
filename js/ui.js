@@ -293,12 +293,13 @@ function renderReport() {
       ${st.embedded ? row('rEmbedded', st.embedded) : ''}
       ${row('rColumns', st.columns)}
       ${row('rFk', st.fk + (st.fkDisabled ? ` <span class="dim">${esc(t('rDisabled', { n: st.fkDisabled }))}</span>` : ''))}
+      ${st.refs ? row('rRefs', st.refs) : ''}
       ${row('rImplicit', st.implicit)}
       ${row('rJunctions', st.junctions)}
       ${row('rIndexes', `${st.indexes} / ${st.comments}`)}
       ${row('rTime', S.parseMs + ' ms')}
     </table>
-    ${list('rWarnings', st.warnings.slice(0, 30).map(w => `<li class="w"><span>${esc(w.kind === 'dup' ? t('warnDup', w) : w.text || '')}</span></li>`))}
+    ${list('rWarnings', st.warnings.slice(0, 30).map(w => `<li class="w"><span>${esc(w.kind === 'dup' ? t('warnDup', w) : w.kind === 'ref' ? t('warnRef', w) : w.text || '')}</span></li>`))}
     ${list('rOrphans', st.orphans.slice(0, 30).map(o => `<li><span>${esc(o.text)}</span><b>${esc(o.where)}</b></li>`))}
     ${list('rSkipped', st.skipped.map(([k, v]) => `<li><span>${esc(k)}</span><b>${v}</b></li>`))}
     ${list('rErrors', st.errors.slice(0, 20).map(e => `<li><span>${esc(e.file ? baseName(e.file) + ':' : t('line') + ' ')}${e.line}</span><b>${esc(e.message)}</b></li>`))}`;
@@ -502,7 +503,7 @@ function sentence(r) {
   if (r.many) return t('sMany', { c, p, f });
   const a = t(r.parentEnd === 'one' ? 'sOne' : 'sZeroOne', { c, p });
   const b = t(r.childEnd === 'zeroOne' ? 's1to1' : 's1toN', { c, p });
-  return (r.kind === 'implicit' ? t('guess') : '') + a + ' ' + b;
+  return (r.kind === 'implicit' ? t('guess') : '') + a + ' ' + b + (r.filter ? ' ' + t('sFilter', { p, f: r.filter }) : '');
 }
 
 function relItem(r, dir) {
@@ -511,6 +512,7 @@ function relItem(r, dir) {
   const right = dir === 'out' ? r.parentEnd : r.childEnd;
   const badges = [
     r.kind === 'implicit' ? `<span class="tag t-imp">${esc(t('tagInferred'))}</span>` : '',
+    r.kind === 'ref' ? `<span class="tag t-ref" title="${esc(t('tagRefTitle'))}">${esc(t('tagRef'))}</span>` : '',
     r.kind === 'embed' ? `<span class="tag t-emb">${esc(t('tagEmbed'))}</span>` : '',
     r.label === 'ref' ? '<span class="tag">ref</span>' : '',
     r.disabled ? `<span class="tag t-off">${esc(t('tagDisabled'))}</span>` : '',
@@ -519,7 +521,7 @@ function relItem(r, dir) {
   ].join('');
   const map = r.kind === 'embed'
     ? `${esc(t('field'))}: ${esc(r.cols[0])}${r.many ? '[]' : ''}`
-    : r.cols.map((c, i) => `${esc(c)} → ${esc(r.refCols[i] || '?')}`).join(', ');
+    : r.cols.map((c, i) => `${esc(c)} → ${esc(r.refCols[i] || '?')}`).join(', ') + (r.filter ? ` <span class="filter">(${esc(r.filter)})</span>` : '');
   const src = r.src && r.src.file && S.files.length > 1 ? `<span class="cn-name">${esc(baseName(r.src.file))}:${r.src.line}</span>` : '';
   return `<li data-go="${esc(other.key)}" tabindex="0">
     <canvas class="glyph" data-l="${left}" data-r="${right}" data-s="${relStyle(r)}"></canvas>

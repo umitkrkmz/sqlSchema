@@ -312,6 +312,8 @@ code, kbd { font-family: var(--mono); }
 }
 .tag.t-imp { border-style: dashed; color: var(--cyan); border-color: rgba(108, 198, 220, 0.5); }
 .tag.t-off { color: var(--rose); border-color: rgba(239, 123, 134, 0.45); }
+.tag.t-ref { color: var(--accent); border-color: rgba(242, 180, 90, 0.5); }
+.rels .filter { color: var(--accent); }
 .tag.t-emb { color: #a58cf2; border-color: rgba(165, 140, 242, 0.5); border-style: dashed; }
 .p-src { margin: 6px 0 0; font: 11px var(--mono); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .p-comment { margin: 8px 0 0; font-size: 13px; color: #c3cbe2; }

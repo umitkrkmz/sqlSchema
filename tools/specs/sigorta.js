@@ -1,7 +1,9 @@
 /*
  * Sigorta — yıllar içinde büyümüş eski (legacy) bir Oracle sistemi.
  * Modül başına klasör (ORTAK, URUN, ACENTE, POLICE, HASAR, TAHSILAT, REASURANS), elle yazılmış betikler,
- * Türkçe adlar ve hiç FK yok: bütün ilişkiler POLICE_NO, MUSTERI_NO, DOSYA_NO gibi kolon adlarından tahmin edilir.
+ * Türkçe adlar ve hiç FK yok: ilişkiler POLICE_NO, MUSTERI_NO, DOSYA_NO gibi kolon adlarından tahmin edilir.
+ * Durum kolonları genel kod tablosuna (KOD_TABLO, KOD_TIP + KOD) bağlıdır; bu FK ile ifade edilemez,
+ * DBA kolon açıklamasına @ref etiketi yazmıştır.
  * Bir klasörde yalnızca PL/SQL paketi, birinde yalnızca veri (INSERT) var; bunlar çizime girmez.
  */
 'use strict';
@@ -90,6 +92,14 @@ SGR.CESSION | Poliçe bazında devir | CESSION_NO pk; POLICE_NO nn; ANLASMA_NO n
 `,
 };
 
+// Durum kolonları genel kod tablosunun yalnızca bir tipine bağlıdır; FK ile tanımlanamaz, DBA açıklamaya @ref yazmıştır
+const REFS = {
+  'SGR.POLICE': { POLICE_DURUM: "Poliçe durumu. @ref KOD_TABLO.KOD (KOD_TIP = 'POLICE_DURUM')" },
+  'SGR.HASAR_DOSYA': { DOSYA_DURUM: "Dosya durumu. @ref KOD_TABLO.KOD (KOD_TIP = 'DOSYA_DURUM')" },
+  'SGR.TEKLIF': { DURUM_KOD: "Teklif durumu. @ref KOD_TABLO.KOD (KOD_TIP = 'TEKLIF_DURUM')" },
+  'SGR.HASAR_IHBAR': { IHBAR_EDEN_MUSTERI_NO: 'İhbarı yapan kişi; sigortalı olmayabilir. @ref MUSTERI' },
+};
+
 const INDEXES = {
   POLICE: ['CREATE INDEX SGR.POLICE_IX1 ON SGR.POLICE (MUSTERI_NO);', 'CREATE INDEX SGR.POLICE_IX2 ON SGR.POLICE (ACENTE_KOD, TANZIM_TAR);', 'CREATE UNIQUE INDEX SGR.POLICE_ARAC_UX1 ON SGR.POLICE_ARAC (PLAKA, POLICE_NO);'],
   HASAR: ['CREATE INDEX SGR.HASAR_DOSYA_IX1 ON SGR.HASAR_DOSYA (POLICE_NO);', 'CREATE INDEX SGR.HASAR_ODEME_IX1 ON SGR.HASAR_ODEME (DOSYA_NO);'],
@@ -125,12 +135,16 @@ module.exports = {
   title: 'Sigorta (eski sistem)',
   sector: 'Sigorta',
   dialect: 'Oracle',
-  scenario: 'Modül başına klasör, Türkçe adlar, elle yazılmış betikler ve hiç FK yok: ilişkiler yalnızca kolon adlarından tahmin edilir.',
-  en: { title: 'Insurance (legacy system)', sector: 'Insurance', scenario: 'A folder per module, Turkish names, hand-written scripts and no FKs at all: relationships are inferred from column names only.' },
+  scenario: 'Modül başına klasör, Türkçe adlar, elle yazılmış betikler ve hiç FK yok: ilişkiler kolon adlarından tahmin edilir. Durum kolonları genel kod tablosuna açıklamadaki @ref etiketiyle bağlanır.',
+  en: { title: 'Insurance (legacy system)', sector: 'Insurance', scenario: 'A folder per module, Turkish names, hand-written scripts and no FKs at all: relationships are inferred from column names. Status columns point to the generic code table through @ref tags in their comments.' },
   build(lib) {
     const files = {};
     for (const [mod, spec] of Object.entries(MODULES)) {
       const t = lib.parseSpec(spec, { infer: RULES });
+      for (const [key, cols] of Object.entries(REFS)) {
+        if (!t.has(key)) continue;
+        for (const [col, text] of Object.entries(cols)) t.get(key).cols.find(c => c.name === col).comment = text;
+      }
       lib.addAudit(t, [{ name: 'KAYIT_TAR', type: 'DATE', nn: true, def: 'SYSDATE' }, { name: 'KAYIT_KULLANICI', type: 'VARCHAR2(30 CHAR)' }, { name: 'GUNCELLEME_TAR', type: 'DATE' }]);
       files[`${mod}/tablolar.sql`] = `-- ${mod} modülü tabloları\n-- Not: bütünlük uygulama katmanında; veritabanında FK tanımlı değildir.\n\n` + lib.emitOracleLegacy([...t.values()]);
       if (INDEXES[mod]) files[`${mod}/indeksler.sql`] = INDEXES[mod].join('\n') + '\n';
