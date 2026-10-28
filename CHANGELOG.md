@@ -5,6 +5,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+## [0.2.0] - 2026-10-28
+
 ### Eklendi · Added
 
 - **Adlandırma profili:** harf düzeni, PK ve FK adı kalıpları, tekil/çoğul, önek, ASCII dışı karakter ve ad uzunluğu için oranlar; baskın kalıp ve ona uymayanlar, şema bazında kapsam, tutarlılık puanı, Markdown olarak indirme.
@@ -41,5 +43,6 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 - **Geliştirme araçları:** test seti, ekran görüntüsü üreticisi.
   Test suite and screenshot generator.
 
-[Yayımlanmamış · Unreleased]: ../../compare/v0.1.0...HEAD
+[Yayımlanmamış · Unreleased]: ../../compare/v0.2.0...HEAD
+[0.2.0]: ../../compare/v0.1.0...v0.2.0
 [0.1.0]: ../../releases/tag/v0.1.0
