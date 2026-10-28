@@ -85,6 +85,8 @@ python -m http.server 8000
 | `/` | Tablo ya da kolon ara |
 | `F` | Tümünü sığdır |
 | `C` | Kolon ayrıntılarını gizle / göster |
+| `↑` / `↓`, `Enter` | Paneldeki ilişkiler arasında dolaş, seçilen tabloya git |
+| `Alt` + `←` / `→` | Gezinme geçmişinde geri / ileri |
 | `Esc` | Odak modunu kapat / seçimi bırak |
 
 <a id="tr-haritayi-okumak"></a>
@@ -107,6 +109,8 @@ Ayrıntı panelinde kolonlar, açıklamalar, tanımın geçtiği dosya ve satır
 *"Her INVOICE kaydı mutlaka bir BILLING_ACCOUNT kaydına bağlı. Bir BILLING_ACCOUNT kaydının sıfır ya da çok INVOICE kaydı olabilir."*
 
 **Odak modu**, seçili tablonun yalnızca 1 ya da 2 adım uzaklıktaki komşularını bırakır, gerisini söndürür.
+
+**İlişki izlemek.** Paneldeki bir ilişkiye tıklamak (ya da `↓` ile seçip `Enter`) o tabloya gider. Panelin üstündeki **iz** gezilen tabloları sırasıyla gösterir (`ABONE › IS_EMRI › CIHAZ`); izdeki bir ada, `‹ ›` düğmelerine ya da `Alt` + `←` / `→` tuşlarına basarak geri ve ileri gidilir. Böylece fareye dokunmadan şema baştan sona gezilebilir.
 
 <img src="docs/images/tr/yakin-plan.png" alt="Yakın plan: kolon satırlarına bağlanan çizgiler ve karga ayağı uçları" width="900">
 
@@ -460,6 +464,8 @@ python -m http.server 8000
 | `/` | Search tables or columns |
 | `F` | Fit everything |
 | `C` | Hide / show column details |
+| `↑` / `↓`, `Enter` | Move through the panel's relationships, go to the chosen table |
+| `Alt` + `←` / `→` | Back / forward in the navigation history |
 | `Esc` | Leave focus mode / clear the selection |
 
 <a id="en-reading"></a>
@@ -484,6 +490,8 @@ The detail panel lists:
 - a plain-language reading of every relationship, such as *"Every INVOICE record belongs to exactly one BILLING_ACCOUNT record. A BILLING_ACCOUNT record can have zero or many INVOICE records."*
 
 **Focus mode** keeps only the neighbours one or two steps away from the selected table and dims everything else.
+
+**Following relationships.** Clicking a relationship in the panel (or picking it with `↓` and pressing `Enter`) goes to that table. The **trail** at the top of the panel lists the tables visited in order (`ABONE › IS_EMRI › CIHAZ`); click a name in it, the `‹ ›` buttons, or press `Alt` + `←` / `→` to go back and forward. The whole schema can be walked without touching the mouse.
 
 <img src="docs/images/en/yakin-plan.png" alt="Close-up: lines attached to column rows, with crow's foot ends" width="900">
 

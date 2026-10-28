@@ -61,7 +61,7 @@ const DICT = {
     starMoon: 'Uydu: gömülü alt belge',
     starGhost: 'Başvurulan ama dosyada tanımı olmayan tablo',
     keyTags: '<b class="k-pk">PK</b> birincil anahtar · <b class="k-fk">FK</b> yabancı anahtar · <b class="k-pk">CK</b> Cassandra sıralama anahtarı · soluk ad = NULL olabilir',
-    keysHelp: '<kbd>Tık</kbd> seç · <kbd>Çift tık</kbd> yaklaş · <kbd>/</kbd> ara · <kbd>F</kbd> sığdır · <kbd>C</kbd> kolonlar · <kbd>Esc</kbd> bırak',
+    keysHelp: '<kbd>Tık</kbd> seç · <kbd>Çift tık</kbd> yaklaş · <kbd>/</kbd> ara · <kbd>F</kbd> sığdır · <kbd>C</kbd> kolonlar · <kbd>↑↓</kbd> ilişkiler · <kbd>Alt+←</kbd> geri · <kbd>Esc</kbd> bırak',
     report: 'rapor',
 
     pasteTitle: 'Şema yapıştır',
@@ -169,6 +169,8 @@ const DICT = {
     nk_length_short: v => `En fazla ${v.n} karakter`, nk_length_long: v => `${v.n} karakterden uzun`,
 
     panelClose: 'Paneli kapat',
+    trailLabel: 'Gezinme geçmişi',
+    navBack: 'Önceki tablo (Alt+←)', navFwd: 'Sonraki tablo (Alt+→)',
     focus: ['Odak: kapalı', 'Odak: 1 adım', 'Odak: 2 adım'],
     focusTitle: 'Yalnızca bu tabloyu ve komşularını göster',
     showColumns: 'Kolonlarıyla göster', showFields: 'Alanlarıyla göster',
@@ -244,7 +246,7 @@ const DICT = {
     starMoon: 'Satellite: embedded sub-document',
     starGhost: 'Referenced but not defined in the files',
     keyTags: '<b class="k-pk">PK</b> primary key · <b class="k-fk">FK</b> foreign key · <b class="k-pk">CK</b> Cassandra clustering key · faded name = nullable',
-    keysHelp: '<kbd>Click</kbd> select · <kbd>Double-click</kbd> zoom in · <kbd>/</kbd> search · <kbd>F</kbd> fit · <kbd>C</kbd> columns · <kbd>Esc</kbd> clear',
+    keysHelp: '<kbd>Click</kbd> select · <kbd>Double-click</kbd> zoom in · <kbd>/</kbd> search · <kbd>F</kbd> fit · <kbd>C</kbd> columns · <kbd>↑↓</kbd> relationships · <kbd>Alt+←</kbd> back · <kbd>Esc</kbd> clear',
     report: 'report',
 
     pasteTitle: 'Paste a schema',
@@ -352,6 +354,8 @@ const DICT = {
     nk_length_short: v => `Up to ${v.n} characters`, nk_length_long: v => `Longer than ${v.n} characters`,
 
     panelClose: 'Close panel',
+    trailLabel: 'Navigation history',
+    navBack: 'Previous table (Alt+←)', navFwd: 'Next table (Alt+→)',
     focus: ['Focus: off', 'Focus: 1 step', 'Focus: 2 steps'],
     focusTitle: 'Show only this table and its neighbours',
     showColumns: 'Show with columns', showFields: 'Show with fields',

@@ -42,6 +42,7 @@ function toast(msg, ms = 4500) {
 function buildIndex() {
   const cell = 300;
   S.idx = new Map();
+  S.byKey = new Map(S.model.tables.map(tb => [tb.key, tb]));
   for (const tb of S.model.tables) {
     const key = Math.floor(tb.x / cell) + ',' + Math.floor(tb.y / cell);
     if (!S.idx.has(key)) S.idx.set(key, []);
@@ -75,6 +76,8 @@ function rebuild() {
   S.order = model.tables.slice().sort((a, b) => b.deg - a.deg || String(a.name).localeCompare(String(b.name)));
   S.hover = S.sel = null;
   S.focus = 0;
+  S.history = [];
+  S.histPos = -1;
   buildIndex();
   refreshEmphasis();
   renderPanel();
@@ -447,10 +450,48 @@ function select(tb, opts = {}) {
   S.sel = tb;
   S.selCol = opts.col ? opts.col.toUpperCase() : null;
   if (!tb) S.focus = 0;
+  if (tb && !opts.fromHistory) pushHistory(tb);
   refreshEmphasis();
   renderPanel();
   invalidate();
   if (tb && opts.fly) flyToTable(tb, opts.k);
+}
+
+/* ─── Gezinme geçmişi ─── */
+
+// Tarayıcı geçmişi gibi: geri gidip yeni bir tablo seçilince ileri kısmı silinir
+const HISTORY_MAX = 50;
+function pushHistory(tb) {
+  if (S.history[S.histPos] === tb.key) return;
+  S.history = S.history.slice(0, S.histPos + 1);
+  S.history.push(tb.key);
+  if (S.history.length > HISTORY_MAX) S.history.shift();
+  S.histPos = S.history.length - 1;
+}
+function goHistory(pos) {
+  const tb = S.byKey && S.byKey.get(S.history[pos]);
+  if (!tb) return;
+  S.histPos = pos;
+  select(tb, { fly: true, fromHistory: true });
+}
+
+// Panel başındaki iz: geçerli tablonun çevresinde en çok 7 adım
+function trailHtml() {
+  if (!S.history || S.history.length < 2) return '';
+  const from = Math.max(0, S.histPos - 4), to = Math.min(S.history.length, S.histPos + 3);
+  const items = [];
+  if (from > 0) items.push('<li class="gap">…</li>');
+  for (let i = from; i < to; i++) {
+    const tb = S.byKey.get(S.history[i]);
+    if (!tb) continue;
+    items.push(`<li class="${i === S.histPos ? 'cur' : i > S.histPos ? 'fwd' : ''}"><button data-hist="${i}" ${i === S.histPos ? 'aria-current="true"' : ''}>${esc(tb.name)}</button></li>`);
+  }
+  if (to < S.history.length) items.push('<li class="gap">…</li>');
+  return `<nav class="trail" aria-label="${esc(t('trailLabel'))}">
+    <button class="nav" data-act="back" title="${esc(t('navBack'))}" ${S.histPos > 0 ? '' : 'disabled'}>‹</button>
+    <button class="nav" data-act="fwd" title="${esc(t('navFwd'))}" ${S.histPos < S.history.length - 1 ? '' : 'disabled'}>›</button>
+    <ol>${items.join('')}</ol>
+  </nav>`;
 }
 
 /* ─── Detay paneli ─── */
@@ -520,6 +561,7 @@ function renderPanel() {
   p.innerHTML = `
     <div class="p-head" style="--c:${col}">
       <button class="p-close" data-act="close" aria-label="${esc(t('panelClose'))}">×</button>
+      ${trailHtml()}
       <div class="p-eyebrow"><span class="dot"></span>${esc(where)}<span class="sep">/</span>${esc(group)}</div>
       <h2 title="${esc(tb.name)}">${esc(tb.name)}</h2>
       ${badges ? `<div class="badges">${badges}</div>` : ''}
@@ -550,10 +592,14 @@ function renderPanel() {
 }
 
 $('#panel').addEventListener('click', e => {
+  const hist = e.target.closest('[data-hist]');
+  if (hist) { goHistory(Number(hist.dataset.hist)); return; }
   const act = e.target.closest('[data-act]');
   if (act) {
     const a = act.dataset.act;
     if (a === 'close') select(null);
+    else if (a === 'back') goHistory(S.histPos - 1);
+    else if (a === 'fwd') goHistory(S.histPos + 1);
     else if (a === 'focus') { S.focus = (S.focus + 1) % 3; refreshEmphasis(); renderPanel(); invalidate(); }
     else if (a === 'zoom' && S.sel) {
       if (!S.columns) setColumns(true);   // düğme açıkça kolonları istiyor
@@ -701,9 +747,26 @@ canvas.addEventListener('wheel', e => {
 }, { passive: false });
 
 window.addEventListener('keydown', e => {
-  const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
   if (e.key === '/' && !typing) { e.preventDefault(); q.focus(); q.select(); return; }
   if (typing || !S.model) return;
+  // Alt+← / Alt+→: gezinme geçmişi (tarayıcının "geri" kısayolunu da engeller)
+  if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    e.preventDefault();
+    goHistory(S.histPos + (e.key === 'ArrowLeft' ? -1 : 1));
+    return;
+  }
+  // ↑ / ↓: paneldeki ilişkiler arasında dolaşır, Enter o tabloya gider
+  if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && S.sel && !e.altKey) {
+    const items = [...document.querySelectorAll('#panel li[data-go]')];
+    if (!items.length) return;
+    e.preventDefault();
+    const i = items.indexOf(document.activeElement);
+    const next = i < 0 ? (e.key === 'ArrowDown' ? 0 : items.length - 1) : Math.max(0, Math.min(items.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)));
+    items[next].focus();
+    items[next].scrollIntoView({ block: 'nearest' });
+    return;
+  }
   if (e.key === 'Escape') {
     if (S.focus) { S.focus = 0; refreshEmphasis(); renderPanel(); invalidate(); }
     else select(null);

@@ -13,6 +13,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
   Hide column details (`C`): the close-up shows only table names and relationships; the choice is remembered and can be set with `?columns=0`.
 - **Dosya başına takımyıldız:** birden fazla dosya açıldığında her dosyanın tabloları kendi takımyıldızında toplanır, farklı dosyalar birbirinden uzak durur. Migration klasörleri ve MongoDB ad ve ilişkiye göre gruplanır; Görünüm menüsünden ya da `?grouping=` ile değiştirilebilir.
   One constellation per file: with several files open, each file's tables gather in their own constellation and different files stay apart. Migration folders and MongoDB are grouped by name and relationships; change it in the View menu or with `?grouping=`.
+- **Gezinme geçmişi ve klavyeyle ilişki izleme:** panelin üstünde gezilen tabloların izi, `‹ ›` ve `Alt` + `←` / `→` ile geri/ileri; `↑` / `↓` ve `Enter` ile ilişkiler arasında dolaşma.
+  Navigation history and keyboard relationship following: a trail of visited tables at the top of the panel, back/forward with `‹ ›` and `Alt` + `←` / `→`; move through relationships with `↑` / `↓` and `Enter`.
 
 ## [0.2.1] - 2026-10-28
 

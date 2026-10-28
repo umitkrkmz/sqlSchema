@@ -279,6 +279,19 @@ code, kbd { font-family: var(--mono); }
   cursor: pointer;
 }
 .p-close:hover { background: rgba(140, 160, 215, 0.12); color: var(--text); }
+/* Gezinme izi: ‹ › ve son gezilen tablolar */
+.trail { display: flex; align-items: center; gap: 4px; margin: -4px 30px 10px 0; min-width: 0; }
+.trail .nav { flex: none; width: 22px; height: 22px; padding: 0; border: 1px solid var(--line-2); border-radius: 5px; background: transparent; color: var(--text); font: 15px/1 var(--sans); cursor: pointer; }
+.trail .nav:hover:not(:disabled) { border-color: var(--accent); }
+.trail .nav:disabled { opacity: 0.3; cursor: default; }
+.trail ol { display: flex; align-items: center; gap: 2px; margin: 0 0 0 4px; padding: 0; list-style: none; min-width: 0; overflow: hidden; }
+.trail li { display: flex; align-items: center; min-width: 0; flex: 0 1 auto; }
+.trail li + li::before { content: "›"; margin: 0 3px; color: var(--faint); font-size: 11px; }
+.trail li button { min-width: 0; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 3px; border: 0; border-radius: 3px; background: none; font: 10.5px var(--mono); color: var(--dim); cursor: pointer; }
+.trail li button:hover { color: var(--text); background: rgba(140, 160, 215, 0.1); }
+.trail li.cur button { color: var(--accent); cursor: default; }
+.trail li.fwd button { opacity: 0.55; }
+.trail li.gap { color: var(--faint); font-size: 11px; }
 .p-eyebrow { display: flex; align-items: center; gap: 7px; font: 11px var(--mono); color: var(--dim); text-transform: none; padding-right: 30px; }
 .p-eyebrow .sep { color: var(--faint); }
 .p-head h2 {
