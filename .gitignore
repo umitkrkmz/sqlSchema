@@ -1,1 +1,4 @@
 .claude/
+
+# Yerel, depoya girmeyen notlar (yol haritası taslağı vb.)
+*.local.md
