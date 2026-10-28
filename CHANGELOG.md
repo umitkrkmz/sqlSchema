@@ -5,6 +5,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+## [0.2.1] - 2026-10-28
+
 ### Değişti · Changed
 
 - **Adlandırma profili, FK kalıpları:** `CREATED_BY`, `UPDATED_BY`, `GUNCELLEYEN` gibi denetim kolonları ayrı sayılır ve orana katılmaz. "Kuralsız" grubu ikiye ayrıldı: yalnızca rol adı (`SAHIBI`) ve hedef adını içermeyen (`CHZ_REF`). Hedefin son kelimesini taşıyan adlar (`AGENT_USER_ID → APP_USER`) rol önekli sayılır.
@@ -50,6 +52,7 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 - **Geliştirme araçları:** test seti, ekran görüntüsü üreticisi.
   Test suite and screenshot generator.
 
-[Yayımlanmamış · Unreleased]: ../../compare/v0.2.0...HEAD
+[Yayımlanmamış · Unreleased]: ../../compare/v0.2.1...HEAD
+[0.2.1]: ../../compare/v0.2.0...v0.2.1
 [0.2.0]: ../../compare/v0.1.0...v0.2.0
 [0.1.0]: ../../releases/tag/v0.1.0
