@@ -36,7 +36,7 @@ const S = {
   files: [], separate: false, model: null, lay: null, order: [], idx: null,
   cam: { x: 0, y: 0, k: 0.3 }, w: 0, h: 0, dpr: 1, kMin: 0.01,
   hover: null, sel: null, selCol: null, focus: 0,
-  implicit: true, grid: true,
+  implicit: true, grid: true, columns: true,
   em: { active: null, near: null, hiRels: null, focus: null },
   anim: null, frame: 0, title: '', parseMs: 0,
 };
@@ -86,8 +86,17 @@ function keyTag(t, c) {
   return c.pk && c.fk ? 'PF' : c.pk ? 'PK' : c.fk ? 'FK' : '';
 }
 
+// Kolon ayrıntıları kapalıyken kart yalnızca başlıktır; çizgiler başlığın ortasına bağlanır.
+// Seçenek değişince ui.js her tablonun _rows önbelleğini siler.
 function cardRows(t) {
   if (t._rows) return t._rows;
+  if (!S.columns) {
+    t._rows = [];
+    t._more = 0;
+    t._rowIdx = new Map();
+    t._h = CARD.head;
+    return t._rows;
+  }
   const rank = c => (c.pk ? 0 : c.fk ? 1 : 2);
   const ordered = t.columns.map((c, i) => [c, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(x => x[0]);
   t._rows = ordered.slice(0, CARD.maxRows);
@@ -779,7 +788,7 @@ function drawCards() {
       ctx.fillStyle = C.dim;
       ctx.fillText(tr('moreCols', { n: t._more }), x0 + 22 * k, y + 0.5);
     }
-    if (!rows.length) {
+    if (!rows.length && S.columns) {
       ctx.textAlign = 'left';
       ctx.font = `${7.5 * k}px ${FONT_MONO}`;
       ctx.fillStyle = C.dim;

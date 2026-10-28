@@ -84,6 +84,7 @@ python -m http.server 8000
 | Çift tık | Tabloya yaklaş, kolonları göster |
 | `/` | Tablo ya da kolon ara |
 | `F` | Tümünü sığdır |
+| `C` | Kolon ayrıntılarını gizle / göster |
 | `Esc` | Odak modunu kapat / seçimi bırak |
 
 <a id="tr-haritayi-okumak"></a>
@@ -97,6 +98,8 @@ Yakınlaştırma düzeyine göre üç görünüm vardır:
 | Galaksi | Veritabanları, şemalar ve şemalar arası ilişki demetleri (çizgi üstündeki sayı = ilişki adedi) |
 | Takımyıldız | Tablolar yıldız olur: boyut = bağlantı sayısı, renk = şema. Seçili tablonun çizgilerinde karga ayağı ve kolon adı yazar. |
 | Yakın plan | Tablolar kart olur; çizgiler doğrudan FK ve PK kolon satırlarına bağlanır. |
+
+**Görünüm** menüsünde üç seçenek var: kolon ayrıntıları, tahmini ilişkiler ve ızgara. **Kolon ayrıntıları** kapatılınca (kısayolu `C`) yakın planda kartlar yalnızca tablo adını gösterir ve çizgiler kartın başlığına bağlanır. Böylece yalnızca tablolar ve ilişkileri kalır. Ayrıntı paneli kolonları göstermeye devam eder. Seçim tarayıcıda hatırlanır.
 
 <img src="docs/images/tr/secim-ve-panel.png" alt="Seçili tablo, vurgulu ilişkileri ve ayrıntı paneli" width="900">
 
@@ -123,7 +126,7 @@ Ayrıntı panelinde kolonlar, açıklamalar, tanımın geçtiği dosya ve satır
 | Çizgi | Anlamı |
 |---|---|
 | Düz | Tanımlı yabancı anahtar ya da Mongoose `ref` |
-| Kesikli | Tahmini ilişki (aşağıya bakın); üst çubuktan kapatılabilir |
+| Kesikli | Tahmini ilişki (aşağıya bakın); **Görünüm** menüsünden kapatılabilir |
 | Noktalı | Devre dışı FK (`DISABLE`, `RELY DISABLE NOVALIDATE`, T-SQL `NOCHECK`) |
 | Kesik-noktalı | MongoDB gömülü belge: alt belge sahibinin içinde yaşar |
 
@@ -452,6 +455,7 @@ python -m http.server 8000
 | Double-click | Zoom into a table, show its columns |
 | `/` | Search tables or columns |
 | `F` | Fit everything |
+| `C` | Hide / show column details |
 | `Esc` | Leave focus mode / clear the selection |
 
 <a id="en-reading"></a>
@@ -465,6 +469,8 @@ The view changes with the zoom level:
 | Galaxy | Databases, schemas and bundles of relationships between schemas (the number on a line = relationship count) |
 | Constellation | Tables become stars: size = number of links, colour = schema. The lines of the selected table show crow's feet and column names. |
 | Close-up | Tables become cards; lines attach directly to the FK and PK column rows. |
+
+The **View** menu has three options: column details, inferred relations and the grid. With **column details** off (shortcut `C`), close-up cards show only the table name and lines attach to the card header, leaving just tables and their relationships. The detail panel still lists the columns. The choice is remembered in the browser.
 
 <img src="docs/images/en/secim-ve-panel.png" alt="A selected table, its highlighted relationships and the detail panel" width="900">
 
@@ -493,7 +499,7 @@ The mark at the end of a line tells how many records can exist on that side. The
 | Line | Meaning |
 |---|---|
 | Solid | Declared foreign key or Mongoose `ref` |
-| Dashed | Inferred relationship (see below); can be turned off in the toolbar |
+| Dashed | Inferred relationship (see below); can be turned off in the **View** menu |
 | Dotted | Disabled FK (`DISABLE`, `RELY DISABLE NOVALIDATE`, T-SQL `NOCHECK`) |
 | Dash-dot | MongoDB embedded document: the sub-document lives inside its owner |
 

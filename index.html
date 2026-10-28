@@ -42,8 +42,14 @@
   </div>
 
   <div class="tools">
-    <label class="toggle" data-i18n-attr="data-short:implicitShort"><input type="checkbox" id="tImplicit" checked><span data-i18n="implicit"></span></label>
-    <label class="toggle" data-i18n-attr="data-short:gridShort"><input type="checkbox" id="tGrid" checked><span data-i18n="grid"></span></label>
+    <div class="menu">
+      <button class="btn ghost" data-act="view" aria-haspopup="true"><span data-i18n="view"></span> <span aria-hidden="true">▾</span></button>
+      <div class="menu-list view-menu pop" id="viewMenu" hidden>
+        <label class="opt"><input type="checkbox" id="tColumns" checked><span><b data-i18n="optColumns"></b><small data-i18n="optColumnsHint"></small></span><kbd>C</kbd></label>
+        <label class="opt"><input type="checkbox" id="tImplicit" checked><span><b data-i18n="implicit"></b><small data-i18n="optImplicitHint"></small></span></label>
+        <label class="opt"><input type="checkbox" id="tGrid" checked><span><b data-i18n="grid"></b></span></label>
+      </div>
+    </div>
     <button class="btn ghost" data-act="fit" data-i18n="fit" data-i18n-attr="title:fitTitle"></button>
     <button class="btn ghost" data-act="png" data-i18n-attr="title:pngTitle">PNG</button>
     <div class="lang" role="group" data-i18n-attr="aria-label:language;title:language">

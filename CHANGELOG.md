@@ -5,6 +5,13 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Eklendi · Added
+
+- **Görünüm menüsü:** kolon ayrıntıları, tahmini ilişkiler ve ızgara seçenekleri üst çubuktan bu menüye taşındı.
+  View menu: the column details, inferred relations and grid options moved here from the toolbar.
+- **Kolon ayrıntılarını gizleme (`C`):** yakın planda yalnızca tablo adları ve ilişkiler; seçim hatırlanır, `?columns=0` ile de açılır.
+  Hide column details (`C`): the close-up shows only table names and relationships; the choice is remembered and can be set with `?columns=0`.
+
 ## [0.2.1] - 2026-10-28
 
 ### Değişti · Changed

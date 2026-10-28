@@ -5,7 +5,7 @@
  *
  * URL parametreleri (paylaşılabilir bağlantılar ve belge görüntüleri için):
  *   ?lang=tr|en   ?sample=<örnek kimliği>   ?select=<tablo adı>   ?zoom=<1.6>   ?legend=0|1
- *   ?pop=naming|report|files   (örnekle birlikte: açılışta gösterilecek pencere)
+ *   ?pop=naming|report|files   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
  */
 (function (NS) {
 'use strict';
@@ -554,7 +554,10 @@ $('#panel').addEventListener('click', e => {
     const a = act.dataset.act;
     if (a === 'close') select(null);
     else if (a === 'focus') { S.focus = (S.focus + 1) % 3; refreshEmphasis(); renderPanel(); invalidate(); }
-    else if (a === 'zoom' && S.sel) flyToTable(S.sel, Math.max(1.5, S.cam.k));
+    else if (a === 'zoom' && S.sel) {
+      if (!S.columns) setColumns(true);   // düğme açıkça kolonları istiyor
+      flyToTable(S.sel, Math.max(1.5, S.cam.k));
+    }
     return;
   }
   const li = e.target.closest('li[data-go]');
@@ -704,6 +707,7 @@ window.addEventListener('keydown', e => {
     if (S.focus) { S.focus = 0; refreshEmphasis(); renderPanel(); invalidate(); }
     else select(null);
   } else if (e.key === 'f' || e.key === 'F') fitView(true);
+  else if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey) setColumns(!S.columns);
   else if (e.key === '+' || e.key === '=') zoomAt(S.w / 2, S.h / 2, 1.4);
   else if (e.key === '-' || e.key === '_') zoomAt(S.w / 2, S.h / 2, 1 / 1.4);
 });
@@ -716,7 +720,7 @@ let appendNext = false;
 fileInput.addEventListener('change', () => { loadEntries(fromInput(fileInput), appendNext); appendNext = false; fileInput.value = ''; });
 folderInput.addEventListener('change', () => { loadEntries(fromInput(folderInput), false); folderInput.value = ''; });
 
-const popovers = ['#sampleMenu', '#report', '#filesPop', '#namingPop'];
+const popovers = ['#sampleMenu', '#viewMenu', '#report', '#filesPop', '#namingPop'];
 function togglePop(sel) {
   for (const p of popovers) $(p).hidden = p === sel ? !$(p).hidden : true;
 }
@@ -733,6 +737,7 @@ document.addEventListener('click', e => {
     case 'add-files': appendNext = true; fileInput.click(); break;
     case 'paste': $('#pasteDlg').showModal(); $('#pasteText').focus(); break;
     case 'samples': togglePop('#sampleMenu'); break;
+    case 'view': togglePop('#viewMenu'); break;
     case 'sample-first': loadSample((NS.SAMPLES || [])[0].id); break;
     case 'fit': fitView(true); break;
     case 'png': exportPng(); break;
@@ -757,6 +762,17 @@ $('#pasteDlg').addEventListener('close', () => {
 
 $('#tImplicit').addEventListener('change', e => { S.implicit = e.target.checked; refreshEmphasis(); renderPanel(); invalidate(); });
 $('#tGrid').addEventListener('change', e => { S.grid = e.target.checked; invalidate(); });
+$('#tColumns').addEventListener('change', e => setColumns(e.target.checked));
+
+// Kolon ayrıntıları: kapalıyken yakın plan yalnızca tablo adlarını ve ilişkileri gösterir
+function setColumns(on, quiet) {
+  S.columns = on;
+  $('#tColumns').checked = on;
+  if (S.model) for (const tb of S.model.tables) tb._rows = null;
+  try { localStorage.setItem('sqlschema.columns', on ? '1' : '0'); } catch (err) { /* depolama kapalı */ }
+  if (!quiet && S.model) toast(t(on ? 'columnsOn' : 'columnsOff'), 2500);
+  invalidate();
+}
 
 let dragDepth = 0;
 window.addEventListener('dragenter', e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { dragDepth++; $('#dropOverlay').hidden = false; } });
@@ -822,6 +838,11 @@ try {
   const saved = localStorage.getItem('sqlschema.legend');
   if (legendPref === '0' || (legendPref !== '1' && (saved === '0' || (saved === null && window.innerWidth < 1100)))) document.body.classList.add('legend-closed');
 } catch (err) { if (legendPref === '0') document.body.classList.add('legend-closed'); }
+{
+  let cols = params.get('columns');
+  if (cols !== '0' && cols !== '1') { try { cols = localStorage.getItem('sqlschema.columns'); } catch (err) { cols = null; } }
+  if (cols === '0') { S.columns = false; $('#tColumns').checked = false; }
+}
 
 // Konsoldan inceleme için: sqlSchema.S.model.tables, sqlSchema.loadText(metin, 'ad.sql')
 Object.assign(NS, { loadText, setFiles, rebuild, loadSample });
