@@ -5,6 +5,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+## [0.3.1] - 2026-10-29
+
 ### Değişti · Changed
 
 - **Dosya takımyıldızları daha belirgin:** aralarındaki boşluk büyüdü, her biri ince bir daireyle sınırlanır ve adı sınırın üstünde, yakın planda da görünür.
@@ -72,7 +74,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 - **Geliştirme araçları:** test seti, ekran görüntüsü üreticisi.
   Test suite and screenshot generator.
 
-[Yayımlanmamış · Unreleased]: ../../compare/v0.3.0...HEAD
+[Yayımlanmamış · Unreleased]: ../../compare/v0.3.1...HEAD
+[0.3.1]: ../../compare/v0.3.0...v0.3.1
 [0.3.0]: ../../compare/v0.2.1...v0.3.0
 [0.2.1]: ../../compare/v0.2.0...v0.2.1
 [0.2.0]: ../../compare/v0.1.0...v0.2.0

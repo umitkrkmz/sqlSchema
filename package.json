@@ -1,6 +1,6 @@
 {
   "name": "sqlschema",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Draws database schemas as a star map in the browser · Veritabanı şemalarını tarayıcıda yıldız haritası olarak çizer",
   "private": true,
   "license": "MIT",
