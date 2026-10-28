@@ -474,12 +474,15 @@ body:not(.loaded) .legend, body:not(.loaded) .hud { display: none; }
 .naming-pop .c2 { background: #a58cf2; }
 .naming-pop .c3 { background: #7fd49a; }
 .naming-pop .c4 { background: var(--rose); }
+.naming-pop .c5 { background: #d8a3d0; }
 .report ul.nb li { display: grid; grid-template-columns: 8px minmax(0, auto) minmax(0, 1fr) 46px 34px; align-items: center; gap: 7px; padding: 2px 0; font-family: var(--sans); cursor: pointer; }
 .nb li:hover .ex { color: var(--text); }
 .nb .sw { width: 8px; height: 8px; border-radius: 2px; }
 .nb .nl { white-space: nowrap; color: var(--text); }
 .nb .nl em { font: normal 9.5px var(--mono); color: var(--accent); margin-left: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+.nb .nl em.weak { color: var(--dim); }
 .nb li:not(.dom) .nl { color: #c3cbe2; }
+.naming-pop .nn.mixed { color: #f0c88a; }
 .nb .ex { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 10.5px var(--mono); color: var(--faint); }
 .report .nb li b { text-align: right; font-family: var(--mono); }
 .report .nb li.dom b:first-of-type { color: var(--text); }

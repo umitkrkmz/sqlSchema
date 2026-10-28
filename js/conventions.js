@@ -7,14 +7,18 @@
  * Boyutlar ve kovalar (sıra, gösterim sırasıdır):
  *   tableCase / columnCase   upperSnake  lowerSnake  pascal  camel  mixed
  *   pkStyle                  id  tableId  tableOther  other  | shared  composite  none (nötr)
- *   fkStyle                  targetId  targetOther  role  samePk  other     (yalnızca tanımlı, tek kolonlu FK)
+ *   fkStyle                  targetId  targetOther  role  samePk  roleOnly  other  | audit (nötr)
+ *                            (yalnızca tanımlı, tek kolonlu FK)
  *   tableNumber              singular  plural
  *   prefix                   plain  prefixed                                (TBL_, T_, tbl...)
  *   charset                  ascii  nonAscii                                (tablo ve kolon adları)
  *   length                   short  long                                    (30 karakter: eski Oracle sınırı)
  *
- * Nötr kovalar orana ve baskınlığa katılmaz: bileşik PK ve üst tablodan gelen PK (1:1) bir
- * adlandırma tercihi değildir, PK'siz tablo ise denetimin konusudur.
+ * Nötr kovalar orana ve baskınlığa katılmaz: bileşik PK, üst tablodan gelen PK (1:1) ve
+ * CREATED_BY gibi denetim kolonları bir adlandırma tercihi değildir, PK'siz tablo ise denetimin konusudur.
+ *
+ * En çok kullanılan kalıbın payı CLEAR_AT'in altındaysa (%51'e %49 gibi) kalıp "baskın" sayılmaz:
+ * clear: false döner ve arayüz "belirgin baskın kalıp yok" der.
  */
 (function (NS) {
 'use strict';
@@ -26,12 +30,21 @@ const norm = s => U(s).replace(/[^\p{L}\p{N}]/gu, '');
 const PREFIX = /^(TBL|TB|TAB|T)_|^tbl(?=\p{Lu})/iu;
 const OTHER_SUFFIX = /(NO|NUM|NR|KOD|KODU|CODE|CD|KEY|REF)$/;
 const NAME_LIMIT = 30;
+const CLEAR_AT = 0.6;
+
+// Kaydı kimin açtığını / değiştirdiğini tutan kolonlar: hedef tablo adı geçmese de yerleşik bir kalıptır
+const TR_FOLD = { '\xC7': 'C', '\u{11E}': 'G', '\u{130}': 'I', '\xD6': 'O', '\u{15E}': 'S', '\xDC': 'U' };
+const AUDIT = new RegExp([
+  '^(CREATED|CREATE|CREATOR|CRE|UPDATED|UPDATE|UPDATER|UPD|MODIFIED|MODIFY|CHANGED|INSERTED|INSERT|INS|LASTUPDATED|LASTMODIFIED|LASTCHANGED|DELETED|APPROVED)(BY|BYUSER|USER|USR)(ID|NO|CODE)?$',
+  '^(KAYITKULLANICI|KAYITEDEN|KAYDEDEN|EKLEYEN|OLUSTURAN|GUNCELLEYEN|SONGUNCELLEYEN|DEGISTIREN|SILEN|ONAYLAYAN)(KULLANICI)?(ID|NO|KOD|SICIL|SICILNO)?$',
+].join('|'));
+const isAudit = col => AUDIT.test(norm(col).replace(/[\xC7\u{11E}\u{130}\xD6\u{15E}\xDC]/gu, ch => TR_FOLD[ch]));
 
 const DIMS = {
   tableCase: { keys: ['upperSnake', 'lowerSnake', 'pascal', 'camel', 'mixed'] },
   columnCase: { keys: ['upperSnake', 'lowerSnake', 'pascal', 'camel', 'mixed'] },
   pkStyle: { keys: ['id', 'tableId', 'tableOther', 'other', 'shared', 'composite', 'none'], neutral: ['shared', 'composite', 'none'] },
-  fkStyle: { keys: ['targetId', 'targetOther', 'role', 'samePk', 'other'] },
+  fkStyle: { keys: ['targetId', 'targetOther', 'role', 'samePk', 'roleOnly', 'other', 'audit'], neutral: ['audit'] },
   tableNumber: { keys: ['singular', 'plural'] },
   prefix: { keys: ['plain', 'prefixed'] },
   charset: { keys: ['ascii', 'nonAscii'] },
@@ -73,9 +86,17 @@ function nameForms(name) {
   return [...forms].filter(Boolean);
 }
 
+// Tablo adının son kelimeleri: rol önekli FK'lerde hedefin yalnızca son kelimesi geçer (AGENT_USER_ID → APP_USER)
+function tailsOf(name) {
+  const words = String(name).replace(PREFIX, '').split(/_|(?=\p{Lu}\p{Ll})/u).filter(Boolean);
+  const tails = [];
+  for (let i = 1; i < words.length; i++) tails.push(...nameForms(words.slice(i).join('_')));
+  return tails.filter(f => f.length >= 3);
+}
+
 // Kolon adının kalıbı: tablo adı + ID / NO / KOD..., rol önekli hâli ya da hiçbiri.
 // Tablo adının son kelimeleri de kabul edilir: HASAR_DOSYA.DOSYA_NO, TROUBLE_TICKET.TICKET_ID
-function stemMatch(col, forms) {
+function stemMatch(col, forms, tails = []) {
   const c = norm(col);
   let suffix = null, stem = null;
   if (/ID$/.test(c) && c.length > 2) { suffix = 'id'; stem = c.slice(0, -2); }
@@ -83,9 +104,9 @@ function stemMatch(col, forms) {
     const m = OTHER_SUFFIX.exec(c);
     if (m && c.length > m[1].length) { suffix = 'other'; stem = c.slice(0, -m[1].length); }
   }
-  if (!stem) return null;
+  if (!stem) return null;   // anahtar eki yok (SAHIBI, ASSIGNED_TO)
   if (forms.some(f => f === stem || (stem.length >= 3 && f.endsWith(stem)))) return { suffix, stem, exact: true };
-  if (forms.some(f => f.length >= 3 && stem.endsWith(f))) return { suffix, stem, exact: false };
+  if (forms.concat(tails).some(f => f.length >= 3 && stem.endsWith(f))) return { suffix, stem, exact: false };
   return { suffix, stem, exact: null };
 }
 
@@ -105,21 +126,24 @@ function pkStyleOf(tb) {
 
 function fkStyleOf(r) {
   const col = r.cols[0], parent = r.parent;
-  const m = stemMatch(col, nameForms(parent.name));
+  if (isAudit(col)) return 'audit';
+  const m = stemMatch(col, nameForms(parent.name), tailsOf(parent.name));
   if (m && m.exact) return m.suffix === 'id' ? 'targetId' : 'targetOther';
   // kendine başvuran kolonda rol adı olağandır: PARENT_ID, MANAGER_ID, UST_BIRIM_ID
   if ((m && m.exact === false) || (m && r.self)) return 'role';
   if (parent.pk.length === 1 && U(parent.pk[0]) === U(col)) return 'samePk';
-  return 'other';
+  // anahtar eki yoksa ad yalnızca rolü söyler (SAHIBI → ABONE); ek varken hedef tutmuyorsa kuralsızdır (CHZ_REF → CIHAZ)
+  return m ? 'other' : 'roleOnly';
 }
 
 /*
- * opts.filter: tablo → boolean (ör. tek bir şema). Dönen nesne:
- *   { tables, columns, fks, score, dims: [{ id, total, dominant, share, buckets: [{ key, n, pct, neutral, items }], outliers }] }
+ * opts.filter: tablo → boolean (ör. tek bir şema); opts.clearAt: belirgin baskınlık eşiği (0.6). Dönen nesne:
+ *   { tables, columns, fks, score, clearAt, dims: [{ id, total, dominant, share, clear, buckets: [{ key, n, pct, neutral, items }], outliers }] }
  * items: [{ t: tablo, c: kolon adı | null, ref: hedef tablo (FK için) }]
  */
 function namingProfile(model, opts = {}) {
   const keep = opts.filter || (() => true);
+  const clearAt = opts.clearAt || CLEAR_AT;
   // Dış ve gömülü tablolar dosyada tanımlı değil; MongoDB'de _id ve ref alanları adlandırma tercihi değildir
   const tables = model.tables.filter(tb => !tb.external && !tb.embedded && keep(tb));
   const sqlTables = tables.filter(tb => tb.dialect !== 'mongodb');
@@ -162,13 +186,14 @@ function namingProfile(model, opts = {}) {
     let dom = null;
     for (const b of counted) if (b.n && (!dom || b.n > dom.n)) dom = b;
     const outliers = dom ? counted.filter(b => b !== dom).flatMap(b => b.items) : [];
-    dims.push({ id, total, dominant: dom ? dom.key : null, share: dom ? dom.n / total : null, buckets, outliers });
+    const share = dom ? dom.n / total : null;
+    dims.push({ id, total, dominant: dom ? dom.key : null, share, clear: dom ? share >= clearAt : false, buckets, outliers });
   }
   // Tutarlılık: her boyutta baskın kalıba uyanların oranının ortalaması (boş boyutlar hariç)
   const scored = dims.filter(d => d.total);
   const score = scored.length ? Math.round(scored.reduce((s, d) => s + d.share, 0) / scored.length * 100) : null;
-  return { tables: tables.length, columns, fks, score, dims, nameLimit: NAME_LIMIT };
+  return { tables: tables.length, columns, fks, score, dims, nameLimit: NAME_LIMIT, clearAt };
 }
 
-Object.assign(NS, { namingProfile, caseOf, isPlural, pkStyleOf, fkStyleOf });
+Object.assign(NS, { namingProfile, caseOf, isPlural, isAudit, pkStyleOf, fkStyleOf });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});

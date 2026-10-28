@@ -5,6 +5,13 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Değişti · Changed
+
+- **Adlandırma profili, FK kalıpları:** `CREATED_BY`, `UPDATED_BY`, `GUNCELLEYEN` gibi denetim kolonları ayrı sayılır ve orana katılmaz. "Kuralsız" grubu ikiye ayrıldı: yalnızca rol adı (`SAHIBI`) ve hedef adını içermeyen (`CHZ_REF`). Hedefin son kelimesini taşıyan adlar (`AGENT_USER_ID → APP_USER`) rol önekli sayılır.
+  Naming profile, FK patterns: audit columns such as `CREATED_BY`, `UPDATED_BY` and `GUNCELLEYEN` are counted separately and left out of the shares. The "irregular" group is split into role name only (`OWNER`) and not containing the target name (`CHZ_REF`). Names carrying the target's last word (`AGENT_USER_ID → APP_USER`) count as role prefixed.
+- **Belirgin baskınlık eşiği:** en çok kullanılan kalıbın payı %60'ın altındaysa "baskın" yerine "belirgin baskın kalıp yok" gösterilir.
+  Clear-dominance threshold: when the most used pattern has less than 60%, the profile says "no clear dominant pattern" instead of "dominant".
+
 ## [0.2.0] - 2026-10-28
 
 ### Eklendi · Added

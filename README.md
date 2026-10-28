@@ -228,11 +228,12 @@ Ekipte yazılı bir adlandırma standardı yoksa ilk adım, şemada fiilen ne ku
 |---|---|
 | Tablo ve kolon adı harf düzeni | `BÜYÜK_HARF`, `küçük_harf`, `PascalCase`, `camelCase` |
 | Birincil anahtar adı | `ID`, `<TABLO>_ID`, `<TABLO>_NO / _KOD`, tablo adıyla ilgisiz |
-| Yabancı anahtar kolonu | `<HEDEF>_ID`, `<HEDEF>_NO / _KOD`, rol önekli (`GONDEREN_MUSTERI_ID`), hedefin PK adıyla aynı, kuralsız (`CHZ_REF`) |
+| Yabancı anahtar kolonu | `<HEDEF>_ID`, `<HEDEF>_NO / _KOD`, rol önekli (`GONDEREN_MUSTERI_ID`, `AGENT_USER_ID → APP_USER`), hedefin PK adıyla aynı, yalnızca rol adı (`SAHIBI`), hedef adını içermeyen (`CHZ_REF`) |
 | Tablo adı | tekil / çoğul (tahmini), `TBL_` gibi önekler |
 | Karakterler ve uzunluk | Türkçe / ASCII dışı karakter, 30 karakteri aşan adlar |
 
 - Her boyutta **baskın kalıp** ve ona **uymayanlar** listelenir. Listedeki bir ada tıklamak tabloyu seçer.
+- En çok kullanılan kalıbın payı %60'ın altındaysa "baskın" denmez; pencere **belirgin baskın kalıp yok** uyarısı gösterir. %51'e %49 gibi bir dağılım, şemada iki ayrı alışkanlık olduğunu söyler.
 - **Kapsam** seçimiyle profil tek bir şema için hesaplanır. Böylece hangi modülün hangi alışkanlıkla yazıldığı ayrılır.
 - **Tutarlılık** puanı, her boyutta baskın kalıba uyan adların ortalama oranıdır.
 - **Markdown indir** profili ekiple paylaşmak için bir dosyaya yazar.
@@ -241,6 +242,7 @@ Araç bir kural dayatmaz: `ID` mi `<TABLO>_ID` mi doğru, buna ekip karar verir.
 
 **Orana katılmayanlar:**
 - Bileşik PK'ler, PK'si üst tablodan gelen 1:1 tablolar ve PK'siz tablolar. Bunlar ayrıca gösterilir.
+- `CREATED_BY`, `UPDATED_BY`, `GUNCELLEYEN`, `KAYIT_KULLANICI` gibi denetim kolonları. Kullanıcı tablosuna bağlı olsalar da kendi yerleşik kalıpları vardır; ayrıca sayılırlar.
 - Tahmini ilişkiler: zaten ada dayandıkları için yalnızca tanımlı FK'ler sayılır.
 - MongoDB koleksiyonlarının `_id` ve `ref` alanları.
 
@@ -596,11 +598,12 @@ When a team has no written naming standard, the first step is to see what the sc
 |---|---|
 | Table and column name case | `UPPER_SNAKE`, `lower_snake`, `PascalCase`, `camelCase` |
 | Primary key name | `ID`, `<TABLE>_ID`, `<TABLE>_NO / _CODE`, unrelated to the table name |
-| Foreign key column | `<TARGET>_ID`, `<TARGET>_NO / _CODE`, role prefix (`SENDER_CUSTOMER_ID`), same as the target PK, irregular (`CHZ_REF`) |
+| Foreign key column | `<TARGET>_ID`, `<TARGET>_NO / _CODE`, role prefix (`SENDER_CUSTOMER_ID`, `AGENT_USER_ID → APP_USER`), same as the target PK, role name only (`OWNER`), not containing the target name (`CHZ_REF`) |
 | Table name | singular / plural (estimated), prefixes such as `TBL_` |
 | Characters and length | Turkish / non-ASCII characters, names longer than 30 characters |
 
 - Each dimension lists the **dominant pattern** and the names that **do not follow it**. Clicking a name selects its table.
+- If the most used pattern has less than 60%, it is not called dominant; the window shows **no clear dominant pattern**. A 51% to 49% split means the schema has two separate habits.
 - **Scope** computes the profile for a single schema, which separates the habits of different modules.
 - The **consistency** score is the average share of names that follow the dominant pattern in each dimension.
 - **Download Markdown** writes the profile to a file to share with the team.
@@ -609,6 +612,7 @@ The tool imposes no rule: whether `ID` or `<TABLE>_ID` is right is the team's de
 
 **Not counted in the shares:**
 - Composite PKs, 1:1 tables whose PK comes from the parent, and tables without a PK. These are shown separately.
+- Audit columns such as `CREATED_BY`, `UPDATED_BY`, `GUNCELLEYEN` and `KAYIT_KULLANICI`. They point to the user table but follow their own established pattern; they are counted separately.
 - Inferred relationships: only declared FKs are counted, because inferred ones are already based on names.
 - The `_id` and `ref` fields of MongoDB collections.
 

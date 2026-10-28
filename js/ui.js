@@ -306,6 +306,10 @@ const schemaKey = s => s.db.name + '|' + s.name;
 const scopeLabel = s => (S.lay.dbs.length > 1 ? s.db.label + ' / ' : '') + schemaLabel(s);
 const fmtPct = n => t('pct', { n: n.toLocaleString(NS.getLang(), { maximumFractionDigits: 1 }) });
 const bucketLabel = (d, b, lim) => t('nk_' + d.id + '_' + b.key, { n: lim });
+// Payı eşiğin altındaysa en çok kullanılan kalıp "baskın" değil, yalnızca "en çok" olarak yazılır
+const topWord = d => t(d.clear ? 'namingDominant' : 'namingTop');
+const outliersTitle = d => t(d.clear ? 'namingOutliers' : 'namingOutliersTop', { n: d.outliers.length });
+const noClearNote = (d, p) => t('namingNoClear', { share: fmtPct(Math.round(d.share * 1000) / 10), at: fmtPct(Math.round(p.clearAt * 100)) });
 // Örnek ve sapan adlar: TABLO.KOLON, FK'de hedefle birlikte; şema yalnızca birden fazla şema varsa yazılır
 function itemName(it) {
   const tb = it.t;
@@ -337,13 +341,14 @@ function renderNaming() {
     const rows = counted.map(b => {
       const dom = b.key === d.dominant;
       return `<li class="${dom ? 'dom' : ''}" ${b.items[0] ? `data-go="${esc(b.items[0].t.key)}" data-col="${esc(b.items[0].c || '')}"` : ''}>
-        <i class="sw c${color.get(b.key)}"></i><span class="nl">${esc(bucketLabel(d, b, p.nameLimit))}${dom && counted.length > 1 ? ` <em>${esc(t('namingDominant'))}</em>` : ''}</span>
+        <i class="sw c${color.get(b.key)}"></i><span class="nl">${esc(bucketLabel(d, b, p.nameLimit))}${dom && counted.length > 1 ? ` <em class="${d.clear ? '' : 'weak'}">${esc(topWord(d))}</em>` : ''}</span>
         <span class="ex" title="${esc(itemName(b.items[0]))}">${esc(itemName(b.items[0]))}</span><b>${esc(fmtPct(b.pct))}</b><b>${b.n}</b></li>`;
     }).join('');
     const extra = neutral.length ? `<p class="nn">${esc(t('namingNotCounted'))}: ${neutral.map(b => `${esc(bucketLabel(d, b, p.nameLimit))} ${b.n}`).join(' · ')}</p>` : '';
     const MAX = 60;
-    const outs = d.outliers.length ? `<details><summary>${esc(t('namingOutliers', { n: d.outliers.length }))}</summary><ul class="no">${d.outliers.slice(0, MAX).map(it => `<li data-go="${esc(it.t.key)}" data-col="${esc(it.c || '')}" tabindex="0">${esc(itemName(it))}</li>`).join('')}${d.outliers.length > MAX ? `<li class="more">${esc(t('namingMore', { n: d.outliers.length - MAX }))}</li>` : ''}</ul></details>` : '';
-    return `<section class="nd"><h5>${esc(t('nd_' + d.id))}</h5><div class="nbar">${bar}</div><ul class="nb">${rows}</ul>${extra}${outs}</section>`;
+    const mixed = d.clear ? '' : `<p class="nn mixed">${esc(noClearNote(d, p))}</p>`;
+    const outs = d.outliers.length ? `<details><summary>${esc(outliersTitle(d))}</summary><ul class="no">${d.outliers.slice(0, MAX).map(it => `<li data-go="${esc(it.t.key)}" data-col="${esc(it.c || '')}" tabindex="0">${esc(itemName(it))}</li>`).join('')}${d.outliers.length > MAX ? `<li class="more">${esc(t('namingMore', { n: d.outliers.length - MAX }))}</li>` : ''}</ul></details>` : '';
+    return `<section class="nd"><h5>${esc(t('nd_' + d.id))}</h5><div class="nbar">${bar}</div><ul class="nb">${rows}</ul>${mixed}${extra}${outs}</section>`;
   }).join('');
   el.innerHTML = `
     <h4>${esc(t('namingTitle'))}</h4>
@@ -382,13 +387,14 @@ function namingMarkdown() {
     if (!d.total) { out.push(t(d.id === 'fkStyle' ? 'namingNoFk' : d.id === 'pkStyle' ? 'namingNoPk' : 'namingEmpty'), ''); continue; }
     out.push(`| ${t('namingPattern')} | ${t('namingShare')} | ${t('namingCount')} | ${t('namingExample')} |`, '|---|---:|---:|---|');
     for (const b of d.buckets.filter(x => !x.neutral && x.n)) {
-      const dom = b.key === d.dominant && d.buckets.filter(x => !x.neutral && x.n).length > 1 ? ` (${t('namingDominant')})` : '';
+      const dom = b.key === d.dominant && d.buckets.filter(x => !x.neutral && x.n).length > 1 ? ` (${topWord(d)})` : '';
       out.push(`| ${cell(bucketLabel(d, b, p.nameLimit))}${dom} | ${fmtPct(b.pct)} | ${b.n} | ${code(itemName(b.items[0]))} |`);
     }
     out.push('');
+    if (!d.clear) out.push(noClearNote(d, p), '');
     const neutral = d.buckets.filter(b => b.neutral && b.n);
     if (neutral.length) out.push(`${t('namingNotCounted')}: ${neutral.map(b => `${bucketLabel(d, b, p.nameLimit)} ${b.n}`).join(' · ')}`, '');
-    if (d.outliers.length) out.push(`**${t('namingOutliers', { n: d.outliers.length })}:** ${d.outliers.map(it => code(itemName(it))).join(', ')}`, '');
+    if (d.outliers.length) out.push(`**${outliersTitle(d)}:** ${d.outliers.map(it => code(itemName(it))).join(', ')}`, '');
   }
   return out.join('\n');
 }

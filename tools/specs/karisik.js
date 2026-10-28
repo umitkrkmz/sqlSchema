@@ -1,7 +1,8 @@
 /*
  * Karışık adlandırma — iki ekibin yıllar içinde aynı veritabanına farklı alışkanlıklarla tablo eklediği bir Oracle şeması.
  * ENVANTER eski ekibin işi: PK <TABLO>_ID. SAHA yeni ekibin işi: PK ID. Arada kısaltılmış (CHZ_REF),
- * İngilizce (DEVICE_REF) ve kuralsız (SAHIBI) FK kolonları, rol önekli FK'ler, TBL_ öneki, Türkçe çoğul,
+ * İngilizce (DEVICE_REF) ve yalnızca rol adı taşıyan (SAHIBI) FK kolonları, rol önekli FK'ler,
+ * kullanıcıya bağlı denetim kolonları (CREATED_BY, GUNCELLEYEN), TBL_ öneki, Türkçe çoğul,
  * bir ORM'in tırnakla açtığı PascalCase tablolar, Türkçe karakterli ve 30 karakteri aşan adlar var.
  * Adlandırma profilinin testidir: tests/run.js buradaki oranları birebir bekler.
  */
@@ -15,7 +16,7 @@ const RULES = [
 
 const SPEC = `
 # ENVANTER: eski ekip, PK <TABLO>_ID
-ENVANTER.CIHAZ | Sahadaki her fiziksel cihaz (modem, ONT, set üstü kutu) | CIHAZ_ID pk; SERI_NO nn uq; CIHAZ_MODEL_ID >CIHAZ_MODEL; DEPO_ID >DEPO; DURUM_KOD; ALIS_TAR; SON_BAKIM_YAPAN_TEKNISYEN_SICIL_NO
+ENVANTER.CIHAZ | Sahadaki her fiziksel cihaz (modem, ONT, set üstü kutu) | CIHAZ_ID pk; SERI_NO nn uq; CIHAZ_MODEL_ID >CIHAZ_MODEL; DEPO_ID >DEPO; DURUM_KOD; ALIS_TAR; SON_BAKIM_YAPAN_TEKNISYEN_SICIL_NO; GUNCELLEYEN:id >SAHA.KULLANICI
 ENVANTER.CIHAZ_MODEL | | CIHAZ_MODEL_ID pk; MARKA_ID nn >MARKA; MODEL_ADI nn
 ENVANTER.MARKA | | MARKA_ID pk; MARKA_ADI nn
 ENVANTER.DEPO | Ana depo ve bölge depoları | DEPO_ID pk; DEPO_ADI nn; IL_KOD >IL
@@ -32,7 +33,8 @@ ENVANTER.SAYIM_DETAY | | NO:id pk; SAYIM_ID nn >SAYIM; CIHAZ_ID nn >CIHAZ; BULUN
 SAHA.TEKNISYEN | | ID pk; AD_SOYAD nn; SICIL_NO uq; BOLGE_ID >BOLGE
 SAHA.BOLGE | | ID pk; BOLGE_ADI nn
 SAHA.ABONE | Saha ekibinin kendi abone kopyası; eski alışkanlıkla açılmış | ABONE_ID pk; AD_SOYAD nn; TCKN:str(11)
-SAHA.IS_EMRI | Kurulum, arıza ve söküm iş emirleri | ID pk; ABONE_ID nn >ABONE; CIHAZ_ID >ENVANTER.CIHAZ; TEKNISYEN_ID >TEKNISYEN; ACILIS_TAR nn; DURUM:str(20) nn
+SAHA.KULLANICI | Uygulama kullanıcıları | ID pk; KULLANICI_ADI:str(50) nn uq; AD_SOYAD nn
+SAHA.IS_EMRI | Kurulum, arıza ve söküm iş emirleri | ID pk; ABONE_ID nn >ABONE; CIHAZ_ID >ENVANTER.CIHAZ; TEKNISYEN_ID >TEKNISYEN; ACILIS_TAR nn; DURUM:str(20) nn; CREATED_BY:id nn >KULLANICI; UPDATED_BY:id >KULLANICI
 SAHA.IS_EMRI_ADIM | | ID pk; IS_EMRI_ID nn >IS_EMRI; SIRA:smallint nn; ACIKLAMA:str(400)
 SAHA.RANDEVULAR | | ID pk; IS_EMRI_ID nn >IS_EMRI; BASLANGIC_TAR nn; BITIS_TAR
 SAHA.MALZEME | | ID pk; MALZEME_ADI nn; BIRIM:str(10)
