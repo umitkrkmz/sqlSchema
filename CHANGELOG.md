@@ -5,6 +5,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+## [0.4.0] - 2026-10-29
+
 ### Eklendi · Added
 
 - **Sözlük tabloları:** en az iki koşullu ilişkinin hedefi olan tablo (genel kod tablosu) sözlük sayılır. Ona giden çizgiler yerine kartta `→ SÖZLÜK` rozeti görünür, yerleşimi çekmez; panelde koşul başına kullanan kolonlar listelenir. Panelden elle açılıp kapatılır; **Görünüm → Sözlük bağlantılarını çiz** ile çizgiler geri gelir.
@@ -83,7 +85,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 - **Geliştirme araçları:** test seti, ekran görüntüsü üreticisi.
   Test suite and screenshot generator.
 
-[Yayımlanmamış · Unreleased]: ../../compare/v0.3.1...HEAD
+[Yayımlanmamış · Unreleased]: ../../compare/v0.4.0...HEAD
+[0.4.0]: ../../compare/v0.3.1...v0.4.0
 [0.3.1]: ../../compare/v0.3.0...v0.3.1
 [0.3.0]: ../../compare/v0.2.1...v0.3.0
 [0.2.1]: ../../compare/v0.2.0...v0.2.1
