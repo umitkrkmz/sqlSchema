@@ -119,6 +119,12 @@ code, kbd { font-family: var(--mono); }
 .view-menu .opt > span { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; font: inherit; color: var(--text); }
 .view-menu .opt b { font-size: 13px; }
 .view-menu .opt small { font-size: 11.5px; color: var(--dim); line-height: 1.35; }
+.view-menu .opt-group { margin: 4px 0 0; padding: 8px 10px 6px; border: 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
+.view-menu .opt-group legend { padding: 0; margin-bottom: 4px; float: left; width: 100%; font: 600 13px var(--sans); color: var(--text); }
+.view-menu .opt-group label { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #c3cbe2; cursor: pointer; }
+.view-menu .opt-group input { accent-color: var(--accent); margin: 0; }
+.view-menu .opt-group label span { font: 12.5px var(--sans); color: inherit; }
+.view-menu .opt-group small { margin-top: 2px; font-size: 11.5px; color: var(--dim); line-height: 1.35; }
 .view-menu kbd { flex: none; padding: 1px 5px; border: 1px solid var(--line-2); border-radius: 4px; font-size: 10.5px; color: var(--dim); }
 .samples-menu { width: 380px; max-height: min(72vh, 640px); overflow: auto; scrollbar-width: thin; }
 .samples-menu button { gap: 3px; padding: 9px 10px; border-top: 1px solid var(--line); border-radius: 0; }

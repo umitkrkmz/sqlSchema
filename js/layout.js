@@ -17,6 +17,7 @@ const L = {
   groupSmall: 40,   // bu sayıdan küçük şemalar tek takımyıldızdır
   groupMax: 70,     // bir takımyıldızdaki en fazla tablo
   groupPad: 110,
+  filePad: 300,     // dosya takımyıldızları arası: aralarında ilişki olsa da ayrı durmaları istenir
   schemaPad: 240,
   dbPad: 700,
   // kat başına kuvvet ayarları (bkz. relax)
@@ -159,9 +160,36 @@ function toRoman(n) {
   return s;
 }
 
-function makeGroups(schema, rels) {
+// Tablonun oluşturulduğu dosya; dış tablolar ve yapıştırılan metin için yok
+const fileOf = t => (t.src && t.src.file) || null;
+
+// Dosya yollarının ayırt edici en kısa sonu: POLICE/tablolar.sql ve HASAR/tablolar.sql → POLICE/tablolar, HASAR/tablolar
+function shortNames(paths) {
+  const out = new Map();
+  const parts = new Map(paths.map(p => [p, String(p).replace(/\.[^./]+$/, '').split('/')]));
+  for (const p of paths) {
+    const segs = parts.get(p);
+    let n = 1;
+    const tail = (s, k) => s.slice(-k).join('/');
+    while (n < segs.length && paths.some(q => q !== p && tail(parts.get(q), n) === tail(segs, n))) n++;
+    out.set(p, tail(segs, n));
+  }
+  return out;
+}
+
+/*
+ * Takımyıldızlar iki yoldan kurulur:
+ *   'file'  şemanın tabloları birden fazla dosyadan geliyorsa her dosya bir takımyıldızdır; ekipler
+ *           modülleri çoğunlukla dosyalara ayırır, harita da bu ayrımı korur
+ *   'name'  ad öneki (CRM_, BILL_) ve ilişki komşuluğu; tek dosyalı dökümlerde ve migration'larda
+ * Her iki yolda da çok büyük takımyıldızlar BFS sırasıyla bölünür.
+ */
+function makeGroups(schema, rels, grouping) {
   const list = schema.tables;
-  if (list.length <= L.groupSmall) return [{ name: schema.label, tables: list.slice() }];
+  // MongoDB'de birden fazla kaynak (doğrulayıcı, Mongoose modeli, örnek belge) aynı koleksiyonu anlatır; modül değildir
+  const files = [...new Set(list.filter(t => t.dialect !== 'mongodb').map(fileOf).filter(Boolean))];
+  const byFile = grouping === 'file' && files.length > 1;
+  if (!byFile && list.length <= L.groupSmall) return [{ name: schema.label, tables: list.slice() }];
   const inSchema = new Set(list);
   const nbrs = new Map(list.map(t => [t, []]));
   for (const r of rels) {
@@ -171,9 +199,15 @@ function makeGroups(schema, rels) {
   }
   const assigned = new Map();
   const groups = [];
+  if (byFile) {
+    const names = shortNames(files);
+    const byPath = new Map(files.map(f => [f, { name: names.get(f), tables: [], file: f }]));
+    groups.push(...byPath.values());
+    for (const t of list) if (byPath.has(fileOf(t)) && !t.embedded) assigned.set(t, byPath.get(fileOf(t)));
+  }
   const byPrefix = new Map();
   for (const t of list) {
-    if (t.embedded) continue;
+    if (t.embedded || byFile) continue;
     const p = prefixOf(t.name);
     if (!p) continue;
     if (!byPrefix.has(p)) byPrefix.set(p, []);
@@ -191,6 +225,7 @@ function makeGroups(schema, rels) {
     const g = named.get(String(t.name).toUpperCase());
     if (g && !assigned.has(t)) assigned.set(t, g);
   }
+  // dosyası olmayanlar (dış başvurular) ve önekle eşleşmeyenler komşularının çoğunluğuna katılır
   for (let pass = 0; pass < 3; pass++) {
     for (const t of list) {
       if (assigned.has(t)) continue;
@@ -255,9 +290,15 @@ function makeGroups(schema, rels) {
     }
     const parts = Math.ceil(order.length / L.groupMax);
     const size = Math.ceil(order.length / parts);
-    for (let k = 0; k < parts; k++) out.push({ name: g.name + ' ' + toRoman(k + 1), tables: order.slice(k * size, (k + 1) * size), loose: g.loose });
+    for (let k = 0; k < parts; k++) out.push({ name: g.name + ' ' + toRoman(k + 1), tables: order.slice(k * size, (k + 1) * size), loose: g.loose, file: g.file });
   }
   return out;
+}
+
+// Arayüzdeki 'auto' seçimi: migration klasöründe dosya bir modülü değil bir sürümü gösterir, orada ada göre
+function resolveGrouping(pref, migration) {
+  if (pref === 'file' || pref === 'name') return pref;
+  return migration ? 'name' : 'file';
 }
 
 // Daireleri (gruplar, şemalar, veritabanları) birbirine bağlantı sayısıyla çeken kat
@@ -279,7 +320,9 @@ function packCircles(items, rels, keyOf, force, pad) {
   return center(items, it => it.r);
 }
 
-function layoutModel(model) {
+// opts.grouping: 'file' | 'name' (varsayılan 'name'; arayüz resolveGrouping ile seçer)
+function layoutModel(model, opts = {}) {
+  const grouping = opts.grouping || 'name';
   const rels = model.rels;
   const byDb = new Map();
   for (const t of model.tables) {
@@ -309,10 +352,10 @@ function layoutModel(model) {
   schemas.forEach((s, i) => { s.index = i; });
 
   for (const s of schemas) {
-    s.groups = makeGroups(s, rels);
+    s.groups = makeGroups(s, rels, grouping);
     for (const g of s.groups) {
       g.schema = s;
-      g.label = g.loose ? '' : titleCase(g.name);
+      g.label = g.loose ? '' : g.file ? g.name : titleCase(g.name);
       g.index = groups.length;
       groups.push(g);
       g.tables.forEach(t => { t.group = g; });
@@ -355,7 +398,7 @@ function layoutModel(model) {
   // 2) takımyıldızlar, 3) şemalar, 4) veritabanları
   for (const s of schemas) {
     s.groups.sort((a, b) => b.tables.length - a.tables.length);
-    s.r = packCircles(s.groups, rels, t => t.group, L.groupForce, L.groupPad) + 60;
+    s.r = packCircles(s.groups, rels, t => t.group, L.groupForce, s.groups.some(g => g.file) ? L.filePad : L.groupPad) + 60;
   }
   for (const db of dbs) db.r = packCircles(db.schemas, rels, t => t.schemaRef, L.schemaForce, L.schemaPad) + (dbs.length > 1 ? 160 : 0);
   packCircles(dbs, [], t => t, L.schemaForce, L.dbPad);
@@ -379,8 +422,8 @@ function layoutModel(model) {
     minX = Math.min(minX, c.x - c.r); maxX = Math.max(maxX, c.x + c.r);
     minY = Math.min(minY, c.y - c.r); maxY = Math.max(maxY, c.y + c.r);
   }
-  return { dbs, schemas, groups, bounds: { minX, minY, maxX, maxY } };
+  return { dbs, schemas, groups, grouping, bounds: { minX, minY, maxX, maxY } };
 }
 
-Object.assign(NS, { L, layoutModel });
+Object.assign(NS, { L, layoutModel, resolveGrouping });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});

@@ -25,8 +25,9 @@ function decode(buf) {
   return buf.toString('utf8');
 }
 
-// Uygulamanın yaptığı gibi: sırala, ayrıştır, (isteğe bağlı) ayrı veritabanları, model, yerleşim
-function build(files, separate) {
+// Uygulamanın yaptığı gibi: sırala, ayrıştır, (isteğe bağlı) ayrı veritabanları, model, yerleşim.
+// grouping verilmezse arayüzün 'auto' seçimi: migration'da ada göre, değilse dosyaya göre
+function build(files, separate, grouping) {
   const { files: ordered, skipped, migration } = NS.orderFiles(files);
   const names = NS.databaseNames(ordered.map(f => f.path));
   const inputs = [];
@@ -36,7 +37,7 @@ function build(files, separate) {
   }
   NS.harmonizeDialects(inputs);
   const model = NS.buildModel(inputs);
-  const lay = NS.layoutModel(model);
+  const lay = NS.layoutModel(model, { grouping: NS.resolveGrouping(grouping, migration) });
   return { model, lay, skipped, migration, order: ordered.map(f => f.path) };
 }
 
@@ -103,12 +104,17 @@ const EXPECT = {
     check('banka: adlandırma tek stil (PascalCase, <Tablo>Id)', p.dims.find(d => d.id === 'tableCase').share === 1 && p.dims.find(d => d.id === 'pkStyle').dominant === 'tableId', p.dims.map(d => d.dominant));
     check('banka: 1:1 alt tabloların PK\'si sapma sayılmaz', dim(p, 'pkStyle').shared === 6 && !dim(p, 'pkStyle').other, dim(p, 'pkStyle'));
   },
-  sigorta({ model: m }) {
+  sigorta({ model: m, lay }, all, s) {
     check('sigorta: hiç FK yok', m.stats.fk === 0, m.stats.fk);
     check('sigorta: 50+ tahmini ilişki', m.stats.implicit >= 50, m.stats.implicit);
     check('sigorta: hasar dosyası → poliçe', rel(m, 'HASAR_DOSYA', 'POLICE_NO', 'POLICE', 'implicit'));
     check('sigorta: poliçe aracı 1:1 poliçe', (rel(m, 'POLICE_ARAC', 'POLICE_NO', 'POLICE') || {}).childEnd === 'zeroOne');
     check('sigorta: tek şema', new Set(m.tables.map(t => t.schema)).size === 1);
+    const labels = lay.schemas[0].groups.map(g => g.label).sort();
+    check('sigorta: modül klasörü başına bir takımyıldız', same(labels, ['ACENTE/tablolar', 'HASAR/tablolar', 'ORTAK/tablolar', 'POLICE/tablolar', 'REASURANS/tablolar', 'TAHSILAT/tablolar', 'URUN/tablolar']), labels);
+    check('sigorta: her tablo kendi dosyasının takımyıldızında', m.tables.every(t => t.group.file === t.src.file));
+    const byName = build(s.files.map(p => ({ path: 'sigorta/' + p, text: fs.readFileSync(path.join(ROOT, 'samples', 'sigorta', p), 'utf8') })), false, 'name').lay;
+    check('sigorta: ada göre gruplama seçilince dosya takımyıldızı yok', !byName.groups.some(g => g.file), byName.groups.map(g => g.label));
   },
   eticaret({ model: m }) {
     check('eticaret: MySQL tanındı', m.stats.dialects.includes('mysql'), m.stats.dialects);
@@ -138,6 +144,7 @@ const EXPECT = {
     check('lojistik: yeniden adlandırılan tabloya FK', rel(m, 'parcels', 'shipment_id', 'shipments', 'fk'));
     check('lojistik: partition tablosu tahminle bağlı', rel(m, 'tracking_events', 'shipment_id', 'shipments', 'implicit'));
     check('lojistik: partition parçaları tablo olmadı', !find(m, 'tracking_events_2026_09'));
+    check('lojistik: migration\'da dosyaya göre gruplanmaz', NS.resolveGrouping('auto', migration) === 'name' && !m.tables.some(t => t.group.file));
   },
   iot({ model: m }) {
     check('iot: Cassandra tanındı', m.stats.dialects.includes('cassandra'), m.stats.dialects);
@@ -162,6 +169,7 @@ const EXPECT = {
     check('sosyal: üçüncü argümanla koleksiyon adı', !!find(m, 'stories'));
     check('sosyal: ref \'Media\' → media (Mongoose çoğul kuralı)', rel(m, 'stories', 'media', 'media', 'fk') && !find(m, 'medias'));
     check('sosyal: dış koleksiyon yok', m.stats.external === 0, m.tables.filter(t => t.external).map(t => t.name));
+    check('sosyal: MongoDB kaynak dosyalarına göre bölünmez', !m.tables.some(t => t.group.file));
   },
   saha({ model: m }) {
     check('saha: SQLite tanındı', m.stats.dialects.includes('sqlite'), m.stats.dialects);
@@ -202,7 +210,7 @@ for (const s of NS.SAMPLES) {
   all[s.id] = res;
   const before = failed;
   common(s, res);
-  if (EXPECT[s.id]) EXPECT[s.id](res, all);
+  if (EXPECT[s.id]) EXPECT[s.id](res, all, s);
   const st = res.model.stats;
   console.log(`${failed === before ? '✓' : '✗'} ${s.id.padEnd(18)} ${String(st.tables).padStart(4)} tablo ${String(st.fk).padStart(4)} FK ${String(st.implicit).padStart(4)} tahmini ${String(st.embedded).padStart(3)} uydu  ${st.dialects.join('+').padEnd(26)} ${Date.now() - t0} ms`);
 }

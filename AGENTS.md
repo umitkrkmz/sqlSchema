@@ -29,7 +29,7 @@ Betikler `index.html`'de şu sırayla yüklenir ve her biri `globalThis.sqlSchem
 | `js/mongo.js` | `$jsonSchema`, Mongoose ve JSON belgelerinden aynı işlem listesi | yok |
 | `js/files.js` | dosya sıralama (Flyway, golang-migrate), ayrıştırıcı seçimi, ayrı veritabanı adları | yok |
 | `js/model.js` | işlemleri dosya sırasıyla uygular; FK çözümleme, kardinalite, ara tablo, tahmini ilişki | yok |
-| `js/layout.js` | veritabanı → şema → takımyıldız → yıldız, deterministik kuvvet yerleşimi | yok |
+| `js/layout.js` | veritabanı → şema → takımyıldız (dosyaya ya da ada göre) → yıldız, deterministik kuvvet yerleşimi | yok |
 | `js/conventions.js` | adlandırma profili: boyutlar, kovalar, oranlar, baskın kalıba uymayanlar (kod döndürür, metin değil) | yok |
 | `js/sample-small.js` | gömülü küçük örnek | yok |
 | `samples/catalog.js` | örnek kataloğu (üretilir) | yok |

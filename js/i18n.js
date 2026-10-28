@@ -30,6 +30,9 @@ const DICT = {
     optImplicitHint: 'Kolon adlarından tahmin edilen bağlantılar, kesikli çizgiyle.',
     columnsOff: 'Kolonlar gizlendi: yalnızca tablolar ve ilişkiler. Geri açmak için C.',
     columnsOn: 'Kolonlar gösteriliyor.',
+    optGrouping: 'Takımyıldızlar',
+    groupAuto: 'Otomatik', groupFile: 'Dosyaya göre', groupName: 'Ad ve ilişkiye göre',
+    optGroupingHint: 'Otomatik: birden fazla dosya açıldığında her dosya ayrı takımyıldız olur; migration klasörlerinde ve MongoDB\'de ad ve ilişkiye göre gruplanır.',
     fit: 'Sığdır', fitTitle: 'Tümünü sığdır (F)',
     pngTitle: 'Görünümü PNG olarak indir',
 
@@ -210,6 +213,9 @@ const DICT = {
     optImplicitHint: 'Links guessed from column names, drawn dashed.',
     columnsOff: 'Columns hidden: tables and relationships only. Press C to show them again.',
     columnsOn: 'Columns shown.',
+    optGrouping: 'Constellations',
+    groupAuto: 'Automatic', groupFile: 'By file', groupName: 'By name and relationships',
+    optGroupingHint: 'Automatic: when several files are open, each file becomes its own constellation; migration folders and MongoDB are grouped by name and relationships.',
     fit: 'Fit', fitTitle: 'Fit all (F)',
     pngTitle: 'Download the view as PNG',
 

@@ -6,6 +6,7 @@
  * URL parametreleri (paylaşılabilir bağlantılar ve belge görüntüleri için):
  *   ?lang=tr|en   ?sample=<örnek kimliği>   ?select=<tablo adı>   ?zoom=<1.6>   ?legend=0|1
  *   ?pop=naming|report|files   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
+ *   ?grouping=auto|file|name
  */
 (function (NS) {
 'use strict';
@@ -14,7 +15,7 @@ const {
   S, $, canvas, CARD, DIALECTS, t,
   levelOf, wx, wy, starR, cardRows, keyTag, schemaColor, schemaLabel, groupLabel, relStyle, relVisible,
   drawGlyph, refreshEmphasis, invalidate, draw, resetHud, resize, fitView, zoomAt, flyToTable,
-  classify, orderFiles, parseFile, databaseNames, harmonizeDialects, buildModel, layoutModel, namingProfile,
+  classify, orderFiles, parseFile, databaseNames, harmonizeDialects, buildModel, layoutModel, resolveGrouping, namingProfile,
 } = NS;
 
 const MAX_FILE = 60 * 1024 * 1024;
@@ -68,7 +69,7 @@ function rebuild() {
     S.model = S.lay = null;
     return false;
   }
-  S.lay = layoutModel(model);
+  S.lay = layoutModel(model, { grouping: resolveGrouping(S.grouping, migration) });
   S.model = model;
   S.parseMs = Math.round(performance.now() - t0);
   S.order = model.tables.slice().sort((a, b) => b.deg - a.deg || String(a.name).localeCompare(String(b.name)));
@@ -763,6 +764,16 @@ $('#pasteDlg').addEventListener('close', () => {
 $('#tImplicit').addEventListener('change', e => { S.implicit = e.target.checked; refreshEmphasis(); renderPanel(); invalidate(); });
 $('#tGrid').addEventListener('change', e => { S.grid = e.target.checked; invalidate(); });
 $('#tColumns').addEventListener('change', e => setColumns(e.target.checked));
+// Takımyıldız gruplaması: 'auto' migration'da ada, değilse dosyaya göre (layout.js resolveGrouping)
+$('#viewMenu').addEventListener('change', e => {
+  if (e.target.name !== 'grouping') return;
+  S.grouping = e.target.value;
+  try { localStorage.setItem('sqlschema.grouping', S.grouping); } catch (err) { /* depolama kapalı */ }
+  if (S.model) rebuild();
+});
+function markGrouping() {
+  for (const r of document.querySelectorAll('#viewMenu input[name="grouping"]')) r.checked = r.value === S.grouping;
+}
 
 // Kolon ayrıntıları: kapalıyken yakın plan yalnızca tablo adlarını ve ilişkileri gösterir
 function setColumns(on, quiet) {
@@ -842,6 +853,10 @@ try {
   let cols = params.get('columns');
   if (cols !== '0' && cols !== '1') { try { cols = localStorage.getItem('sqlschema.columns'); } catch (err) { cols = null; } }
   if (cols === '0') { S.columns = false; $('#tColumns').checked = false; }
+  let grouping = params.get('grouping');
+  if (!['auto', 'file', 'name'].includes(grouping)) { try { grouping = localStorage.getItem('sqlschema.grouping'); } catch (err) { grouping = null; } }
+  S.grouping = ['auto', 'file', 'name'].includes(grouping) ? grouping : 'auto';
+  markGrouping();
 }
 
 // Konsoldan inceleme için: sqlSchema.S.model.tables, sqlSchema.loadText(metin, 'ad.sql')
