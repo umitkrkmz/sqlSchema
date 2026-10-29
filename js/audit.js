@@ -13,6 +13,7 @@
  *   }
  *   Borç: opts.debt kabul edilmiş bulgu anahtarlarıdır. Eşleşen bulgular debt: true olur, counts ve clean yalnızca
  *   yeni bulguları sayar; kayıtta olup artık bulunmayanlar ödenmiştir (paid).
+ *   reviewChange(before, after, opts): bir değişikliğin getirdiği ve giderdiği bulgular (aşağıda)
  *   findingKey(f): kural, tablo (şemasıyla) ve kolonlardan kalıcı kimlik: 'fk-no-index:SATIS.SIPARIS.KAMPANYA_ID'
  *   AUDIT_RULES: [{ id, group, severity, guess }]   gruplar: keys, types, norm, naming; guess: bulgu addan tahmin
  */
@@ -317,7 +318,7 @@ function auditModel(model, opts = {}) {
   const seen = new Set();
   const counts = { error: 0, warning: 0, info: 0 }, debtCounts = { error: 0, warning: 0, info: 0 };
   for (const f of findings) {
-    f.key = findingKey(f);
+    f.key = findingKey(f, opts.nameOf);
     f.debt = keys.has(f.key);
     if (f.debt) seen.add(f.key);
     (f.debt ? debtCounts : counts)[f.severity]++;
@@ -329,8 +330,9 @@ function auditModel(model, opts = {}) {
 
 // Bulgunun kalıcı kimliği: tablo nesneleri her kurulumda yenilenir, ad ve kolonlar kalır.
 // Tablo düzeyindeki toplu bulgularda kolon listesi de kimliğe girer: listeye yeni kolon eklenirse bulgu yeniden görünür.
-function findingKey(f) {
-  const tn = tb => U((tb.schema ? tb.schema + '.' : '') + tb.name);
+// nameOf: tablo → ad (değişiklik incelemesinde adı değişen tablonun eski bulguları yeni adıyla eşleşsin diye)
+function findingKey(f, nameOf) {
+  const tn = tb => U(nameOf ? nameOf(tb) : (tb.schema ? tb.schema + '.' : '') + tb.name);
   const where = f.t ? tn(f.t) : f.tables.map(tn).sort().join('+');
   const list = f.col ? [f.col] : f.data.cols || f.data.names || [];
   return f.rule + ':' + where + (list.length ? '.' + list.map(U).sort().join(',') : '');
@@ -348,5 +350,25 @@ function boolEncoding(c, ti, w) {
   return null;
 }
 
-Object.assign(NS, { auditModel, AUDIT_RULES, typeInfo, findingKey });
+// Değişiklik incelemesi (PR, yeni migration): "sonra"da olup "önce"de olmayan bulgular bu değişiklikle gelmiştir, tersi
+// giderilmiştir. Adı değişen tablolar farktan eşlenir; eski bulgu yeni adıyla "yeni" görünmez. Borç kaydındakiler sayılmaz.
+//   reviewChange(before, after, { diff, debt }) → { diff, findings, fixed, counts, before, after }
+function reviewChange(before, after, opts = {}) {
+  const diff = opts.diff || NS.diffModels(before, after);
+  const renamed = new Map();
+  for (const e of diff.tables) if (e.renamed && e.before && e.after) renamed.set(e.before, (e.after.schema ? e.after.schema + '.' : '') + e.after.name);
+  const nameOf = tb => renamed.get(tb) || (tb.schema ? tb.schema + '.' : '') + tb.name;
+  const a0 = auditModel(before, { debt: opts.debt, nameOf }), a1 = auditModel(after, { debt: opts.debt });
+  const old = new Set(a0.findings.map(f => f.key)), now = new Set(a1.findings.map(f => f.key));
+  // önce denetlenemeyen kural (dökümde indeks yoktu) sonra çalışırsa değişmeyen tablolardaki bulguları yeni değildir
+  const skippedBefore = new Set(a0.skipped.map(x => x.rule));
+  const touched = f => f.tables.some(tb => { const e = diff.byAfter.get(tb); return !e || e.status !== 'same'; });
+  const findings = a1.findings.filter(f => !old.has(f.key) && !f.debt && (!skippedBefore.has(f.rule) || touched(f)));
+  const fixed = a0.findings.filter(f => !now.has(f.key));
+  const counts = { error: 0, warning: 0, info: 0 };
+  for (const f of findings) counts[f.severity]++;
+  return { diff, findings, fixed, counts, before: a0, after: a1 };
+}
+
+Object.assign(NS, { auditModel, reviewChange, AUDIT_RULES, typeInfo, findingKey });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});

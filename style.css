@@ -803,7 +803,9 @@ body:not(.loaded) .legend, body:not(.loaded) .hud { display: none; }
   resize: vertical;
 }
 .paste .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
-#fixBody { padding: 18px; }
+#fixBody, #reviewBody { padding: 18px; }
+#reviewPre { white-space: pre-wrap; word-break: break-word; }
+.au-review .au-chips i.paid { color: #7fd49a; }
 .fix-dlg { width: min(900px, calc(100% - 32px)); }
 .fix-dlg .fx-opts { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 8px; font-size: 12.5px; }
 .fix-dlg .fx-opts label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }

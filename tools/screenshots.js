@@ -30,6 +30,7 @@ const SCENES = {
   'zaman-cizelgesi': 'sample=lojistik&time=V4&select=shipments&zoom=0.85&legend=0',
   'tasarim-denetimi': 'sample=hatali&audit=1&select=KAMPANYA&zoom=1.1&legend=0',
   'duzeltme-onerileri': 'sample=hatali&fix=1&legend=0',
+  'inceleme-raporu': 'sample=hatali&diff=V1&review=1&legend=0',
 };
 
 const CANDIDATES = [

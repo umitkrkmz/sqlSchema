@@ -8,7 +8,7 @@
  *   ?pop=naming|report|files|diff|audit   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
  *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)   ?impact=1 (select ile)
  *   ?diff=V3 (migration klasöründe bu sürümle karşılaştır)   ?time=V4 (zaman çizelgesi bu sürümde; ?time=1 baştan)
- *   ?audit=1 (tasarım denetimi haritada)   ?fix=1 (düzeltme önerileri penceresi)
+ *   ?audit=1 (tasarım denetimi haritada)   ?fix=1 (düzeltme önerileri penceresi)   ?review=1 (değişiklik incelemesi; diff ya da time ile)
  */
 (function (NS) {
 'use strict';
@@ -79,7 +79,7 @@ function rebuild() {
   }
   // karşılaştırma açıksa: "önce" modeli kurulur, fark hesaplanır; silinen tablolar da haritada yerini alır
   let shown = model;
-  S.diffRes = null;
+  S.diffRes = S.diffBefore = null;
   stopPlay();
   S.tl = null;
   S.hover = S.sel = null;
@@ -92,6 +92,7 @@ function rebuild() {
       const before = buildBefore(ordered, f => (S.separate ? dbNames.get(f.path) : 'main'));
       if (before) {
         S.diffRes = NS.diffModels(before, model);
+        S.diffBefore = before;
         const gone = S.diffRes.tables.filter(e => e.status === 'removed').map(e => e.before);
         shown = { ...model, tables: model.tables.concat(gone) };
       }
@@ -572,7 +573,7 @@ function renderAudit() {
     <p class="intro">${esc(t('auditIntro'))}</p>
     <p class="au-sum">${esc(t('auditSummary', a))}</p>
     <p class="au-chips">${sevCounts(a.counts) || `<span class="nn">${esc(t(a.debt ? 'debtNoNew' : 'auditNone'))}</span>`}</p>
-    ${debtHtml(a, owed, open)}
+    ${reviewBoxHtml()}${debtHtml(a, owed, open)}
     ${skipped}${auditRulesHtml(fresh, open, '')}
     ${worst.length > 1 ? `<h5>${esc(t('auditWorst'))}</h5><ul class="au-items au-worst">${worst.map(([tb, fs]) =>
       `<li data-go="${esc(tb.key)}" tabindex="0"><b>${esc(tb.name)}</b><span class="au-chips">${sevCounts(countSev(fs))}</span></li>`).join('')}</ul>` : ''}
@@ -591,6 +592,7 @@ $('#auditPop').addEventListener('click', e => {
     if (act === 'audit-map') setAuditMap(!S.auditMap);
     else if (act === 'audit-md') downloadText(auditMarkdown(), fileStem() + '-' + t('auditFile') + '.md', 'text/markdown;charset=utf-8');
     else if (act === 'audit-fix') openFix();
+    else if (act === 'review-open') openReview();
     else if (act === 'debt-accept') acceptDebt();
     else if (act === 'debt-clear') clearDebt();
     else if (act === 'debt-file') downloadProject();
@@ -830,14 +832,101 @@ $('#fixDlg').addEventListener('click', e => {
   const script = $('#fixPre').textContent;
   if (b.dataset.fixAct === 'close') $('#fixDlg').close();
   else if (b.dataset.fixAct === 'download') downloadText(script, fileStem() + '-' + t('fixFile') + '.sql', 'application/sql;charset=utf-8');
-  else if (b.dataset.fixAct === 'copy') {
-    // file:// sayfalarında pano API'si olmayabilir: metin seçilir, kullanıcı kopyalar
-    const done = () => toast(t('fixCopied'), 2500);
-    const select = () => { const r = document.createRange(); r.selectNodeContents($('#fixPre')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); let ok = false; try { ok = document.execCommand('copy'); } catch (err) { /* desteklenmiyor */ } if (ok) done(); else toast(t('fixSelected'), 4000); };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(script).then(done, select);
-    else select();
-  }
+  else if (b.dataset.fixAct === 'copy') copyPre($('#fixPre'));
 });
+
+// file:// sayfalarında pano API'si olmayabilir: metin seçilir, kullanıcı kopyalar
+function copyPre(pre) {
+  const text = pre.textContent;
+  const done = () => toast(t('fixCopied'), 2500);
+  const select = () => { const r = document.createRange(); r.selectNodeContents(pre); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); let ok = false; try { ok = document.execCommand('copy'); } catch (err) { /* desteklenmiyor */ } if (ok) done(); else toast(t('fixSelected'), 4000); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, select);
+  else select();
+}
+
+/* ─── Değişiklik incelemesi ─── */
+
+// Karşılaştırma ya da zaman çizelgesi açıkken: "sonra"nın getirdiği ve giderdiği bulgular (audit.js reviewChange).
+// Rapor PR yorumuna yapıştırılacak Markdown'dur; güvenli ve gözden geçirilecek düzeltme SQL'i katlanır bölümde.
+S.diffBefore = null;   // karşılaştırmanın "önce" modeli (rebuild ve zaman adımı kurar)
+S.review = null;       // { src, stamp, res }
+S.reviewSql = true;
+const SEV_ICON = { error: '\u{2717}', warning: '\u{26A0}', info: '\u{2139}' };
+
+function getReview() {
+  if (!S.diffRes || !S.diffBefore) return null;
+  const src = S.full ? S.full.model : S.model;
+  const debt = currentDebt();
+  const stamp = debt ? debt.updated : '';
+  if (!S.review || S.review.src !== src || S.review.stamp !== stamp) {
+    const after = { ...src, tables: src.tables.filter(tb => S.diffRes.byAfter.has(tb)) };
+    S.review = { src, stamp, res: NS.reviewChange(S.diffBefore, after, { diff: S.diffRes, debt: debt ? debt.keys : null }) };
+  }
+  return S.review.res;
+}
+
+function reviewMarkdown(r, withSql) {
+  const [before, after] = diffSides();
+  const code = s => '`' + String(s).replace(/`/g, "'") + '`';
+  const line = f => {
+    const what = auditWhat(f), label = auditLabel(f);
+    return `- ${SEV_ICON[f.severity]} ${label ? code(label) + ' · ' : ''}${ruleText(f.rule).title}${what ? ': ' + what : ''}`;
+  };
+  const bySev = list => list.slice().sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity]);
+  const out = [`## ${t('reviewHead', { before, after })}`, '',
+    [t('reviewTables', r.diff.summary), ...['error', 'warning', 'info'].filter(k => r.counts[k]).map(k => t(SEV_KEY[k], { n: r.counts[k] }))].join(' · '), ''];
+  if (!r.findings.length) out.push(t('reviewNone'), '');
+  else out.push(`### ${t('reviewNew')} (${r.findings.length})`, '', ...bySev(r.findings).map(line), '');
+  if (r.fixed.length) out.push(`### ${t('reviewFixed')} (${r.fixed.length})`, '', ...bySev(r.fixed).map(line), '');
+  if (withSql && r.findings.length) {
+    const fx = NS.fixAll(r.findings, fixOptions(r.after)).filter(x => x.fix.risk !== 'risky');
+    if (fx.length) out.push(`<details><summary>${t('reviewSql')} (${fx.length})</summary>`, '', '```sql', fx.map(x => fixText(x.f, x.fix)).join('\n\n'), '```', '', '</details>', '');
+  }
+  return out.join('\n');
+}
+
+function openReview() {
+  renderReview();
+  const d = $('#reviewDlg');
+  if (!d.open) d.showModal();
+}
+function renderReview() {
+  const r = getReview();
+  if (!r) { $('#reviewDlg').open && $('#reviewDlg').close(); return; }
+  $('#reviewBody').innerHTML = `<h3>${esc(t('reviewTitle'))}</h3>
+    <p>${esc(t('reviewIntro'))}</p>
+    <div class="fx-opts"><label><input type="checkbox" data-rv="sql" ${S.reviewSql ? 'checked' : ''}> ${esc(t('reviewWithSql'))}</label></div>
+    <pre id="reviewPre" tabindex="0">${esc(reviewMarkdown(r, S.reviewSql))}</pre>
+    <div class="row">
+      <span class="grow">${esc(t('reviewBox', { n: r.findings.length, fixed: r.fixed.length }))}</span>
+      <button class="btn ghost" data-rv-act="copy">${esc(t('fixCopy'))}</button>
+      <button class="btn ghost" data-rv-act="download">${esc(t('namingMd'))}</button>
+      <button class="btn" data-rv-act="close">${esc(t('fixClose'))}</button>
+    </div>`;
+}
+$('#reviewDlg').addEventListener('change', e => {
+  if (!e.target.dataset || e.target.dataset.rv !== 'sql') return;
+  S.reviewSql = e.target.checked;
+  renderReview();
+});
+$('#reviewDlg').addEventListener('click', e => {
+  const b = e.target.closest('[data-rv-act]');
+  if (!b) return;
+  const act = b.dataset.rvAct;
+  if (act === 'close') $('#reviewDlg').close();
+  else if (act === 'download') downloadText($('#reviewPre').textContent, fileStem() + '-' + t('reviewFile') + '.md', 'text/markdown;charset=utf-8');
+  else if (act === 'copy') copyPre($('#reviewPre'));
+});
+
+// Denetim penceresinde: karşılaştırma açıkken bu değişikliğin özeti
+function reviewBoxHtml() {
+  const r = getReview();
+  if (!r) return '';
+  const [before, after] = diffSides();
+  return `<div class="au-debt au-review"><h5>${esc(t('reviewTitle'))} <small>${esc(before)} → ${esc(after)}</small></h5>
+    <p class="au-chips">${sevCounts(r.counts) || `<span class="nn">${esc(t('reviewNone'))}</span>`}${r.fixed.length ? `<i class="paid">${esc(t('reviewFixedN', { n: r.fixed.length }))}</i>` : ''}</p>
+    <div class="df-row"><button class="btn sm ghost" data-act="review-open">${esc(t('reviewBtn'))}</button></div></div>`;
+}
 
 function downloadText(text, name, type) {
   const a = document.createElement('a');
@@ -1325,6 +1414,7 @@ function renderDiff() {
     ${s.added + s.removed + s.changed ? '' : `<p class="nn">${esc(t('diffNone'))}</p>`}
     ${group('added', by('added'))}${group('removed', by('removed'))}${group('changed', by('changed'))}
     <div class="df-row">
+      <button class="btn sm ghost" data-act="diff-review" title="${esc(t('reviewIntro'))}">${esc(t('reviewBtn'))}</button>
       ${s.added + s.removed + s.changed ? `<button class="btn sm ghost" data-act="diff-md">${esc(t('namingMd'))}</button>` : ''}
       <button class="btn sm" data-act="diff-close">${esc(t(S.tl ? 'tlClose' : 'diffClose'))}</button>
     </div>`;
@@ -1386,6 +1476,7 @@ $('#diffPop').addEventListener('click', e => {
   else if (a === 'diff-folder') $('#diffFolder').click();
   else if (a === 'diff-close') { if (S.tl) stopTimeline(); else stopDiff(); }
   else if (a === 'time-open') { $('#diffPop').hidden = true; startTimeline(0); }
+  else if (a === 'diff-review') openReview();
   else if (a === 'diff-md') downloadText(diffMarkdown(), fileStem() + '-' + t('diffFile') + '.md', 'text/markdown;charset=utf-8');
 });
 
@@ -1450,6 +1541,7 @@ function applyStep(i) {
   S.lay = lay;
   S.model = { ...st.model, tables };
   S.diffRes = st.diff;
+  S.diffBefore = T.pos ? tl.steps[T.pos - 1].model : { tables: [], rels: [] };
   S.relSet = new Set(st.model.rels);
   S.order = tables.slice().sort(byDegree);
   S.sel = keep != null ? byId.get(keep) || null : null;
@@ -2190,6 +2282,7 @@ NS.onLangChange(() => {
     renderTimeBar();
     renderAudit();
     if ($('#fixDlg').open) renderFix();
+    if ($('#reviewDlg').open) renderReview();
     resetHud();
   }
   if (S.title && S.files.length > 1 && /^\d+ /.test(S.title)) $('#fileName').textContent = t('nFiles', { n: S.files.filter(f => f.text != null).length });
@@ -2284,6 +2377,8 @@ if (params.get('sample')) {
     if (pop) { togglePop(pop); if (pop === '#auditPop') renderAudit(); }
     // ?fix=1: düzeltme önerileri penceresi
     if (params.get('fix') === '1') openFix();
+    // ?review=1: karşılaştırma ya da zaman çizelgesiyle birlikte değişiklik incelemesi
+    if (params.get('review') === '1' && getReview()) openReview();
     invalidate();
   });
 }

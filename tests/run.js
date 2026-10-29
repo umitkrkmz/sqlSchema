@@ -196,6 +196,9 @@ const EXPECT = {
     check('lojistik fark: adı değişen kolonun FK\'si değişmiş sayılmaz', !de('shipments').fks.length, de('shipments').fks.map(f => [f.status, f.rel.cols]));
     check('lojistik fark: silinen kolon ve FK', de('addresses').cols.some(c => c.status === 'removed' && c.name === 'customer_id') && de('addresses').fks.some(f => f.status === 'removed'));
     check('lojistik fark: silinen ve eklenen tablo', de('legacy_route').status === 'removed' && de('tracking_events').status === 'added');
+    check('lojistik inceleme: yalnızca ad değiştiren sürüm bulgu getirmez', !NS.reviewChange(build(upTo(3)).model, build(upTo(4)).model).findings.length);
+    // V14 ilk indeksi getirir: önce denetlenemeyen FK indeksi kuralı değişmeyen tablolarda yeni bulgu saymaz
+    check('lojistik inceleme: ilk indeksi getiren sürüm eski tablolara bulgu yüklemez', !NS.reviewChange(build(upTo(13)).model, build(upTo(14)).model).findings.length);
     check('lojistik fark: aynı dosyalarda fark yok', NS.diffModels(build(lfiles.filter(f => /\/V/.test(f.path))).model, build(lfiles.filter(f => /\/V/.test(f.path))).model).summary.same === 23);
     // zaman çizelgesi: dosya sırasıyla her sürüme kadarki model; soy, geçmiş, birleşik yerleşim
     const ordF = order.map(p => lfiles.find(f => f.path.endsWith(p) || p.endsWith(f.path))).filter(Boolean);
@@ -307,6 +310,12 @@ const EXPECT = {
     const af = NS.auditModel(fixed, { debt: keysV3 });
     // PK (KAMPANYA_ID, MUSTERI_ID) KAMPANYA_ID'nin FK indeksini de karşılar
     check('borç: düzeltilen bulgular ödendi', same(af.debt.paid, ['no-pk:KAMPANYA_KATILIM', 'fk-no-index:KAMPANYA_KATILIM.KAMPANYA_ID']) && af.debt.left === 19 && af.clean > a.clean, [af.debt.paid, af.clean]);
+    // değişiklik incelemesi: V5'in getirdiği bulgular; düzeltme sürümü bulgu getirmez, giderir
+    const r45 = NS.reviewChange(build(upToV(4)).model, m);
+    check('inceleme: V4 → V5 yalnızca V5 bulguları', r45.findings.length === 9 && same(r45.counts, { error: 1, warning: 4, info: 4 }) && !r45.fixed.length && r45.findings.every(f => f.tables.some(t => ['ESKI_FIYAT_LISTESI', 'MUSTERI_RAPOR_DUZ', 'BayiPerformans'].includes(t.name))), r45.findings.map(f => f.key));
+    const rfix = NS.reviewChange(m, fixed);
+    check('inceleme: düzeltme sürümü yeni bulgu getirmez, giderir', !rfix.findings.length && same(rfix.fixed.map(f => f.key).sort(), ['fk-no-index:KAMPANYA_KATILIM.KAMPANYA_ID', 'no-pk:KAMPANYA_KATILIM']), rfix.fixed.map(f => f.key));
+    check('inceleme: borçtaki bulgular yeni sayılmaz', NS.reviewChange(build(upToV(1)).model, build(upToV(2)).model, { debt: ['no-pk:KAMPANYA_KATILIM'] }).findings.length === 12);
     check('borç: proje dosyası şema sayılmaz', NS.classify('satis/db/satis.sqlschema.json').skip === 'project');
     // indeks işlemi: benzersiz olmayan indeks modelde, kolonu silinince indeks de gider
     check('hatali: indeksler modelde', find(m, 'MUSTERI_NOTU').indexes.length === 2 && find(m, 'SIPARIS').indexes.length === 2);

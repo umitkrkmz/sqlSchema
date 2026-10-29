@@ -5,6 +5,11 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Eklendi · Added
+
+- **Değişiklik incelemesi (PR):** karşılaştırma ya da zaman çizelgesi açıkken bu değişikliğin getirdiği ve giderdiği bulgular; adı değişen tablolar eşlenir, borç sayılmaz. PR yorumu için Markdown rapor, isteğe bağlı düzeltme SQL'iyle; denetim penceresinde özet; `?review=1`.
+  Change review (PR): with a comparison or the timeline active, the findings this change brings and resolves; renamed tables are matched and debt is not counted. A Markdown report for a PR comment, optionally with fix SQL; a summary in the audit window; `?review=1`.
+
 ## [0.8.0] - 2026-10-29
 
 ### Eklendi · Added

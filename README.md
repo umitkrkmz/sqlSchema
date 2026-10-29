@@ -448,6 +448,14 @@ Kurallar dört grupta toplanır:
 
 <img src="docs/images/tr/duzeltme-onerileri.png" alt="Düzeltme önerileri: risk seçimi ve Oracle betiği" width="900">
 
+**Değişiklik incelemesi (PR).** Hatayı canlıya çıkmadan, yeni migration'ın PR'ında yakalamak için:
+- **Açmak:** bir karşılaştırma (önce → sonra) ya da zaman çizelgesi açıkken **karşılaştır** penceresindeki **İnceleme raporu**. Denetim penceresinin başında da bu değişikliğin özeti görünür.
+- **Ne sayılır:** "sonra"da olup "önce"de olmayan bulgular bu değişiklikle gelmiştir; tersi giderilmiştir. Adı değişen tablolar eşlenir: eski bulgu yeni adıyla "yeni" görünmez. Borç kaydındakiler sayılmaz. Önce denetlenemeyen bir kural (dökümde indeks yoktu) sonra çalışırsa değişmeyen tablolardaki bulguları yeni sayılmaz.
+- **Rapor:** PR yorumuna yapıştırılacak Markdown. Eklenen, değişen ve silinen tablo sayıları; önem sırasıyla yeni bulgular; giderilenler. İsteğe bağlı olarak güvenli ve gözden geçirilecek düzeltme SQL'i katlanır bir bölümde.
+- **Bağlantı:** `?diff=V14&review=1` raporu açar.
+
+<img src="docs/images/tr/inceleme-raporu.png" alt="Değişiklik incelemesi: V1'den bugüne gelen bulgular, PR yorumu için Markdown" width="900">
+
 <img src="docs/images/tr/tasarim-denetimi.png" alt="Tasarım denetimi: hatalı tablolar haritada kırmızı, panelde KAMPANYA tablosunun bulguları" width="900">
 
 **Hatalı tasarım (DBA incelemesi)** örneği bu özellik için hazırlanmıştır: düzgün bir başlangıç şemasına üç geliştiricinin özensiz eklediği migration'lar. Her kural en az bir kez tetiklenir.
@@ -1024,6 +1032,14 @@ The rules fall into four groups:
 - **Tested:** the tests add the generated script to the samples as a new migration and audit again, checking that the fixed findings disappear and no new ones appear.
 
 <img src="docs/images/en/duzeltme-onerileri.png" alt="Fix suggestions: risk selection and an Oracle script" width="900">
+
+**Change review (PR).** To catch problems in a new migration's PR before they reach production:
+- **Opening:** with a comparison (before → after) or the timeline active, **Review report** in the **compare** window. The audit window also shows a summary of the change at the top.
+- **What counts:** findings in "after" but not in "before" came with this change; the reverse were resolved. Renamed tables are matched, so an old finding does not reappear as "new" under a new name. Findings in the debt register are not counted. If a rule could not run before (the dump had no indexes) but runs after, its findings on unchanged tables are not counted as new.
+- **Report:** Markdown to paste into a PR comment: added, changed and removed table counts, new findings by severity, and resolved findings. Optionally, safe and review-level fix SQL in a collapsible section.
+- **Link:** `?diff=V14&review=1` opens the report.
+
+<img src="docs/images/en/inceleme-raporu.png" alt="Change review: findings since V1, as Markdown for a PR comment" width="900">
 
 <img src="docs/images/en/tasarim-denetimi.png" alt="Design audit: tables with errors in red on the map, findings of the KAMPANYA table in the panel" width="900">
 
