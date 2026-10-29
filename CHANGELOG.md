@@ -5,6 +5,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+## [0.7.0] - 2026-10-29
+
 ### Eklendi · Added
 
 - **Şema farkı:** açık dosyalar önceki bir sürümle karşılaştırılır (migration klasöründe bir sürüm ya da ayrıca seçilen dosyalar). Eklenen, silinen, değişen ve adı değişen tablolar haritada renklenir; panelde kolon, PK ve FK farkları; ad değişikliği tahmini; Markdown rapor; `?diff=V3`.
@@ -125,7 +127,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 - **Geliştirme araçları:** test seti, ekran görüntüsü üreticisi.
   Test suite and screenshot generator.
 
-[Yayımlanmamış · Unreleased]: ../../compare/v0.6.0...HEAD
+[Yayımlanmamış · Unreleased]: ../../compare/v0.7.0...HEAD
+[0.7.0]: ../../compare/v0.6.0...v0.7.0
 [0.6.0]: ../../compare/v0.5.0...v0.6.0
 [0.5.0]: ../../compare/v0.4.0...v0.5.0
 [0.4.0]: ../../compare/v0.3.1...v0.4.0
