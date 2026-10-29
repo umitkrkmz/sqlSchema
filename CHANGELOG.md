@@ -5,16 +5,18 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+## [0.9.0] - 2026-10-29
+
 ### Eklendi · Added
 
-- **Standart belgesi:** kayıtlı standarttan (yoksa öneriden) ekibe gönderilecek Markdown belge; her maddede şemanın kendisinden doğru ve yanlış örnekler, PK'nin en sık tipi, zorunlular, anahtar ve veri tipi önerileri, kural önem tablosu; `?doc=1`.
-  Standard document: a Markdown document for the team generated from the saved standard (or the proposal); right and wrong examples from the schema itself for each item, the most common PK type, requirements, key and data type advice, a rule severity table; `?doc=1`.
-- **Standart ve kurallar:** adlandırma profilinden standart önerisi (baskın kalıp belirgin değilse "ekip karar vermeli"); tablo / kolon harf düzeni, PK, FK, tekil / çoğul, ad sınırı, ASCII, zorunlu açıklama ve denetim kolonları; kural başına önem (hata / uyarı / bilgi / kapalı). Kaydedilince denetim, inceleme ve komut satırı standarda göre denetler; standart `*.sqlschema.json` proje dosyasına yazılır. Yeni kurallar: tekil / çoğul, eksik açıklama, eksik denetim kolonu (yalnızca standartta tanımlıysa); `?std=1`.
-  Standard and rules: a standard proposed from the naming profile ("the team should decide" when no dominant pattern is clear); table / column case, PK, FK, singular / plural, name limit, ASCII, required comments and audit columns; per-rule severity (error / warning / info / off). Once saved, the audit, review and command line check against the standard; it is written to the `*.sqlschema.json` project file. New rules: singular / plural, missing comment, missing audit column (only when the standard defines them); `?std=1`.
-- **Komut satırı denetimi:** `tools/sqlschema-lint.js` denetimi, borç kaydını ve değişiklik incelemesini Node'da çalıştırır (`--since V15`, `--baseline <yol>`); metin, Markdown, JSON ve SARIF çıktı; `--fail-on` ile çıkış kodu; `--fix` ile düzeltme SQL'i. README'de GitHub Actions örneği.
-  Command-line audit: `tools/sqlschema-lint.js` runs the audit, debt register and change review in Node (`--since V15`, `--baseline <path>`); text, Markdown, JSON and SARIF output; exit code via `--fail-on`; fix SQL via `--fix`. A GitHub Actions example in the README.
 - **Değişiklik incelemesi (PR):** karşılaştırma ya da zaman çizelgesi açıkken bu değişikliğin getirdiği ve giderdiği bulgular; adı değişen tablolar eşlenir, borç sayılmaz. PR yorumu için Markdown rapor, isteğe bağlı düzeltme SQL'iyle; denetim penceresinde özet; `?review=1`.
   Change review (PR): with a comparison or the timeline active, the findings this change brings and resolves; renamed tables are matched and debt is not counted. A Markdown report for a PR comment, optionally with fix SQL; a summary in the audit window; `?review=1`.
+- **Komut satırı denetimi:** `tools/sqlschema-lint.js` denetimi, borç kaydını ve değişiklik incelemesini Node'da çalıştırır (`--since V15`, `--baseline <yol>`); metin, Markdown, JSON ve SARIF çıktı; `--fail-on` ile çıkış kodu; `--fix` ile düzeltme SQL'i. README'de GitHub Actions örneği.
+  Command-line audit: `tools/sqlschema-lint.js` runs the audit, debt register and change review in Node (`--since V15`, `--baseline <path>`); text, Markdown, JSON and SARIF output; exit code via `--fail-on`; fix SQL via `--fix`. A GitHub Actions example in the README.
+- **Standart ve kurallar:** adlandırma profilinden standart önerisi (baskın kalıp belirgin değilse "ekip karar vermeli"); tablo / kolon harf düzeni, PK, FK, tekil / çoğul, ad sınırı, ASCII, zorunlu açıklama ve denetim kolonları; kural başına önem (hata / uyarı / bilgi / kapalı). Kaydedilince denetim, inceleme ve komut satırı standarda göre denetler; standart `*.sqlschema.json` proje dosyasına yazılır. Yeni kurallar: tekil / çoğul, eksik açıklama, eksik denetim kolonu (yalnızca standartta tanımlıysa); `?std=1`.
+  Standard and rules: a standard proposed from the naming profile ("the team should decide" when no dominant pattern is clear); table / column case, PK, FK, singular / plural, name limit, ASCII, required comments and audit columns; per-rule severity (error / warning / info / off). Once saved, the audit, review and command line check against the standard; it is written to the `*.sqlschema.json` project file. New rules: singular / plural, missing comment, missing audit column (only when the standard defines them); `?std=1`.
+- **Standart belgesi:** kayıtlı standarttan (yoksa öneriden) ekibe gönderilecek Markdown belge; her maddede şemanın kendisinden doğru ve yanlış örnekler, PK'nin en sık tipi, zorunlular, anahtar ve veri tipi önerileri, kural önem tablosu; `?doc=1`.
+  Standard document: a Markdown document for the team generated from the saved standard (or the proposal); right and wrong examples from the schema itself for each item, the most common PK type, requirements, key and data type advice, a rule severity table; `?doc=1`.
 
 ## [0.8.0] - 2026-10-29
 
@@ -155,7 +157,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 - **Geliştirme araçları:** test seti, ekran görüntüsü üreticisi.
   Test suite and screenshot generator.
 
-[Yayımlanmamış · Unreleased]: ../../compare/v0.8.0...HEAD
+[Yayımlanmamış · Unreleased]: ../../compare/v0.9.0...HEAD
+[0.9.0]: ../../compare/v0.8.0...v0.9.0
 [0.8.0]: ../../compare/v0.7.0...v0.8.0
 [0.7.0]: ../../compare/v0.6.0...v0.7.0
 [0.6.0]: ../../compare/v0.5.0...v0.6.0
