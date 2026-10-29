@@ -536,7 +536,7 @@ function relItem(r, dir) {
 }
 
 // Kolonun kod değerleri: kutucuklar ve nereden okunduğu
-const VALUE_SRC = { comment: 'vsrcComment' };
+const VALUE_SRC = { comment: 'vsrcComment', check: 'vsrcCheck', enum: 'vsrcEnum' };
 function valuesHtml(c) {
   const MAX = 40;
   const chips = c.values.slice(0, MAX).map(v => `<span class="cv"><b>${esc(v.code)}</b>${v.label ? ' ' + esc(v.label) : ''}</span>`).join('');
@@ -594,7 +594,7 @@ function renderPanel() {
     const k = keyTag(tb, c);
     const hl = S.selCol && c.name.toUpperCase() === S.selCol ? ' class="hl"' : '';
     // açıklama bir değer listesiyse liste kutucuk olur, metnin geri kalanı açıklama olarak kalır
-    const note = c.valuesSrc === 'comment' ? c.valuesNote : c.comment;
+    const note = c.commentUsed ? c.valuesNote : c.comment;
     return `<tr${hl}><td class="ck ${k ? 'k-' + k : ''}">${k}</td><td class="cn${c.nullable ? ' nul' : ''}">${esc(c.name)}${note ? `<div class="cc">${esc(note)}</div>` : ''}${c.values ? valuesHtml(c) : ''}</td><td class="ct">${esc(String(c.type).toLowerCase())}${c.nullable ? '' : `<b title="${esc(mongo ? t('reqTitle') : 'NOT NULL')}">${mongo ? 'req' : 'nn'}</b>`}</td></tr>`;
   }).join('');
   const where = [tb.db !== 'main' ? tb.db : '', schemaLabel(tb.schemaRef)].filter(Boolean).join(' / ');

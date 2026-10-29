@@ -92,7 +92,11 @@ sec.RolePermission | | RoleId:int pk >Role; PermissionId:int pk >Permission
 sec.AuditLog +part | Denetim izi (FK yok) | AuditLogId pk ai; EmployeeId; Action:str(50) nn; Entity:str(100) nn; EntityKey:str(100); OccurredAt:ts nn
 `;
 
-const EXTRA = `/****** Object:  View [acc].[vw_CustomerBalance]    Script Date: 24.10.2026 09:41:17 ******/
+const EXTRA = `ALTER TABLE [cust].[Person]  WITH CHECK ADD  CONSTRAINT [CK_Person_Gender] CHECK  (([Gender]='F' OR [Gender]='M' OR [Gender]='U'))
+GO
+ALTER TABLE [cust].[Person] CHECK CONSTRAINT [CK_Person_Gender]
+GO
+/****** Object:  View [acc].[vw_CustomerBalance]    Script Date: 24.10.2026 09:41:17 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON

@@ -86,6 +86,41 @@ function typeFamily(type) {
   return 'other';
 }
 
+// MySQL ENUM('a','b') / SET('a','b') tipindeki değerler
+function enumFromType(type) {
+  const m = /^(?:enum|set)\s*\((.*)\)$/is.exec(String(type || '').trim());
+  if (!m) return null;
+  const vals = [...m[1].matchAll(/'((?:[^']|'')*)'/g)].map(x => x[1].replace(/''/g, "'"));
+  return vals.length ? vals : null;
+}
+
+/*
+ * Kolonun kod değerleri: c.values = [{ code, label }], c.valuesSrc nereden okunduğunu söyler.
+ *   'check' CHECK kısıtı · 'enum' ENUM tipi ya da MongoDB enum · 'comment' açıklamadaki liste
+ * İzin verilen değerler kısıttan ya da tipten gelir; anlamları açıklamada yazılıysa etiket olarak eklenir.
+ * c.commentUsed: açıklamadaki liste kullanıldı, panel açıklamanın yalnızca kalanını (c.valuesNote) yazar.
+ */
+function setValues(c) {
+  const fromComment = valuesFromComment(c.comment);
+  const typeEnum = enumFromType(c.type);
+  const allowed = c.allowed || typeEnum;
+  c.values = null;
+  c.valuesSrc = null;
+  c.commentUsed = false;
+  c.valuesNote = null;
+  if (allowed) {
+    const label = code => { const v = fromComment && fromComment.find(x => x.code.toUpperCase() === String(code).toUpperCase()); return v ? v.label : null; };
+    c.values = allowed.map(code => ({ code: String(code), label: label(code) }));
+    c.valuesSrc = c.allowed ? (c.allowedSrc || 'check') : 'enum';
+    if (fromComment && c.values.some(v => v.label)) { c.commentUsed = true; c.valuesNote = fromComment.rest; }
+  } else if (fromComment) {
+    c.values = fromComment.slice();
+    c.valuesSrc = 'comment';
+    c.commentUsed = true;
+    c.valuesNote = fromComment.rest;
+  }
+}
+
 function buildModel(inputs, opts = {}) {
   const U = s => String(s == null ? '' : s).toUpperCase();
   const tables = new Map();   // anahtar → tablo
@@ -172,6 +207,7 @@ function buildModel(inputs, opts = {}) {
       if (!ex.type || /^(mixed|any|null)$/i.test(ex.type)) ex.type = col.type;
       if (col.nullable === false) ex.nullable = false;
       if (!ex.comment && col.comment) ex.comment = col.comment;
+      if (!ex.allowed && col.allowed) { ex.allowed = col.allowed; ex.allowedSrc = col.allowedSrc; }
       if (col.embedded) ex.embedded = true;
     }
     if (def.embedded) t.embedded = true;
@@ -278,6 +314,11 @@ function buildModel(inputs, opts = {}) {
         if (col && op.text) col.comment = op.text;
         break;
       }
+      case 'check': {
+        const col = getCol(t, op.col);
+        if (col) { col.allowed = op.values.slice(); col.allowedSrc = 'check'; }
+        break;
+      }
       case 'drop':
         t.dropped = true;
         tables.delete(t.key);
@@ -329,11 +370,7 @@ function buildModel(inputs, opts = {}) {
   for (const t of alive()) {
     for (const c of t.columns) {
       if (t.pk.some(p => U(p) === U(c.name))) { c.pk = true; c.nullable = false; }
-      // kod değerleri: c.values = [{ code, label }], c.valuesSrc kaynağı söyler
-      const v = valuesFromComment(c.comment);
-      c.values = v ? v.slice() : null;
-      c.valuesSrc = v ? 'comment' : null;
-      c.valuesNote = v ? v.rest : null;
+      setValues(c);
     }
   }
 

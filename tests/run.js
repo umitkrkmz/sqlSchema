@@ -99,6 +99,8 @@ const EXPECT = {
     check('banka: Person 1:1 Customer', rel(m, 'Person', 'CustomerId', 'Customer').childEnd === 'zeroOne');
     check('banka: AML alarmı → işlem (tahmini)', rel(m, 'Alert', 'TransactionId', 'Transaction', 'implicit'));
     check('banka: ara tablo RolePermission', find(m, 'RolePermission').junction);
+    const g = find(m, 'Person').colIdx.get('GENDER');
+    check('banka: SSMS CHECK ([x]=\'F\' OR ...) değer listesi', g.valuesSrc === 'check' && g.values.map(v => v.code).join() === 'F,M,U', g.values);
     check('banka: görünüm ve yordam atlandı', m.stats.skipped.some(([k]) => k === 'CREATE VIEW') && m.stats.skipped.some(([k]) => k === 'CREATE PROCEDURE'));
     const p = NS.namingProfile(m);
     check('banka: adlandırma tek stil (PascalCase, <Tablo>Id)', p.dims.find(d => d.id === 'tableCase').share === 1 && p.dims.find(d => d.id === 'pkStyle').dominant === 'tableId', p.dims.map(d => d.dominant));
@@ -118,6 +120,9 @@ const EXPECT = {
     check('sigorta: açıklamadaki değer listeleri', vals('MUSTERI', 'MUSTERI_TIP') === 'G=Gerçek kişi, T=Tüzel kişi' && vals('MUSTERI', 'CINSIYET') === 'E=Erkek, K=Kadın, B=Belirtilmemiş' && vals('MUSTERI', 'KARA_LISTE') === 'E=Evet, H=Hayır', [vals('MUSTERI', 'MUSTERI_TIP'), vals('MUSTERI', 'CINSIYET'), vals('MUSTERI', 'KARA_LISTE')]);
     const kanal = find(m, 'HASAR_IHBAR').colIdx.get('IHBAR_KANAL');
     check('sigorta: listenin önündeki metin ayrı tutulur', kanal.values.length === 4 && kanal.valuesNote === 'İhbarın geldiği kanal', [kanal.values.length, kanal.valuesNote]);
+    const mt = find(m, 'MUSTERI').colIdx.get('MUSTERI_TIP');
+    check('sigorta: CHECK değerleri açıklamadaki anlamlarla birleşir', mt.valuesSrc === 'check' && vals('MUSTERI', 'MUSTERI_TIP') === 'G=Gerçek kişi, T=Tüzel kişi', [mt.valuesSrc, vals('MUSTERI', 'MUSTERI_TIP')]);
+    check('sigorta: anlamı yazılmamış CHECK değerleri', vals('POLICE_ARAC', 'KULLANIM_TARZ') === 'HUSUSI=null, TICARI=null, TAKSI=null, RESMI=null', vals('POLICE_ARAC', 'KULLANIM_TARZ'));
     check('sigorta: @ref açıklaması değer listesi sayılmaz', !find(m, 'POLICE').colIdx.get('POLICE_DURUM').values || find(m, 'POLICE').colIdx.get('POLICE_DURUM').valuesSrc !== 'comment');
     check('sigorta: KOD_TABLO sözlük, MUSTERI değil', find(m, 'KOD_TABLO').dictionary && !find(m, 'MUSTERI').dictionary && m.stats.dictionaries === 1);
     check('sigorta: sözlüğe giden ilişkiler işaretli', m.rels.filter(r => r.dict).length === 3 && !rel(m, 'HASAR_IHBAR', 'IHBAR_EDEN_MUSTERI_NO', 'MUSTERI', 'ref').dict);
@@ -133,6 +138,8 @@ const EXPECT = {
     check('eticaret: arama kaydı → kullanıcı (tahmini)', rel(m, 'search_logs', 'user_id', 'users', 'implicit'));
     check('eticaret: kategori kendine bağlı', rel(m, 'categories', 'parent_id', 'categories').self);
     check('eticaret: satıcı 1:1 kullanıcı', rel(m, 'sellers', 'user_id', 'users').childEnd === 'zeroOne');
+    const st = find(m, 'orders').colIdx.get('STATUS');
+    check('eticaret: MySQL ENUM tipi değer listesi', st.valuesSrc === 'enum' && st.values.length === 4, st.values);
     const p = NS.namingProfile(m);
     check('eticaret: adlandırma snake_case, PK id, çoğul', same(dim(p, 'pkStyle'), { id: 35, composite: 5 }) && p.dims.find(d => d.id === 'tableNumber').dominant === 'plural' && p.dims.find(d => d.id === 'columnCase').share === 1);
   },
@@ -181,6 +188,8 @@ const EXPECT = {
     check('sosyal: ref \'Media\' → media (Mongoose çoğul kuralı)', rel(m, 'stories', 'media', 'media', 'fk') && !find(m, 'medias'));
     check('sosyal: dış koleksiyon yok', m.stats.external === 0, m.tables.filter(t => t.external).map(t => t.name));
     check('sosyal: MongoDB kaynak dosyalarına göre bölünmez', !m.tables.some(t => t.group.file));
+    const vis = find(m, 'posts').colIdx.get('VISIBILITY');
+    check('sosyal: enum değerleri kolonun değer listesi, açıklamaya yazılmaz', vis.valuesSrc === 'enum' && vis.values.map(v => v.code).join() === 'public,followers,circle' && !/enum:/.test(vis.comment || ''), [vis.values, vis.comment]);
   },
   saha({ model: m }) {
     check('saha: SQLite tanındı', m.stats.dialects.includes('sqlite'), m.stats.dialects);
@@ -292,6 +301,13 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   const wrongNo = no.filter(s => v(s));
   check('değer listesi sanılmayan açıklamalar', !wrongNo.length, wrongNo.map(s => [s, v(s)]));
   check('listenin dışındaki metin', NS.valuesFromComment('G = Gerçek, T = Tüzel. Varsayılan G').rest === 'Varsayılan G');
+
+  // CHECK kısıtındaki değer listeleri
+  const ck = one("CREATE TABLE a (id int PRIMARY KEY, durum CHAR(1) CONSTRAINT ck CHECK (durum IN ('A','P')) NOT NULL, tip varchar(5), adet int CHECK (adet > 0), puan int, CONSTRAINT ck2 CHECK (tip IN ('B','K')), CONSTRAINT ck3 CHECK (puan BETWEEN 1 AND 5));\nALTER TABLE a ADD CONSTRAINT ck4 CHECK (id IN (1, 2) AND tip = 'B');");
+  const cv = c => { const x = find(ck, 'a').colIdx.get(c); return x.values ? x.values.map(v => v.code).join() : null; };
+  check('CHECK IN: satır içi ve tablo düzeyi', cv('DURUM') === 'A,P' && cv('TIP') === 'B,K', [cv('DURUM'), cv('TIP')]);
+  check('CHECK IN satır içinde NOT NULL\'u bozmaz', !find(ck, 'a').colIdx.get('DURUM').nullable);
+  check('karşılaştırma, aralık ve bileşik koşul liste sayılmaz', !cv('ADET') && !cv('PUAN') && !cv('ID'), [cv('ADET'), cv('PUAN'), cv('ID')]);
 }
 
 // Adlandırma sınıflandırıcıları

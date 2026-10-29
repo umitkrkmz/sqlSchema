@@ -13,6 +13,7 @@
  *   renamecol { t, col, to }          rename    { t, to }
  *   drop      { t }                   dropcon   { t, name }      droppk { t }
  *   state     { t, name, disabled }   tcomment  { t, text }      ccomment { t, col, text }
+ *   check     { t, col, values }      yalnızca izin verilen değer listesi: CHECK (X IN ('A','P')), CHECK (X='A' OR X='P')
  */
 (function (NS) {
 'use strict';
@@ -157,10 +158,52 @@ function parseReferences(c, P) {
   return { parts: parts && P.qn(parts), cols, onDelete, disabled };
 }
 
+/*
+ * CHECK gövdesinden izin verilen değer listesi. İki biçim okunur:
+ *   (DURUM IN ('A', 'P'))          Oracle, PostgreSQL, MySQL
+ *   (([Durum]='A' OR [Durum]='P'))  SQL Server "Generate Scripts" çıktısı
+ * Aralık, karşılaştırma ve birden fazla kolonlu koşullar değer listesi değildir; okunmaz.
+ */
+function readCheckValues(c) {
+  if (!c.isP('(')) return null;
+  const s = c.i;
+  c.skipGroup();
+  const inner = c.toks.slice(s + 1, c.i - 1);
+  const isId = t => t && (t.t === 'w' || t.t === 'q');
+  const lit = t => t && (t.t === 's' || t.t === 'n');
+  const toks = inner.filter(t => !(t.t === 'p' && (t.v === '(' || t.v === ')')));
+  // IN biçimi: parantezleri atınca  ad IN lit , lit , lit
+  if (isId(toks[0]) && toks[1] && toks[1].u === 'IN') {
+    const values = [];
+    for (let j = 2; j < toks.length; j++) {
+      if (j % 2 === 0 ? !lit(toks[j]) : !(toks[j].t === 'p' && toks[j].v === ',')) return null;
+      if (j % 2 === 0) values.push(String(toks[j].v));
+    }
+    return values.length >= 2 ? { col: toks[0].v, values } : null;
+  }
+  // OR biçimi:  ad = lit OR ad = lit ...
+  const values = [];
+  let col = null;
+  for (let j = 0; j < toks.length; j += 4) {
+    const [a, eq, v, or] = toks.slice(j, j + 4);
+    if (!isId(a) || !eq || eq.v !== '=' || !lit(v)) return null;
+    if (col !== null && col.toUpperCase() !== a.v.toUpperCase()) return null;
+    col = a.v;
+    values.push(String(v.v));
+    if (or && or.u !== 'OR') return null;
+  }
+  return values.length >= 2 ? { col, values } : null;
+}
+
 // Tablo seviyesi kısıt; imleç CONSTRAINT / PRIMARY / FOREIGN / UNIQUE ... üzerinde
 function parseConstraint(c, tparts, P) {
   let name = null;
   if (c.acceptW('CONSTRAINT') && c.isIdent() && !c.isW('PRIMARY', 'FOREIGN', 'UNIQUE', 'CHECK')) name = c.next().v;
+  if (c.acceptW('CHECK')) {
+    const r = readCheckValues(c);
+    if (r) P.op({ op: 'check', t: tparts, col: r.col, values: r.values });
+    return;
+  }
   if (c.acceptSeq('PRIMARY', 'KEY')) {
     c.acceptW('CLUSTERED', 'NONCLUSTERED');
     const info = {};
@@ -261,6 +304,12 @@ function parseColumnDef(c, tparts, P) {
     if (c.acceptW('REFERENCES')) {
       const r = parseReferences(c, P);
       if (r.parts) P.op({ op: 'fk', t: tparts, cols: [name], ref: r.parts, refCols: r.cols, name: pending, disabled: r.disabled, onDelete: r.onDelete });
+      pending = null;
+      continue;
+    }
+    if (c.acceptW('CHECK')) {
+      const r = readCheckValues(c);
+      if (r && r.col.toUpperCase() === name.toUpperCase()) P.op({ op: 'check', t: tparts, col: name, values: r.values });
       pending = null;
       continue;
     }

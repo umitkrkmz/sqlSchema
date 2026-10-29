@@ -215,7 +215,8 @@ function emitEntity(E, parts, fields, owner) {
       columns.push({ name: f.name, type: f.many ? 'array<object>' : 'object', nullable: f.nullable, comment: f.comment || null, embedded: true });
       continue;
     }
-    columns.push({ name: f.name, type: f.type, nullable: f.nullable, comment: f.comment || null, pk: !!f.pk });
+    // enum, model.js'te kolonun kod değerleri olur (CHECK ve ENUM tipiyle aynı gösterim)
+    columns.push({ name: f.name, type: f.type, nullable: f.nullable, comment: f.comment || null, pk: !!f.pk, allowed: f.enum || null, allowedSrc: f.enum ? 'enum' : null });
   }
   E.op({ op: 'create', t: parts, def: { columns, comment: null, embedded: !!owner }, merge: true });
   E.stats.tables++;
@@ -247,7 +248,7 @@ function jsonSchemaFields(sch, top = true) {
     const f = { name, nullable: !req.has(name) || types.includes('null'), pk: name === '_id' };
     const notes = [];
     if (p.description) notes.push(p.description);
-    if (Array.isArray(p.enum)) notes.push('enum: ' + p.enum.join(', '));
+    if (Array.isArray(p.enum)) f.enum = p.enum.map(String);
     if (nonNull.includes('object') && isPlain(p.properties)) {
       f.sub = jsonSchemaFields(p, false);
     } else if (nonNull.includes('array')) {
@@ -357,10 +358,8 @@ function parseMongoose(src, E) {
       f.nullable = !(v.required === true || (Array.isArray(v.required) && v.required[0] === true));
       if (v.unique === true) f.unique = true;
       if (typeof v.ref === 'string') f.ref = [collOf.get(v.ref) || pluralize(v.ref)];
-      const notes = [];
-      if (Array.isArray(v.enum)) notes.push('enum: ' + v.enum.join(', '));
-      if (typeof v.description === 'string') notes.push(v.description);
-      if (notes.length) f.comment = notes.join(' · ');
+      if (Array.isArray(v.enum)) f.enum = v.enum.map(String);
+      if (typeof v.description === 'string') f.comment = v.description;
       return f;
     }
     return { name, type: mongooseTypeName(v), nullable: true };

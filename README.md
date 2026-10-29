@@ -197,6 +197,16 @@ COMMENT ON COLUMN HASAR_IHBAR.IHBAR_KANAL IS 'İhbarın geldiği kanal: ACN = Ac
 - **Kartta:** kolon adının yanında küçük bir `≡` işareti.
 - **Aramada:** değerlerin anlamı da aranır. "iptal" yazınca `4 = İptal` değerini tutan kolon bulunur; büyük/küçük harf ve Türkçe karakter farkı yok sayılır.
 
+İzin verilen değerler başka yerlerde de tanımlı olabilir; hepsi aynı kutucuklarla gösterilir ve kaynağı yanına yazılır:
+
+| Kaynak | Örnek |
+|---|---|
+| `CHECK` kısıtı | `CHECK (MUSTERI_TIP IN ('G', 'T'))` · SQL Server: `CHECK (([Gender]='F' OR [Gender]='M'))` |
+| `ENUM` tipi | MySQL `status enum('active','passive')` |
+| MongoDB `enum` | `$jsonSchema` ve Mongoose alanlarındaki `enum: ['tr', 'en']` |
+
+Değerler kısıttan ya da tipten geliyor, anlamları açıklamada yazılıyorsa ikisi birleşir: `CHECK (MUSTERI_TIP IN ('G','T'))` ile `'G = Gerçek kişi, T = Tüzel kişi'` açıklaması `G Gerçek kişi · T Tüzel kişi` olarak görünür. Aralık (`BETWEEN`), karşılaştırma (`> 0`) ve birden fazla kolonlu koşullar değer listesi sayılmaz.
+
 <a id="tr-coklu-dosya"></a>
 
 ### Birden fazla dosya ve migration
@@ -629,6 +639,16 @@ COMMENT ON COLUMN HASAR_IHBAR.IHBAR_KANAL IS 'Channel of the claim: ACN = Agency
 - **In the panel:** the values appear as chips under the column; the part of the comment outside the list ("Channel of the claim") is shown separately.
 - **On the card:** a small `≡` next to the column name.
 - **In search:** the meanings of values are searched too. Typing "iptal" finds the column holding `4 = İptal`; case and Turkish characters are ignored.
+
+Allowed values may be defined elsewhere too; all of them are shown with the same chips, with the source next to them:
+
+| Source | Example |
+|---|---|
+| `CHECK` constraint | `CHECK (MUSTERI_TIP IN ('G', 'T'))` · SQL Server: `CHECK (([Gender]='F' OR [Gender]='M'))` |
+| `ENUM` type | MySQL `status enum('active','passive')` |
+| MongoDB `enum` | `enum: ['tr', 'en']` in `$jsonSchema` and Mongoose fields |
+
+When the values come from a constraint or type and their meanings are written in the comment, the two are combined: `CHECK (MUSTERI_TIP IN ('G','T'))` with the comment `'G = Gerçek kişi, T = Tüzel kişi'` shows as `G Gerçek kişi · T Tüzel kişi`. Ranges (`BETWEEN`), comparisons (`> 0`) and multi-column conditions are not value lists.
 
 <a id="en-multi-file"></a>
 

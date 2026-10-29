@@ -9,6 +9,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 - **Açıklamadaki kod değerleri:** `1 = Aktif, 2 = Pasif`, `A: Aktif; P: Pasif`, `E-Evet / H-Hayır` gibi değer listeleri kolon açıklamasından okunur; panelde kutucuk, kartta `≡` işareti olarak görünür ve aramada bulunur.
   Code values in comments: value lists such as `1 = Active, 2 = Passive`, `A: Active; P: Passive` or `Y-Yes / N-No` are read from column comments; they appear as chips in the panel and a `≡` mark on the card, and are searchable.
+- **CHECK, ENUM ve MongoDB enum değerleri:** `CHECK (X IN (…))`, SQL Server `CHECK ([X]='A' OR [X]='P')`, MySQL `ENUM` tipi ve MongoDB `enum` alanları aynı değer kutucuklarıyla gösterilir; anlamları açıklamada yazılıysa birleşir. MongoDB enum'u artık açıklamaya "enum: …" diye eklenmez.
+  CHECK, ENUM and MongoDB enum values: `CHECK (X IN (…))`, SQL Server `CHECK ([X]='A' OR [X]='P')`, the MySQL `ENUM` type and MongoDB `enum` fields are shown with the same value chips, combined with meanings written in the comment. MongoDB enums are no longer appended to the comment as "enum: …".
 
 ## [0.4.0] - 2026-10-29
 

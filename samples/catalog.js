@@ -88,6 +88,7 @@
       "ACENTE/tablolar.sql",
       "HASAR/indeksler.sql",
       "HASAR/tablolar.sql",
+      "ORTAK/indeksler.sql",
       "ORTAK/kod_tablo_verisi.sql",
       "ORTAK/tablolar.sql",
       "POLICE/indeksler.sql",
