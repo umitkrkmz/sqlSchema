@@ -37,6 +37,7 @@ const S = {
   cam: { x: 0, y: 0, k: 0.3 }, w: 0, h: 0, dpr: 1, kMin: 0.01,
   hover: null, sel: null, selCol: null, focus: 0,
   implicit: true, grid: true, columns: true, dictLines: false,
+  pick: new Set(), relSet: null,   // çoklu seçim (tablo anahtarları) · alt diyagramda görünen ilişkiler
   em: { active: null, near: null, hiRels: null, focus: null },
   anim: null, frame: 0, title: '', parseMs: 0,
 };
@@ -46,7 +47,8 @@ const sx = x => (x - S.cam.x) * S.cam.k + S.w / 2;
 const sy = y => (y - S.cam.y) * S.cam.k + S.h / 2;
 const wx = px => (px - S.w / 2) / S.cam.k + S.cam.x;
 const wy = py => (py - S.h / 2) / S.cam.k + S.cam.y;
-const relVisible = r => S.implicit || r.kind !== 'implicit';
+// alt diyagramda yalnızca iki ucu da diyagramda olan ilişkiler görünür (panel de dahil)
+const relVisible = r => (S.implicit || r.kind !== 'implicit') && (!S.relSet || S.relSet.has(r));
 const relStyle = r => (r.kind === 'implicit' ? 'imp' : r.kind === 'embed' ? 'emb' : r.kind === 'ref' ? 'ref' : r.disabled ? 'off' : 'fk');
 const schemaColor = t => (t.external ? '#8892ad' : PALETTE[t.schemaRef.index % PALETTE.length]);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -661,9 +663,19 @@ function drawStars(lv) {
         ctx.fill();
       }
     }
+    if (S.pick.has(t.key)) drawPickRing(x, y, r + 4);
   }
   ctx.globalAlpha = 1;
   if (S.sel) drawReticle(sx(S.sel.x), sy(S.sel.y), starR(S.sel) + 7);
+}
+
+// çoklu seçime eklenmiş tablo: vurgu renginde ince halka
+function drawPickRing(x, y, r) {
+  ctx.strokeStyle = 'rgba(242,180,90,0.95)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.stroke();
 }
 
 function drawReticle(x, y, r) {
@@ -768,8 +780,9 @@ function drawCards() {
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.setLineDash(t.external ? [3, 3] : t.embedded ? [5, 2] : []);
-    ctx.strokeStyle = isSel ? '#ffffff' : rgba(col, isAct ? 0.95 : 0.55);
-    ctx.lineWidth = isSel ? 1.6 : 1;
+    const picked = S.pick.has(t.key);
+    ctx.strokeStyle = isSel ? '#ffffff' : picked ? 'rgba(242,180,90,0.95)' : rgba(col, isAct ? 0.95 : 0.55);
+    ctx.lineWidth = isSel || picked ? 1.6 : 1;
     ctx.stroke();
     ctx.setLineDash([]);
     // başlık

@@ -6,7 +6,7 @@
  * URL parametreleri (paylaşılabilir bağlantılar ve belge görüntüleri için):
  *   ?lang=tr|en   ?sample=<örnek kimliği>   ?select=<tablo adı>   ?center=<tablo adı>   ?zoom=<1.6>   ?legend=0|1
  *   ?pop=naming|report|files   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
- *   ?grouping=auto|file|name   ?list=0|1
+ *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)
  */
 (function (NS) {
 'use strict';
@@ -66,6 +66,8 @@ function rebuild() {
   const model = buildModel(inputs, { dictionaries: S.dictOverride });
   S.migration = migration;
   S.ordered = ordered;
+  S.full = null;
+  S.relSet = null;
   if (!model.tables.length) {
     S.model = S.lay = null;
     return false;
@@ -89,6 +91,10 @@ function rebuild() {
   document.body.classList.add('loaded');
   $('#empty').hidden = true;
   fitView(false);
+  // görünüm ayarı ya da dosya seçimi değişince açık alt diyagram korunur
+  if (S.subKeys && !enterSubset(S.subKeys, S.subNeighbors)) S.subKeys = null;
+  S.pick = new Set([...S.pick].filter(k => S.byKey.has(k)));
+  renderPickBar();
   return true;
 }
 
@@ -102,6 +108,9 @@ function guessSeparate(files) {
 // Yükleme bitince çözülen bir Promise döndürür (URL'deki ?select= için)
 function setFiles(files, title, opts = {}) {
   S.files = files;
+  // yeni dosya kümesi: önceki seçim ve alt diyagram geçersiz
+  S.subKeys = null;
+  S.pick = new Set();
   S.title = title;
   $('#fileName').textContent = title;
   $('#fileName').title = title;
@@ -463,13 +472,131 @@ function select(tb, opts = {}) {
   if (tb && opts.fly) flyToTable(tb, opts.k);
 }
 
+/* ─── Çoklu seçim ve alt diyagram ─── */
+
+// Ctrl/Cmd + tık, panel ya da tablo listesiyle tablolar seçime eklenir. Alt diyagram yalnızca onları (isteğe
+// bağlı bir adım komşularıyla) kendi yerleşimiyle çizer. Tam model S.full'da saklanır; çıkınca tam yerleşim
+// yeniden kurulur (deterministik olduğu için aynı harita döner).
+S.full = null;
+S.subKeys = null;
+S.subNeighbors = false;
+
+function togglePick(tb) {
+  if (!tb) return;
+  if (S.pick.has(tb.key)) S.pick.delete(tb.key); else S.pick.add(tb.key);
+  afterPick();
+}
+function pickTables(tables) {
+  const all = tables.every(tb => S.pick.has(tb.key));
+  for (const tb of tables) { if (all) S.pick.delete(tb.key); else S.pick.add(tb.key); }
+  afterPick();
+}
+function afterPick() {
+  renderPickBar();
+  renderPanel();
+  renderList();
+  invalidate();
+}
+
+function subsetModel(full, keys, neighbors) {
+  const byKey = new Map(full.tables.map(tb => [tb.key, tb]));
+  const set = new Set(keys.map(k => byKey.get(k)).filter(Boolean));
+  if (neighbors) {
+    for (const tb of [...set]) {
+      for (const r of tb.out.concat(tb.inc)) {
+        if (r.kind === 'implicit' && !S.implicit) continue;
+        set.add(r.child);
+        set.add(r.parent);
+      }
+    }
+  }
+  // gömülü belgeler (MongoDB uyduları) sahipleriyle gelir
+  for (const tb of full.tables) if (tb.embedded && tb.owner && set.has(tb.owner)) set.add(tb);
+  const tables = full.tables.filter(tb => set.has(tb));
+  const rels = full.rels.filter(r => set.has(r.child) && set.has(r.parent));
+  // alt bilgi çubuğu alt diyagramın kendi sayılarını göstersin
+  const stats = {
+    ...full.stats,
+    tables: tables.filter(tb => !tb.external && !tb.embedded).length,
+    embedded: tables.filter(tb => tb.embedded).length,
+    fk: rels.filter(r => r.kind === 'fk').length,
+    implicit: rels.filter(r => r.kind === 'implicit').length,
+  };
+  return { ...full, tables, rels, stats, dbs: [...new Set(tables.map(tb => tb.db))], sub: true };
+}
+
+function enterSubset(keys, neighbors) {
+  const full = S.full ? S.full.model : S.model;
+  const sub = subsetModel(full, keys, neighbors);
+  if (!sub.tables.length) return false;
+  S.full = { model: full };
+  S.subKeys = keys.slice();
+  S.subNeighbors = !!neighbors;
+  S.pick = new Set();
+  S.model = sub;
+  S.relSet = new Set(sub.rels);
+  S.lay = layoutModel(sub, { grouping: resolveGrouping(S.grouping, S.migration) });
+  afterLayout();
+  return true;
+}
+
+function exitSubset() {
+  if (!S.full) return;
+  S.model = S.full.model;
+  S.full = null;
+  S.subKeys = null;
+  S.relSet = null;
+  S.lay = layoutModel(S.model, { grouping: resolveGrouping(S.grouping, S.migration) });
+  afterLayout();
+}
+
+function afterLayout() {
+  S.hover = null;
+  // etiketler bu sırayla çizilir; alt diyagramda yalnızca diyagramdaki tablolar
+  S.order = S.model.tables.slice().sort((a, b) => b.deg - a.deg || String(a.name).localeCompare(String(b.name)));
+  for (const tb of S.model.tables) { tb._rows = null; tb._lw = 0; }
+  buildIndex();
+  if (S.sel && !S.byKey.has(S.sel.key)) S.sel = null;
+  refreshEmphasis();
+  renderPanel();
+  renderList();
+  renderNaming();
+  renderPickBar();
+  resetHud();
+  fitView(true);
+}
+
+function renderPickBar() {
+  const el = $('#pickBar');
+  if (S.full) {
+    el.innerHTML = `<span class="pb-title">${esc(t('pbSub'))}</span><b>${esc(t('pbCount', { n: S.model.tables.length }))}</b>
+      <button class="btn sm" data-act="sub-exit">${esc(t('pbExit'))}</button>`;
+  } else if (S.pick.size) {
+    el.innerHTML = `<b>${esc(t('pbSelected', { n: S.pick.size }))}</b>
+      <label class="toggle"><input type="checkbox" id="pbNeighbors" ${S.subNeighbors ? 'checked' : ''}><span>${esc(t('pbNeighbors'))}</span></label>
+      <button class="btn sm" data-act="sub-open">${esc(t('pbOpen'))}</button>
+      <button class="btn sm ghost" data-act="pick-clear">${esc(t('pbClear'))}</button>`;
+  }
+  el.hidden = !S.full && !S.pick.size;
+}
+
+$('#pickBar').addEventListener('change', e => { if (e.target.id === 'pbNeighbors') S.subNeighbors = e.target.checked; });
+$('#pickBar').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  e.stopPropagation();
+  if (b.dataset.act === 'sub-open') enterSubset([...S.pick], S.subNeighbors);
+  else if (b.dataset.act === 'sub-exit') exitSubset();
+  else if (b.dataset.act === 'pick-clear') { S.pick = new Set(); afterPick(); }
+});
+
 /* ─── Tablo listesi ─── */
 
 // Veritabanı › şema › takımyıldız › tablo. "Tabloları sırayla gezmek" için: ↑ ↓ seçimi ve haritayı birlikte taşır.
 // Varsayılan kapalı (Görünüm menüsü ya da L); açıkken lejant kapanır, ikisi aynı kenarı paylaşır.
 S.list = false;
 S.listOrder = 'file';
-let listKeys = [];
+let listKeys = [], listGroups = [];
 
 // Dosyadaki sıra: tablonun tanımlandığı dosya ve satır; dosyası olmayanlar (dış başvurular) en sonda
 const fileOrder = (a, b) => {
@@ -484,6 +611,7 @@ function renderList() {
   const multiDb = S.lay.dbs.length > 1, multiSchema = S.lay.schemas.length > 1;
   const out = [];
   listKeys = [];
+  listGroups = [];
   let shown = 0, total = 0;
   for (const s of S.lay.schemas) {
     const groups = s.groups.map(g => {
@@ -495,7 +623,11 @@ function renderList() {
     if (!groups.length) continue;
     if (multiSchema) out.push(`<div class="tl-schema" style="--c:${PALETTE[s.index % PALETTE.length]}">${esc((multiDb ? s.db.label + ' / ' : '') + schemaLabel(s))}</div>`);
     for (const { g, ts } of groups) {
-      if (s.groups.length > 1) out.push(`<div class="tl-group">${esc(groupLabel(g))} <span>${ts.length}</span></div>`);
+      if (s.groups.length > 1) {
+        listGroups.push(ts);
+        const all = ts.every(tb => S.pick.has(tb.key));
+        out.push(`<div class="tl-group">${esc(groupLabel(g))} <span>${ts.length}</span><button class="tl-pick${all ? ' on' : ''}" data-pickgroup="${listGroups.length - 1}" title="${esc(t('listPickGroup'))}">${all ? '\u{2212}' : '+'}</button></div>`);
+      }
       for (const tb of ts) {
         listKeys.push(tb.key);
         shown++;
@@ -505,7 +637,7 @@ function renderList() {
           tb.dictionary ? `<i class="acc">${esc(t('tagDict'))}</i>` : '',
           tb.external ? `<i>${esc(t('tagExternal'))}</i>` : '',
         ].join('');
-        out.push(`<button class="tl-row${tb === S.sel ? ' on' : ''}${tb.external ? ' ext' : ''}" data-key="${esc(tb.key)}" tabindex="-1"><span class="tl-name">${esc(tb.name)}</span>${tags}<span class="tl-n">${tb.columns.length}</span></button>`);
+        out.push(`<button class="tl-row${tb === S.sel ? ' on' : ''}${tb.external ? ' ext' : ''}${S.pick.has(tb.key) ? ' picked' : ''}" data-key="${esc(tb.key)}" tabindex="-1"><span class="tl-name">${esc(tb.name)}</span>${tags}<span class="tl-n">${tb.columns.length}</span></button>`);
       }
     }
   }
@@ -550,7 +682,10 @@ $('#tlFilter').addEventListener('input', renderList);
 $('#tableList').addEventListener('click', e => {
   const order = e.target.closest('[data-order]');
   if (order) { S.listOrder = order.dataset.order; renderList(); return; }
+  const grp = e.target.closest('[data-pickgroup]');
+  if (grp) { pickTables(listGroups[Number(grp.dataset.pickgroup)] || []); return; }
   const row = e.target.closest('.tl-row');
+  if (row && (e.ctrlKey || e.metaKey)) { togglePick(S.byKey.get(row.dataset.key)); return; }
   if (row) listGo(listKeys.indexOf(row.dataset.key));
 });
 $('#tableList').addEventListener('keydown', e => {
@@ -719,6 +854,7 @@ function renderPanel() {
       <div class="p-actions">
         <button class="btn sm ${S.focus ? '' : 'ghost'}" data-act="focus" title="${esc(t('focusTitle'))}">${esc(t('focus')[S.focus])}</button>
         <button class="btn sm ghost" data-act="zoom">${esc(t(mongo ? 'showFields' : 'showColumns'))}</button>
+        <button class="btn sm ${S.pick.has(tb.key) ? '' : 'ghost'}" data-act="pick" title="${esc(t('pickTitle'))}">${esc(t(S.pick.has(tb.key) ? 'pickRemove' : 'pickAdd'))}</button>
         ${!dictCandidate(tb) ? '' : `<button class="btn sm ghost" data-act="dict" title="${esc(t('dictMarkTitle'))}">${esc(t(tb.dictionary ? 'dictUnmark' : 'dictMark'))}</button>`}
       </div>
     </div>
@@ -753,6 +889,7 @@ $('#panel').addEventListener('click', e => {
     else if (a === 'fwd') goHistory(S.histPos + 1);
     else if (a === 'focus') { S.focus = (S.focus + 1) % 3; refreshEmphasis(); renderPanel(); invalidate(); }
     else if (a === 'dict' && S.sel) toggleDictionary(S.sel);
+    else if (a === 'pick' && S.sel) togglePick(S.sel);
     else if (a === 'zoom' && S.sel) {
       if (!S.columns) setColumns(true);   // düğme açıkça kolonları istiyor
       flyToTable(S.sel, Math.max(1.5, S.cam.k));
@@ -889,7 +1026,9 @@ function endPointer(e) {
   if (pinch && pointers.size < 2) { pinch = null; return; }
   if (drag && !drag.moved && e.type === 'pointerup') {
     const tb = hitTest(e.offsetX, e.offsetY);
-    select(tb);
+    // Ctrl/Cmd + tık: tabloyu çoklu seçime ekle / çıkar (alt diyagram için)
+    if ((e.ctrlKey || e.metaKey) && tb) togglePick(tb);
+    else select(tb);
     if (tb && e.pointerType !== 'mouse') S.hover = null;
   }
   drag = null;
@@ -932,7 +1071,9 @@ window.addEventListener('keydown', e => {
   }
   if (e.key === 'Escape') {
     if (S.focus) { S.focus = 0; refreshEmphasis(); renderPanel(); invalidate(); }
-    else select(null);
+    else if (S.sel) select(null);
+    else if (S.full) exitSubset();
+    else if (S.pick.size) { S.pick = new Set(); afterPick(); }
   } else if (e.key === 'f' || e.key === 'F') fitView(true);
   else if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey) setColumns(!S.columns);
   else if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.metaKey) {
@@ -1143,6 +1284,12 @@ if (document.fonts && document.fonts.ready) {
 if (params.get('sample')) {
   loadSample(params.get('sample')).then(ok => {
     if (!ok || !S.model) return;
+    // ?sub=A,B,C&near=1: bu tablolarla (ve komşularıyla) alt diyagram
+    const subNames = (params.get('sub') || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    if (subNames.length) {
+      const keys = S.model.tables.filter(x => subNames.includes(x.name.toUpperCase())).map(x => x.key);
+      if (keys.length) enterSubset(keys, params.get('near') === '1');
+    }
     const byName = p => { const n = (params.get(p) || '').toUpperCase(); return n && S.model.tables.find(x => x.name.toUpperCase() === n); };
     const tb = byName('select') || byName('center');
     const zoom = Number(params.get('zoom'));

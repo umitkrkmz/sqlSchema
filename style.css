@@ -452,6 +452,32 @@ table.dict .dc:hover { border-color: var(--accent); color: var(--text); }
 .keys kbd { font-size: 10px; padding: 0 5px; border: 1px solid var(--line-2); border-radius: 4px; color: #c3cbe2; }
 body:not(.loaded) .legend, body:not(.loaded) .hud { display: none; }
 
+/* ─── Çoklu seçim / alt diyagram çubuğu ─── */
+.pickbar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 14px;
+  background: var(--panel);
+  border: 1px solid rgba(242, 180, 90, 0.5);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  font-size: 12.5px;
+  white-space: nowrap;
+  z-index: 13;
+}
+.pickbar b { font-weight: 600; }
+.pickbar .pb-title { font: 600 11px var(--cond); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+.pickbar .toggle span { display: inline; }
+.tl-group { display: flex; align-items: center; gap: 4px; }
+.tl-pick { margin-left: auto; width: 18px; height: 16px; padding: 0; border: 1px solid var(--line-2); border-radius: 4px; background: none; color: var(--dim); font: 11px/1 var(--mono); cursor: pointer; }
+.tl-pick:hover, .tl-pick.on { border-color: var(--accent); color: var(--accent); }
+.tl-row.picked { box-shadow: inset 2px 0 0 var(--accent); }
+
 /* ─── Tablo listesi ─── */
 .tlist {
   position: absolute;

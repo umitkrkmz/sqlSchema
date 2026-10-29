@@ -122,6 +122,15 @@ Ayrıntı panelinde kolonlar, açıklamalar, tanımın geçtiği dosya ve satır
 
 <img src="docs/images/tr/tablo-listesi.png" alt="Tablo listesi: modül takımyıldızlarına göre sıralı tablolar ve seçili tablo" width="900">
 
+**Alt diyagram.** Büyük bir şemada yalnızca ilgilendiğiniz tabloları ayrı bir haritada görmek için:
+- **Seçim:** haritada `Ctrl` / `Cmd` + tık, paneldeki **Seçime ekle** düğmesi ya da tablo listesinde `Ctrl` / `Cmd` + tık. Listedeki takımyıldız başlığındaki **+** bütün takımyıldızı (ör. bir modül dosyasını) ekler. Seçilen tablolar haritada vurgulu bir halkayla işaretlenir.
+- **Açma:** üstte beliren çubukta **Alt diyagramı aç**. **Komşularıyla** işaretliyse seçilen tablolara doğrudan bağlı tablolar da gelir.
+- **Alt diyagramda:** yalnızca bu tablolar ve aralarındaki ilişkiler kendi yerleşimiyle çizilir; panel, arama, tablo listesi ve adlandırma profili de yalnızca bu tablolara bakar.
+- **Dönüş:** **Tümüne dön** ya da `Esc`. Tam harita aynı konumlarla geri gelir.
+- **Bağlantı:** `?sub=BILLING_ACCOUNT,INVOICE&near=1` bu alt diyagramı doğrudan açar.
+
+<img src="docs/images/tr/alt-diyagram.png" alt="Alt diyagram: iki tablo ve komşuları kendi yerleşimiyle" width="900">
+
 <img src="docs/images/tr/yakin-plan.png" alt="Yakın plan: kolon satırlarına bağlanan çizgiler ve karga ayağı uçları" width="900">
 
 #### Karga ayağı
@@ -594,6 +603,15 @@ The detail panel lists:
 - The list and the legend share the same edge; opening one closes the other. The choice is remembered in the browser.
 
 <img src="docs/images/en/tablo-listesi.png" alt="Table list: tables ordered by module constellation, with the selected table" width="900">
+
+**Sub-diagram.** To see only the tables you care about in a large schema, on a map of their own:
+- **Picking:** `Ctrl` / `Cmd` + click on the map, the **Add to selection** button in the panel, or `Ctrl` / `Cmd` + click in the table list. The **+** on a constellation heading in the list adds the whole constellation (for example one module file). Picked tables are marked with a highlighted ring.
+- **Opening:** **Open sub-diagram** in the bar that appears at the top. With **with neighbours** ticked, tables directly linked to the picked ones come along.
+- **In the sub-diagram:** only these tables and the relationships between them are drawn, with a layout of their own; the panel, search, table list and naming profile also look only at these tables.
+- **Going back:** **Back to all** or `Esc`. The full map returns with the same positions.
+- **Link:** `?sub=BILLING_ACCOUNT,INVOICE&near=1` opens this sub-diagram directly.
+
+<img src="docs/images/en/alt-diyagram.png" alt="Sub-diagram: two tables and their neighbours with a layout of their own" width="900">
 
 <img src="docs/images/en/yakin-plan.png" alt="Close-up: lines attached to column rows, with crow's foot ends" width="900">
 

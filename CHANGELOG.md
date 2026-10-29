@@ -9,6 +9,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 - **Tablo listesi (`L`):** şema ve takımyıldız başlıkları altında bütün tablolar; dosya sırası ya da A → Z, `↑` / `↓` ile seçim ve harita birlikte ilerler, süzme kutusu, PK yok / M:N / sözlük / dış işaretleri. Görünüm menüsünden açılır, `?list=1`.
   Table list (`L`): every table under schema and constellation headings; file order or A → Z, `↑` / `↓` moves the selection and the map together, a filter box, no-PK / M:N / lookup / external tags. Opened from the View menu, `?list=1`.
+- **Alt diyagram:** `Ctrl`/`Cmd` + tık, panel ya da tablo listesiyle seçilen tablolar (isteğe bağlı komşularıyla) kendi yerleşimiyle ayrı bir haritada; panel, arama, liste ve adlandırma profili de yalnızca onlara bakar. **Tümüne dön** ya da `Esc`; `?sub=A,B&near=1`.
+  Sub-diagram: tables picked with `Ctrl`/`Cmd` + click, the panel or the table list (optionally with their neighbours) on a separate map with a layout of their own; the panel, search, list and naming profile look only at them. **Back to all** or `Esc`; `?sub=A,B&near=1`.
 
 ### Değişti · Changed
 

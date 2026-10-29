@@ -83,6 +83,12 @@ const EXPECT = {
     check('telekom: 350+ FK', m.stats.fk >= 350, m.stats.fk);
     check('telekom: PL/SQL paketi atlandı', m.stats.skipped.some(([k]) => k === 'CREATE PACKAGE'));
     check('telekom: CRM takımyıldızlara bölündü', m.tables.find(t => t.schema === 'CRM').schemaRef.groups.length > 1);
+    // alt diyagram aynı tablo nesneleriyle ayrı yerleşim kurar; tam yerleşim yeniden kurulunca konumlar birebir döner
+    const pos = m.tables.map(t => t.x + ',' + t.y).join(';');
+    const keep = new Set(m.tables.filter(t => t.schema === 'BILLING'));
+    NS.layoutModel({ ...m, tables: m.tables.filter(t => keep.has(t)), rels: m.rels.filter(r => keep.has(r.child) && keep.has(r.parent)) });
+    NS.layoutModel(m, { grouping: 'file' });
+    check('telekom: alt diyagramdan dönünce yerleşim aynı', m.tables.map(t => t.x + ',' + t.y).join(';') === pos);
     const fk = dim(NS.namingProfile(m), 'fkStyle');
     check('telekom: AGENT_USER_ID → APP_USER rol önekli sayılır, hedef adını içermeyen FK yok', !fk.other && fk.role >= 50 && fk.audit === 2, fk);
   },
