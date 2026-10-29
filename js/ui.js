@@ -954,10 +954,14 @@ function valuesHtml(c) {
 
 // "Sözlük olarak göster" düğmesi yalnızca sözlüğe benzeyen tablolarda çıkar: az kolon, çok gelen ilişki,
 // kendisi pek bir yere bağlanmıyor (durum, tip, kod tabloları). Zaten sözlükse ya da elle seçildiyse her zaman.
+// Ad ya da kolonlar da sözlüğü andırmalı; yalnızca "az kolon, çok gelen ilişki" CUSTOMER gibi ana tabloları da yakalar
+const DICT_NAME = /(^|_)(KOD|KODU|CODE|CODES|TIP|TIPI|TYPE|TYPES|STATUS|DURUM|SOZLUK|LOOKUP|LOV|PARAM|PARAMETRE|DICT|DICTIONARY|ENUM)(_|$)/i;
+const DICT_COL = /^(KOD|KODU|CODE|TIP|TYPE|KOD_TIP|TIP_ID|TYPE_ID|GRUP|GROUP)$/i;
 function dictCandidate(tb) {
   if (tb.external || tb.embedded) return false;
   if (tb.dictionary || S.dictOverride.has(tb.key)) return true;
-  return tb.inc.filter(r => !r.self).length >= 3 && tb.columns.length <= 8 && tb.out.filter(r => !r.self).length <= 1;
+  const looks = DICT_NAME.test(tb.name) || tb.columns.some(c => DICT_COL.test(c.name));
+  return looks && tb.inc.filter(r => !r.self).length >= 3 && tb.columns.length <= 8 && tb.out.filter(r => !r.self).length <= 1;
 }
 
 // Sözlük tablosunun hangi koşulla (TIP_ID = 7) hangi kolonlarca kullanıldığı
