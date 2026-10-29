@@ -123,6 +123,10 @@ const EXPECT = {
     const mt = find(m, 'MUSTERI').colIdx.get('MUSTERI_TIP');
     check('sigorta: CHECK değerleri açıklamadaki anlamlarla birleşir', mt.valuesSrc === 'check' && vals('MUSTERI', 'MUSTERI_TIP') === 'G=Gerçek kişi, T=Tüzel kişi', [mt.valuesSrc, vals('MUSTERI', 'MUSTERI_TIP')]);
     check('sigorta: anlamı yazılmamış CHECK değerleri', vals('POLICE_ARAC', 'KULLANIM_TARZ') === 'HUSUSI=null, TICARI=null, TAKSI=null, RESMI=null', vals('POLICE_ARAC', 'KULLANIM_TARZ'));
+    const pdv = find(m, 'POLICE').colIdx.get('POLICE_DURUM');
+    check('sigorta: veri dosyası tablodan önce gelse de sözlük değerleri okunur', pdv.valuesSrc === 'dict' && vals('POLICE', 'POLICE_DURUM') === 'A=Aktif, I=İptal, Y=Yenilendi', [pdv.valuesSrc, vals('POLICE', 'POLICE_DURUM')]);
+    check('sigorta: verisi olmayan koşul boş kalır', !find(m, 'TEKLIF').colIdx.get('DURUM_KOD').values);
+    check('sigorta: veri dosyası tablonun dosyalarına sayılmaz', !find(m, 'KOD_TABLO').files.some(f => /verisi/.test(f)), find(m, 'KOD_TABLO').files);
     check('sigorta: @ref açıklaması değer listesi sayılmaz', !find(m, 'POLICE').colIdx.get('POLICE_DURUM').values || find(m, 'POLICE').colIdx.get('POLICE_DURUM').valuesSrc !== 'comment');
     check('sigorta: KOD_TABLO sözlük, MUSTERI değil', find(m, 'KOD_TABLO').dictionary && !find(m, 'MUSTERI').dictionary && m.stats.dictionaries === 1);
     check('sigorta: sözlüğe giden ilişkiler işaretli', m.rels.filter(r => r.dict).length === 3 && !rel(m, 'HASAR_IHBAR', 'IHBAR_EDEN_MUSTERI_NO', 'MUSTERI', 'ref').dict);
@@ -211,6 +215,12 @@ const EXPECT = {
     const adres = rel(m, 'ADRES', 'ADRES_TIP_ID', 'SOZLUK');
     check('sozluk: koşulsuz FK da sözlük bağlantısı', adres && adres.kind === 'fk' && !adres.filter && adres.dict);
     check('sozluk: şemalı ve şemasız @ref aynı tabloya', rel(m, 'ABONE', 'DURUM_ID', 'SOZLUK', 'ref') && rel(m, 'ABONE', 'TIP_ID', 'SOZLUK', 'ref'));
+    const dv = (t, c) => { const x = find(m, t).colIdx.get(c); return x.valuesSrc === 'dict' ? x.values.map(v => v.code + '=' + v.label).join(', ') : null; };
+    check('sozluk: INSERT satırlarından koşula uyan kod değerleri', dv('ABONE', 'DURUM_ID') === '1=Aktif, 2=Pasif, 3=Askıya alınmış, 4=İptal' && dv('HAT', 'DURUM_ID') === '5=Açık, 6=Kapalı, 7=Tek yönlü kapalı', [dv('ABONE', 'DURUM_ID'), dv('HAT', 'DURUM_ID')]);
+    check('sozluk: koşulsuz sözlük bağlantısında değer gösterilmez', !dv('ADRES', 'ADRES_TIP_ID'));
+    check('sozluk: verisi olmayan tip boş kalır', !find(m, 'ODEME').colIdx.get('YONTEM_ID').values);
+    check('sozluk: düz FK ile küçük tabloya da değer gelir', (dv('SOZLUK', 'TIP_ID') || '').startsWith('1=Abone durumu, 2=Abone tipi'));
+    check('sozluk: veri satırları sayıldı, INSERT raporda kalır', m.stats.dataRows === 42 && m.stats.skipped.some(([k, n]) => k === 'INSERT' && n === 42), [m.stats.dataRows, m.stats.skipped]);
     check('sozluk: TIP_ID kolonları SOZLUK_TIP\'e tahmin edilmez', !m.rels.some(r => r.kind === 'implicit'), m.rels.filter(r => r.kind === 'implicit').map(r => r.child.name + '.' + r.cols[0]));
   },
   karisik({ model: m }) {
@@ -307,6 +317,11 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   const cv = c => { const x = find(ck, 'a').colIdx.get(c); return x.values ? x.values.map(v => v.code).join() : null; };
   check('CHECK IN: satır içi ve tablo düzeyi', cv('DURUM') === 'A,P' && cv('TIP') === 'B,K', [cv('DURUM'), cv('TIP')]);
   check('CHECK IN satır içinde NOT NULL\'u bozmaz', !find(ck, 'a').colIdx.get('DURUM').nullable);
+  // INSERT satırları
+  const ins = one("CREATE TABLE kod (id int PRIMARY KEY, grup varchar(10), ad varchar(50));\nCREATE TABLE a (id int PRIMARY KEY, k int);\nCOMMENT ON COLUMN a.k IS '@ref kod (grup = ''X'')';\nINSERT INTO kod (id, grup, ad) VALUES (1, 'X', 'Bir'), (2, 'X', 'İki'), (3, 'Y', 'Üç');\nINSERT INTO kod VALUES (-4, 'X', NULL);\nINSERT INTO kod (id, grup, ad) SELECT id, 'X', ad FROM baska;\nINSERT INTO kod (id, grup, ad) VALUES (5, 'X', UPPER('beş'));");
+  const kv = find(ins, 'a').colIdx.get('K').values;
+  check('INSERT: çok satırlı VALUES, kolonsuz INSERT, eksi sayı, NULL, işlev', kv && kv.map(v => v.code + '=' + v.label).join() === '1=Bir,2=İki,-4=null,5=null', kv);
+  check('INSERT ... SELECT okunmaz', find(ins, 'kod').rows.length === 5, find(ins, 'kod').rows.length);
   check('karşılaştırma, aralık ve bileşik koşul liste sayılmaz', !cv('ADET') && !cv('PUAN') && !cv('ID'), [cv('ADET'), cv('PUAN'), cv('ID')]);
 }
 

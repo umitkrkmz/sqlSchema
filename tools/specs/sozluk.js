@@ -53,8 +53,21 @@ const REFS = {
   'CRM.CAGRI': { KANAL_ID: 13, NEDEN_ID: 14, SONUC_ID: 22 },
 };
 
-const DATA = `-- Sözlük tipleri (başlangıç verisi; çizime girmez)
+// Sözlüğün bir kısmının içeriği: harita bu satırlardan @ref'li kolonların kod anlamlarını gösterir
+const ROWS = {
+  1: ['AKTIF:Aktif', 'PASIF:Pasif', 'ASKIDA:Askıya alınmış', 'IPTAL:İptal'],
+  7: ['ACIK:Açık', 'KAPALI:Kapalı', 'TEK_YON:Tek yönlü kapalı'],
+  13: ['MAGAZA:Mağaza', 'CAGRI:Çağrı merkezi', 'WEB:İnternet', 'MOBIL:Mobil uygulama', 'BAYI:Bayi'],
+  15: ['ACIK:Açık', 'ISLEMDE:İşlemde', 'COZULDU:Çözüldü', 'KAPANDI:Kapandı'],
+};
+
+let sozlukId = 0;
+const DATA = `-- Sözlük tipleri ve içeriğin bir kısmı (başlangıç verisi; çizime girmez)
 ${Object.entries(TYPES).map(([id, ad]) => `INSERT INTO ORTAK.SOZLUK_TIP (ID, AD) VALUES (${id}, '${ad}');`).join('\n')}
+${Object.entries(ROWS).map(([tip, rows]) => rows.map((r, i) => {
+    const [kod, ad] = r.split(':');
+    return `INSERT INTO ORTAK.SOZLUK (ID, TIP_ID, KOD, AD, SIRA, AKTIF) VALUES (${++sozlukId}, ${tip}, '${kod}', '${ad}', ${i + 1}, 'E');`;
+  }).join('\n')).join('\n')}
 COMMIT;
 `;
 

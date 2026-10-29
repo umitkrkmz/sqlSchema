@@ -14,6 +14,7 @@
  *   drop      { t }                   dropcon   { t, name }      droppk { t }
  *   state     { t, name, disabled }   tcomment  { t, text }      ccomment { t, col, text }
  *   check     { t, col, values }      yalnızca izin verilen değer listesi: CHECK (X IN ('A','P')), CHECK (X='A' OR X='P')
+ *   rows      { t, cols, rows }       INSERT ... VALUES satırları (sözlük tablolarının içeriği için; tablo başına sınırlı)
  */
 (function (NS) {
 'use strict';
@@ -571,6 +572,41 @@ function statementLabel(toks) {
   return w.join(' ') || '?';
 }
 
+/*
+ * INSERT INTO t (a, b) VALUES (1, 'x'), (2, 'y'): sözlük tablolarındaki kodların anlamını göstermek için.
+ * Yalnızca düz değerler (metin, sayı, NULL) okunur; işlev çağrıları bilinmeyen değer olur. INSERT ... SELECT
+ * okunmaz. Veri dökümleri büyük olabileceğinden tablo başına ROWS_MAX satırdan sonrası atlanır.
+ */
+const ROWS_MAX = 2000;
+function parseInsert(c, P) {
+  c.acceptW('INTO');
+  const raw = readName(c);
+  if (!raw) return;
+  const key = raw.join('.').toUpperCase();
+  const seen = P.rowCount.get(key) || 0;
+  if (seen >= ROWS_MAX) return;
+  const cols = c.isP('(') ? readColList(c) : null;
+  if (!c.acceptW('VALUES')) return;
+  const rows = [];
+  while (c.isP('(') && seen + rows.length < ROWS_MAX) {
+    const s = c.i;
+    c.skipGroup();
+    const row = [];
+    for (const item of splitTopLevel(c.toks.slice(s + 1, c.i - 1))) {
+      const [a, b] = item;
+      if (item.length === 1 && (a.t === 's' || a.t === 'n')) row.push(String(a.v));
+      else if (item.length === 1 && a.t === 'w' && a.u === 'NULL') row.push(null);
+      else if (item.length === 2 && a.t === 'p' && a.v === '-' && b.t === 'n') row.push('-' + b.v);
+      else row.push(undefined);
+    }
+    rows.push(row);
+    if (!c.acceptP(',')) break;
+  }
+  if (!rows.length) return;
+  P.rowCount.set(key, seen + rows.length);
+  P.op({ op: 'rows', t: P.qn(raw), cols, rows });
+}
+
 // USE ile varsayılan şema seçen lehçeler (MySQL'de veritabanı = şema, Cassandra'da keyspace)
 const USE_SETS_SCHEMA = new Set(['mysql', 'mariadb', 'cassandra', 'sql']);
 
@@ -581,6 +617,7 @@ function parseSQL(src, opts = {}) {
     dialect,
     ops: [],
     defaultSchema: null,
+    rowCount: new Map(),
     line: 0,
     stats: { statements: 0, tables: 0, indexes: 0, comments: 0, skipped: new Map(), errors: [] },
     skip(label) { this.stats.skipped.set(label, (this.stats.skipped.get(label) || 0) + 1); },
@@ -612,6 +649,10 @@ function parseSQL(src, opts = {}) {
         parseDrop(c, P);
       } else if (c.acceptW('RENAME')) {
         parseRename(c, P);
+      } else if (c.acceptW('INSERT')) {
+        // çizime girmez, raporda sayılır; satırlar yalnızca kod değerlerini göstermek için tutulur
+        P.skip('INSERT');
+        parseInsert(c, P);
       } else if (c.acceptW('USE')) {
         const parts = readName(c);
         if (parts && USE_SETS_SCHEMA.has(dialect)) P.defaultSchema = parts[parts.length - 1];

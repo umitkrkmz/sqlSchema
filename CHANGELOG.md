@@ -11,6 +11,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
   Code values in comments: value lists such as `1 = Active, 2 = Passive`, `A: Active; P: Passive` or `Y-Yes / N-No` are read from column comments; they appear as chips in the panel and a `≡` mark on the card, and are searchable.
 - **CHECK, ENUM ve MongoDB enum değerleri:** `CHECK (X IN (…))`, SQL Server `CHECK ([X]='A' OR [X]='P')`, MySQL `ENUM` tipi ve MongoDB `enum` alanları aynı değer kutucuklarıyla gösterilir; anlamları açıklamada yazılıysa birleşir. MongoDB enum'u artık açıklamaya "enum: …" diye eklenmez.
   CHECK, ENUM and MongoDB enum values: `CHECK (X IN (…))`, SQL Server `CHECK ([X]='A' OR [X]='P')`, the MySQL `ENUM` type and MongoDB `enum` fields are shown with the same value chips, combined with meanings written in the comment. MongoDB enums are no longer appended to the comment as "enum: …".
+- **Sözlük verisi:** sözlük tablosunun `INSERT … VALUES` satırları okunur; `@ref … (TIP_ID = 7)` ile bağlı kolonda o tipin kodları ve anlamları görünür. Koşulsuz sözlük bağlantısında değer gösterilmez; tablo başına en çok 2 000 satır.
+  Lookup data: the `INSERT … VALUES` rows of lookup tables are read; a column linked with `@ref … (TIP_ID = 7)` shows the codes and meanings of that type. Unconditional lookup links show no values; at most 2,000 rows per table.
 
 ## [0.4.0] - 2026-10-29
 

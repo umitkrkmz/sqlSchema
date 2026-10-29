@@ -207,6 +207,13 @@ COMMENT ON COLUMN HASAR_IHBAR.IHBAR_KANAL IS 'İhbarın geldiği kanal: ACN = Ac
 
 Değerler kısıttan ya da tipten geliyor, anlamları açıklamada yazılıyorsa ikisi birleşir: `CHECK (MUSTERI_TIP IN ('G','T'))` ile `'G = Gerçek kişi, T = Tüzel kişi'` açıklaması `G Gerçek kişi · T Tüzel kişi` olarak görünür. Aralık (`BETWEEN`), karşılaştırma (`> 0`) ve birden fazla kolonlu koşullar değer listesi sayılmaz.
 
+**Sözlük verisi.** Dosyalarda sözlük tablosunun `INSERT` satırları da varsa, `@ref SOZLUK.ID (TIP_ID = 7)` ile bağlı kolonun altında o tipin değerleri görünür (`1 Aktif · 2 Pasif …`; kaynak: "sözlükten: SOZLUK · TIP_ID = 7"):
+- **Kod ve anlam:** kod bağlantının hedef kolonundan, anlam `AD`, `ACIKLAMA`, `NAME` gibi bir kolondan alınır.
+- **Koşul:** yalnızca `KOLON = değer` eşitlikleri (`AND` ile birden fazla) uygulanır.
+- **Koşulsuz sözlük bağlantısı:** değer gösterilmez, çünkü sözlüğün hangi tipinin geçerli olduğu bilinemez. Sözlük olmayan küçük tablolara giden düz FK'lerde tablonun bütün satırları değer olur.
+- **Sınır:** yalnızca düz `INSERT … VALUES` okunur, `INSERT … SELECT` okunmaz. Büyük veri dökümlerinde tablo başına ilk 2 000 satır alınır. `INSERT`'ler yine çizime girmez, raporda sayılır.
+- **Öncelik:** kolonun kendi `CHECK` ya da açıklama listesi önceliklidir; orada anlamı yazılmamış kodların anlamı sözlükten tamamlanır.
+
 <a id="tr-coklu-dosya"></a>
 
 ### Birden fazla dosya ve migration
@@ -261,7 +268,7 @@ Migration'lar baştan sona uygulanır ve harita şemanın **son hâlini** göste
 | `CREATE UNIQUE INDEX` (1:1 tespiti) | ✓ | ✓ | ✓ | ✓ | ✓ | |
 | Tablo / kolon açıklamaları | `COMMENT ON` | `sp_addextendedproperty` | `COMMENT '…'` | `COMMENT ON` | | |
 
-**Çizime girmeyenler.** View, sequence, trigger, package, procedure, function, type, grant ve `INSERT` raporda sayılır ama çizilmez. Ayrıştırıcı bunların içindeki `;` işaretlerine takılmaz:
+**Çizime girmeyenler.** View, sequence, trigger, package, procedure, function, type, grant ve `INSERT` raporda sayılır ama çizilmez (`INSERT … VALUES` satırları yalnızca [sözlük değerleri](#tr-haritayi-okumak) için okunur). Ayrıştırıcı bunların içindeki `;` işaretlerine takılmaz:
 - PL/SQL blokları `/` satırına kadar bütün tutulur.
 - T-SQL blokları `GO` satırına kadar bütün tutulur.
 - MySQL blokları `DELIMITER` ayracına kadar bütün tutulur.
@@ -650,6 +657,13 @@ Allowed values may be defined elsewhere too; all of them are shown with the same
 
 When the values come from a constraint or type and their meanings are written in the comment, the two are combined: `CHECK (MUSTERI_TIP IN ('G','T'))` with the comment `'G = Gerçek kişi, T = Tüzel kişi'` shows as `G Gerçek kişi · T Tüzel kişi`. Ranges (`BETWEEN`), comparisons (`> 0`) and multi-column conditions are not value lists.
 
+**Lookup data.** If the files also contain the `INSERT` rows of the lookup table, a column linked with `@ref SOZLUK.ID (TIP_ID = 7)` shows the values of that type (`1 Aktif · 2 Pasif …`; source: "from the lookup: SOZLUK · TIP_ID = 7"):
+- **Code and meaning:** the code comes from the link's target column, the meaning from a column such as `AD`, `ACIKLAMA` or `NAME`.
+- **Condition:** only `COLUMN = value` equalities (several joined with `AND`) are applied.
+- **Unconditional lookup link:** no values are shown, because it is not known which type of the lookup applies. For plain FKs to small tables that are not lookups, all rows of the table become values.
+- **Limits:** only plain `INSERT … VALUES` is read, not `INSERT … SELECT`. For large data dumps the first 2,000 rows per table are taken. `INSERT`s are still not drawn and are counted in the report.
+- **Priority:** the column's own `CHECK` or comment list comes first; meanings missing there are filled in from the lookup.
+
 <a id="en-multi-file"></a>
 
 ### Multiple files and migrations
@@ -704,7 +718,7 @@ Migrations are applied from first to last, and the map shows the **final state**
 | `CREATE UNIQUE INDEX` (1:1 detection) | ✓ | ✓ | ✓ | ✓ | ✓ | |
 | Table / column comments | `COMMENT ON` | `sp_addextendedproperty` | `COMMENT '…'` | `COMMENT ON` | | |
 
-**Not drawn.** Views, sequences, triggers, packages, procedures, functions, types, grants and `INSERT`s are counted in the report but not drawn. The parser does not trip over the `;` inside them:
+**Not drawn.** Views, sequences, triggers, packages, procedures, functions, types, grants and `INSERT`s are counted in the report but not drawn (`INSERT … VALUES` rows are read only for [lookup values](#en-reading)). The parser does not trip over the `;` inside them:
 - PL/SQL blocks are kept whole up to the `/` line.
 - T-SQL blocks are kept whole up to the `GO` line.
 - MySQL blocks are kept whole up to the `DELIMITER` mark.

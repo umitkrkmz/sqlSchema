@@ -86,6 +86,41 @@ function typeFamily(type) {
   return 'other';
 }
 
+const ROWS_MAX = 5000;   // tablo başına tutulan veri satırı (INSERT)
+const LABEL_COL = /^(AD|ADI|ISIM|NAME|ACIKLAMA|DESCRIPTION|DESC|TANIM|LABEL|TITLE|BASLIK|METIN|TEXT|DEGER|VALUE|DISPLAY_NAME)$/;
+
+// @ref koşulu "TIP_ID = 7 AND DIL = 'TR'": yalnızca kolon = sabit eşitlikleri; başka biçimde null
+function parseFilter(text) {
+  if (!text) return [];
+  const out = [];
+  for (const part of String(text).split(/\s+AND\s+/i)) {
+    const m = /^\s*"?([\p{L}\p{N}_$#]+)"?\s*=\s*(?:'((?:[^']|'')*)'|(-?\d+(?:\.\d+)?))\s*$/u.exec(part);
+    if (!m) return null;
+    out.push({ col: m[1].toUpperCase(), val: m[2] !== undefined ? m[2].replace(/''/g, "'") : m[3] });
+  }
+  return out;
+}
+
+/*
+ * Sözlük verisi: hedef tablonun INSERT satırları varsa, bağlantının koşuluna uyan satırlar kolonun
+ * değerleri olur (kod = hedef kolon, anlam = AD / ACIKLAMA / NAME gibi bir kolon). Kolonun kendi
+ * CHECK / açıklama listesi öncelikli; orada anlamı eksik kodların anlamı sözlükten tamamlanır.
+ */
+function valuesFromRows(r, U) {
+  const p = r.parent;
+  if (!p.rows || !p.rows.length || r.cols.length !== 1 || r.kind === 'implicit' || r.kind === 'embed') return null;
+  const filter = parseFilter(r.filter);
+  // koşulsuz bağlantıda sözlüğün hangi tipinin geçerli olduğu bilinmez; bütün satırları göstermek yanıltır
+  if (!filter || (p.dictionary && !filter.length)) return null;
+  const key = U(r.refCols[0]);
+  const rows = p.rows.filter(row => row[key] != null && filter.every(f => String(row[f.col]) === f.val));
+  if (!rows.length || rows.length > 200) return null;
+  const skip = new Set([key, ...filter.map(f => f.col)]);
+  const cols = p.columns.map(c => U(c.name)).filter(n => !skip.has(n) && rows.some(row => row[n] != null));
+  const labelCol = cols.find(n => LABEL_COL.test(n)) || cols.find(n => typeFamily(p.colIdx.get(n) && p.colIdx.get(n).type) === 'str');
+  return rows.map(row => ({ code: String(row[key]), label: labelCol && row[labelCol] != null ? String(row[labelCol]) : null }));
+}
+
 // MySQL ENUM('a','b') / SET('a','b') tipindeki değerler
 function enumFromType(type) {
   const m = /^(?:enum|set)\s*\((.*)\)$/is.exec(String(type || '').trim());
@@ -254,7 +289,7 @@ function buildModel(inputs, opts = {}) {
     const t = find(db, op.t);
     // DROP TABLE IF EXISTS çoğu dökümde CREATE'ten hemen önce gelir; olmayan tabloyu silmek bir şey yapmaz
     if (!t) return op.op === 'drop';
-    touch(t, op);
+    if (op.op !== 'rows') touch(t, op);   // veri dosyası tablonun tanımlandığı dosyalardan sayılmaz
     switch (op.op) {
       case 'fk':
         t.fkDefs.push({ ...op, db });
@@ -317,6 +352,18 @@ function buildModel(inputs, opts = {}) {
       case 'check': {
         const col = getCol(t, op.col);
         if (col) { col.allowed = op.values.slice(); col.allowedSrc = 'check'; }
+        break;
+      }
+      case 'rows': {
+        // satırlar kolon adına göre tutulur; INSERT'ler farklı kolon sıraları kullanabilir
+        const names = (op.cols || t.columns.map(c => c.name)).map(U);
+        t.rows = t.rows || [];
+        for (const r of op.rows) {
+          if (t.rows.length >= ROWS_MAX) break;
+          const o = {};
+          names.forEach((n, i) => { if (i < r.length && r[i] !== undefined) o[n] = r[i]; });
+          t.rows.push(o);
+        }
         break;
       }
       case 'drop':
@@ -485,6 +532,23 @@ function buildModel(inputs, opts = {}) {
     if (r.kind !== 'embed') for (const c of cols) if (c) c.fk = true;
   }
 
+  // Sözlük verisi: bağlantının hedefindeki INSERT satırlarından kolonun kod değerleri
+  for (const r of rels) {
+    const vals = valuesFromRows(r, U);
+    const col = vals && getCol(r.child, r.cols[0]);
+    if (!col) continue;
+    if (!col.values) {
+      col.values = vals;
+      col.valuesSrc = 'dict';
+      col.valuesFrom = r.parent.name + (r.filter ? ' · ' + r.filter : '');
+    } else {
+      for (const v of col.values) {
+        const d = !v.label && vals.find(x => x.code.toUpperCase() === v.code.toUpperCase());
+        if (d && d.label) v.label = d.label;
+      }
+    }
+  }
+
   // Ara tablolar (M:N):
   //   klasik   PK'nin en az iki kolonu farklı FK'lerden gelir   (ROLE_PERMISSION)
   //   vekil    tek kolonlu kendi PK'si + iki FK, başka veri yok  (ID, A_ID, B_ID)
@@ -537,6 +601,7 @@ function buildModel(inputs, opts = {}) {
       refs: rels.filter(r => r.kind === 'ref').length,
       dictionaries: all.filter(t => t.dictionary).length,
       valueLists: all.reduce((s, t) => s + t.columns.filter(c => c.values).length, 0),
+      dataRows: all.reduce((s, t) => s + (t.rows ? t.rows.length : 0), 0),
       embeds: rels.filter(r => r.kind === 'embed').length,
       junctions: all.filter(t => t.junction).length,
       indexes: inputs.reduce((s, i) => s + i.stats.indexes, 0),

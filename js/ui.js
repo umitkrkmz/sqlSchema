@@ -296,6 +296,7 @@ function renderReport() {
       ${st.refs ? row('rRefs', st.refs) : ''}
       ${st.dictionaries ? row('rDicts', st.dictionaries) : ''}
       ${st.valueLists ? row('rValueLists', st.valueLists) : ''}
+      ${st.dataRows ? row('rDataRows', st.dataRows) : ''}
       ${row('rImplicit', st.implicit)}
       ${row('rJunctions', st.junctions)}
       ${row('rIndexes', `${st.indexes} / ${st.comments}`)}
@@ -536,7 +537,7 @@ function relItem(r, dir) {
 }
 
 // Kolonun kod değerleri: kutucuklar ve nereden okunduğu
-const VALUE_SRC = { comment: 'vsrcComment', check: 'vsrcCheck', enum: 'vsrcEnum' };
+const VALUE_SRC = { comment: 'vsrcComment', check: 'vsrcCheck', enum: 'vsrcEnum', dict: 'vsrcDict' };
 function valuesHtml(c) {
   const MAX = 40;
   const chips = c.values.slice(0, MAX).map(v => `<span class="cv"><b>${esc(v.code)}</b>${v.label ? ' ' + esc(v.label) : ''}</span>`).join('');
