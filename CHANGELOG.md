@@ -5,6 +5,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+## [0.8.0] - 2026-10-29
+
 ### Eklendi · Added
 
 - **Tasarım denetimi:** 29 kural (anahtarlar ve bütünlük, veri tipleri, normalizasyon, adlandırma); her bulgu ne, neden ve öneriyle. Hata / uyarı / bilgi, addan tahmin edilen bulgular işaretli. Haritada gösterme, panelde tablonun bulguları, en çok bulgu olan tablolar, Markdown inceleme belgesi; `?audit=1`, `?pop=audit`.
@@ -142,7 +144,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 - **Geliştirme araçları:** test seti, ekran görüntüsü üreticisi.
   Test suite and screenshot generator.
 
-[Yayımlanmamış · Unreleased]: ../../compare/v0.7.0...HEAD
+[Yayımlanmamış · Unreleased]: ../../compare/v0.8.0...HEAD
+[0.8.0]: ../../compare/v0.7.0...v0.8.0
 [0.7.0]: ../../compare/v0.6.0...v0.7.0
 [0.6.0]: ../../compare/v0.5.0...v0.6.0
 [0.5.0]: ../../compare/v0.4.0...v0.5.0
