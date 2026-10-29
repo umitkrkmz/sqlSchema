@@ -682,5 +682,61 @@ function inferImplicit(all, rels, getCol, U) {
   }
 }
 
-Object.assign(NS, { buildModel, typeFamily, valuesFromComment });
+/*
+ * Etki analizi: "bu tabloyu (ya da PK kolonunu) değiştirirsem, bir satırını silersem ne etkilenir?"
+ * Tabloya bağlanan tablolar derece derece çıkarılır (1. derece doğrudan bağlananlar). Her bağlantının
+ * silmedeki davranışı ayrıca söylenir; CASCADE zinciri "birlikte silinenler" olarak ayrıca verilir.
+ *   opts.accept(r)  hangi ilişkiler sayılır (arayüz: görünür olanlar)   opts.col  yalnızca bu kolona bağlananlar (1. derece)
+ * Eylemler: cascade · setNull · setDefault · restrict (FK silmeyi engeller) · unenforced (@ref, tahmini ya da
+ * devre dışı FK: veritabanı denetlemez, yetim satır kalabilir) · embedded (MongoDB gömülü belge)
+ */
+function deleteAction(r) {
+  if (r.kind === 'embed') return 'embedded';
+  if (r.kind !== 'fk' || r.disabled) return 'unenforced';
+  const a = String(r.onDelete || '').toUpperCase();
+  return a === 'CASCADE' ? 'cascade' : a === 'SET NULL' ? 'setNull' : a === 'SET DEFAULT' ? 'setDefault' : 'restrict';
+}
+
+function impactOf(root, opts = {}) {
+  const accept = opts.accept || (() => true);
+  const col = opts.col ? String(opts.col).toUpperCase() : null;
+  const depth = new Map([[root, 0]]);
+  const levels = [];
+  let frontier = [root];
+  for (let d = 1; frontier.length && d <= (opts.maxDepth || 12); d++) {
+    const next = [];
+    for (const t of frontier) {
+      for (const r of t.inc) {
+        if (r.self || !accept(r) || depth.has(r.child)) continue;
+        if (d === 1 && col && !r.refCols.some(c => String(c).toUpperCase() === col)) continue;
+        depth.set(r.child, d);
+        next.push({ t: r.child, via: r, action: deleteAction(r) });
+      }
+    }
+    if (next.length) levels.push(next);
+    frontier = next.map(x => x.t);
+  }
+  // birlikte silinenler: kökte bir satır silinince CASCADE zinciriyle giden tablolar. Silme bütün satırı
+  // etkilediği için kolon seçili olsa da tablo düzeyindedir.
+  const cascade = [];
+  const seen = new Set([root]);
+  let fr = [root];
+  while (fr.length) {
+    const nx = [];
+    for (const t of fr) {
+      for (const r of t.inc) {
+        if (r.self || !accept(r) || seen.has(r.child)) continue;
+        const action = deleteAction(r);
+        if (action !== 'cascade' && action !== 'embedded') continue;
+        seen.add(r.child);
+        cascade.push({ t: r.child, via: r, action });
+        nx.push(r.child);
+      }
+    }
+    fr = nx;
+  }
+  return { root, col, levels, cascade, total: depth.size - 1 };
+}
+
+Object.assign(NS, { buildModel, typeFamily, valuesFromComment, impactOf, deleteAction });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});

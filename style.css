@@ -331,6 +331,20 @@ code, kbd { font-family: var(--mono); }
 .cvals .cv b { font: 500 10px var(--mono); color: var(--accent); }
 .cvals .cv.more { border-style: dashed; color: var(--dim); }
 .cvals .vsrc { font: italic 10px var(--sans); color: var(--faint); margin-left: 2px; }
+/* Etki analizi */
+.impact { border-bottom: 1px solid var(--line); }
+.impact h4 { margin: 10px 0 4px; font: 600 10.5px var(--cond); letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+.impact h4 span { font: 10.5px var(--mono); letter-spacing: 0; margin-left: 4px; }
+.impact .imp-sum { margin: 0 0 4px; font-size: 12.5px; color: var(--text); }
+.impact .imp-hint { margin: 0 0 6px; font-size: 11px; color: var(--faint); }
+.impact .imp-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 4px; }
+.impact .imp-chips button { padding: 1px 6px; border: 1px solid rgba(239, 123, 134, 0.5); border-radius: 4px; background: none; font: 10.5px var(--mono); color: #f3b0b7; cursor: pointer; }
+.impact > .btn { margin: 8px 0 12px; }
+.tag.act-cascade, .tag.act-embedded { color: var(--rose); border-color: rgba(239, 123, 134, 0.5); }
+.tag.act-restrict { color: var(--accent); border-color: rgba(242, 180, 90, 0.5); }
+.tag.act-setNull, .tag.act-setDefault { color: var(--cyan); border-color: rgba(108, 198, 220, 0.5); }
+.tag.act-unenforced { border-style: dashed; }
+.has-impact table.cols tr[data-col] { cursor: pointer; }
 table.dict { width: 100%; border-collapse: collapse; font-size: 12px; }
 table.dict td { padding: 5px 0; border-top: 1px solid var(--line); vertical-align: top; }
 table.dict tr:first-child td { border-top: 0; }

@@ -23,6 +23,7 @@ const SCENES = {
   'sozluk-rozetleri': 'sample=sozluk&center=ABONE&zoom=1.25&legend=0',
   'tablo-listesi': 'sample=sigorta&list=1&select=HASAR_DOSYA&zoom=0.9&legend=0',
   'alt-diyagram': 'sample=telekom&sub=BILLING_ACCOUNT,INVOICE&near=1&legend=0',
+  'etki-analizi': 'sample=kucuk&select=CUSTOMER&impact=1&zoom=0.75&legend=0',
   'mongodb-uydular': 'sample=sosyal&select=posts&zoom=0.75&legend=0',
   'adlandirma-profili': 'sample=karisik&pop=naming&legend=0',
 };

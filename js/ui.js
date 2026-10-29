@@ -6,7 +6,7 @@
  * URL parametreleri (paylaşılabilir bağlantılar ve belge görüntüleri için):
  *   ?lang=tr|en   ?sample=<örnek kimliği>   ?select=<tablo adı>   ?center=<tablo adı>   ?zoom=<1.6>   ?legend=0|1
  *   ?pop=naming|report|files   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
- *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)
+ *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)   ?impact=1 (select ile)
  */
 (function (NS) {
 'use strict';
@@ -78,6 +78,7 @@ function rebuild() {
   S.order = model.tables.slice().sort((a, b) => b.deg - a.deg || String(a.name).localeCompare(String(b.name)));
   S.hover = S.sel = null;
   S.focus = 0;
+  S.impactRes = S.impactDepth = null;
   S.history = [];
   S.histPos = -1;
   buildIndex();
@@ -466,6 +467,7 @@ function select(tb, opts = {}) {
   S.selCol = opts.col ? opts.col.toUpperCase() : null;
   if (!tb) S.focus = 0;
   if (tb && !opts.fromHistory) pushHistory(tb);
+  computeImpact();
   refreshEmphasis();
   renderPanel();
   markListSel();
@@ -558,6 +560,7 @@ function afterLayout() {
   for (const tb of S.model.tables) { tb._rows = null; tb._lw = 0; }
   buildIndex();
   if (S.sel && !S.byKey.has(S.sel.key)) S.sel = null;
+  computeImpact();
   refreshEmphasis();
   renderPanel();
   renderList();
@@ -808,6 +811,61 @@ $('#tableList').addEventListener('keydown', e => {
   listGo(from < 0 ? 0 : from + (e.key === 'ArrowDown' ? 1 : -1));
 });
 
+/* ─── Etki analizi ─── */
+
+// Kip açıkken seçili tabloyu izler; panelde bir kolona tıklanınca yalnızca o kolona bağlananlar (S.selCol)
+const IMPACT_ACTION = { cascade: 'actCascade', setNull: 'actSetNull', setDefault: 'actSetDefault', restrict: 'actRestrict', unenforced: 'actUnenforced', embedded: 'actEmbedded' };
+
+function computeImpact() {
+  S.impactRes = S.impact && S.sel ? NS.impactOf(S.sel, { accept: relVisible, col: S.selCol }) : null;
+  S.impactDepth = S.impactRes ? new Map(S.impactRes.levels.flatMap((l, i) => l.map(x => [x.t, i + 1]))) : null;
+}
+function setImpact(on) {
+  S.impact = on;
+  document.body.classList.toggle('has-impact', on);
+  if (!on) S.selCol = null;
+  computeImpact();
+  refreshEmphasis();
+  renderPanel();
+  invalidate();
+}
+
+const impactSummary = res => (res.total
+  ? t(res.col ? 'impactColSummary' : 'impactSummary', { n: res.total, d1: res.levels[0].length, col: res.col })
+  : t(res.col ? 'impactColNone' : 'impactNone', { col: res.col }));
+
+function impactHtml(res) {
+  const target = res.root.name + (res.col ? '.' + res.col : '');
+  const sum = impactSummary(res);
+  const item = x => `<li data-go="${esc(x.t.key)}" tabindex="0">
+    <canvas class="glyph" data-l="${x.via.parentEnd}" data-r="${x.via.childEnd}" data-s="${relStyle(x.via)}"></canvas><div class="ri">
+      <div class="rn"><b>${esc(x.t.name)}</b><span class="rs">${esc(x.t.schema)}</span><span class="tag act-${x.action}">${esc(t(IMPACT_ACTION[x.action]))}</span></div>
+      <div class="rc">${x.via.cols.map((c, i) => `${esc(c)} → ${esc(x.via.refCols[i] || '?')}`).join(', ')}</div></div></li>`;
+  const levels = res.levels.map((l, i) => `<h4>${esc(t('impactDepth', { d: i + 1 }))} <span>${l.length}</span></h4><ul class="rels">${l.map(item).join('')}</ul>`).join('');
+  const cascade = res.cascade.length ? `<h4>${esc(t('impactCascade'))} <span>${res.cascade.length}</span></h4><p class="imp-chips">${res.cascade.map(x => `<button data-go="${esc(x.t.key)}">${esc(x.t.name)}</button>`).join('')}</p>` : '';
+  return `<section class="impact">
+    <h3>${esc(t('impactHead'))} · ${esc(target)} <span>${res.total}</span></h3>
+    <p class="imp-sum">${esc(sum)}</p>
+    <p class="imp-hint">${esc(t(res.col ? 'impactColHint' : 'impactHint'))}</p>
+    ${cascade}${levels}
+    ${res.total ? `<button class="btn sm ghost" data-act="impact-md">${esc(t('namingMd'))}</button>` : ''}
+  </section>`;
+}
+
+// Etki raporu: değişiklik öncesi ekiple paylaşmak için
+function impactMarkdown(res) {
+  const cell = s => String(s).replace(/\|/g, '\\|');
+  const out = [`# ${t('impactHead')} · ${res.root.name}${res.col ? '.' + res.col : ''} · ${S.title || ''}`, ''];
+  out.push(impactSummary(res), '');
+  if (res.cascade.length) out.push(`## ${t('impactCascade')}`, '', res.cascade.map(x => '`' + x.t.name + '`').join(', '), '');
+  res.levels.forEach((l, i) => {
+    out.push(`## ${t('impactDepth', { d: i + 1 })}`, '', `| ${t('impactTable')} | ${t('impactColumns')} | ${t('impactAction')} |`, '|---|---|---|');
+    for (const x of l) out.push(`| \`${cell((x.t.schema ? x.t.schema + '.' : '') + x.t.name)}\` | ${cell(x.via.cols.map((c, j) => c + ' → ' + (x.via.refCols[j] || '?')).join(', '))} | ${cell(t(IMPACT_ACTION[x.action]))} |`);
+    out.push('');
+  });
+  return out.join('\n');
+}
+
 /* ─── Gezinme geçmişi ─── */
 
 // Tarayıcı geçmişi gibi: geri gidip yeni bir tablo seçilince ileri kısmı silinir
@@ -945,7 +1003,7 @@ function renderPanel() {
     const hl = S.selCol && c.name.toUpperCase() === S.selCol ? ' class="hl"' : '';
     // açıklama bir değer listesiyse liste kutucuk olur, metnin geri kalanı açıklama olarak kalır
     const note = c.commentUsed ? c.valuesNote : c.comment;
-    return `<tr${hl}><td class="ck ${k ? 'k-' + k : ''}">${k}</td><td class="cn${c.nullable ? ' nul' : ''}">${esc(c.name)}${note ? `<div class="cc">${esc(note)}</div>` : ''}${c.values ? valuesHtml(c) : ''}</td><td class="ct">${esc(String(c.type).toLowerCase())}${c.nullable ? '' : `<b title="${esc(mongo ? t('reqTitle') : 'NOT NULL')}">${mongo ? 'req' : 'nn'}</b>`}</td></tr>`;
+    return `<tr${hl} data-col="${esc(c.name)}"><td class="ck ${k ? 'k-' + k : ''}">${k}</td><td class="cn${c.nullable ? ' nul' : ''}">${esc(c.name)}${note ? `<div class="cc">${esc(note)}</div>` : ''}${c.values ? valuesHtml(c) : ''}</td><td class="ct">${esc(String(c.type).toLowerCase())}${c.nullable ? '' : `<b title="${esc(mongo ? t('reqTitle') : 'NOT NULL')}">${mongo ? 'req' : 'nn'}</b>`}</td></tr>`;
   }).join('');
   const where = [tb.db !== 'main' ? tb.db : '', schemaLabel(tb.schemaRef)].filter(Boolean).join(' / ');
   const group = tb.external ? t('externalRef') : tb.embedded ? t('satelliteOf', { o: tb.owner ? tb.owner.name : '' }) : tb.group.loose ? t('looseStar') : tb.desig + ' ' + groupLabel(tb.group);
@@ -962,11 +1020,13 @@ function renderPanel() {
       <div class="p-actions">
         <button class="btn sm ${S.focus ? '' : 'ghost'}" data-act="focus" title="${esc(t('focusTitle'))}">${esc(t('focus')[S.focus])}</button>
         <button class="btn sm ghost" data-act="zoom">${esc(t(mongo ? 'showFields' : 'showColumns'))}</button>
+        <button class="btn sm ${S.impact ? '' : 'ghost'}" data-act="impact" title="${esc(t('impactTitle'))}">${esc(t('impactBtn'))}</button>
         <button class="btn sm ${S.pick.has(tb.key) ? '' : 'ghost'}" data-act="pick" title="${esc(t('pickTitle'))}">${esc(t(S.pick.has(tb.key) ? 'pickRemove' : 'pickAdd'))}</button>
         ${!dictCandidate(tb) ? '' : `<button class="btn sm ghost" data-act="dict" title="${esc(t('dictMarkTitle'))}">${esc(t(tb.dictionary ? 'dictUnmark' : 'dictMark'))}</button>`}
       </div>
     </div>
     <div class="p-body">
+      ${S.impactRes && S.impactRes.root === tb ? impactHtml(S.impactRes) : ''}
       <section>
         <h3>${esc(t(mongo ? 'fields' : 'columns'))} <span>${tb.columns.length}</span></h3>
         <table class="cols"><tbody>${rows || `<tr><td class="empty-row">${esc(t('noColumnInfo'))}</td></tr>`}</tbody></table>
@@ -998,6 +1058,8 @@ $('#panel').addEventListener('click', e => {
     else if (a === 'focus') { S.focus = (S.focus + 1) % 3; refreshEmphasis(); renderPanel(); invalidate(); }
     else if (a === 'dict' && S.sel) toggleDictionary(S.sel);
     else if (a === 'pick' && S.sel) togglePick(S.sel);
+    else if (a === 'impact') setImpact(!S.impact);
+    else if (a === 'impact-md' && S.impactRes) downloadText(impactMarkdown(S.impactRes), fileStem() + '-' + t('impactFile') + '-' + S.impactRes.root.name + '.md', 'text/markdown;charset=utf-8');
     else if (a === 'zoom' && S.sel) {
       if (!S.columns) setColumns(true);   // düğme açıkça kolonları istiyor
       flyToTable(S.sel, Math.max(1.5, S.cam.k));
@@ -1008,6 +1070,17 @@ $('#panel').addEventListener('click', e => {
   if (go) {
     const tb = S.byKey.get(go.dataset.go);
     if (tb) select(tb, { fly: true, col: go.dataset.col || null });
+    return;
+  }
+  // etki analizinde kolona tıklamak analizi o kolona daraltır (tekrar tıklamak tabloya döner)
+  const row = S.impact && e.target.closest('table.cols tr[data-col]');
+  if (row) {
+    const col = row.dataset.col.toUpperCase();
+    S.selCol = S.selCol === col ? null : col;
+    computeImpact();
+    refreshEmphasis();
+    renderPanel();
+    invalidate();
   }
 });
 $('#panel').addEventListener('keydown', e => {
@@ -1178,7 +1251,8 @@ window.addEventListener('keydown', e => {
     return;
   }
   if (e.key === 'Escape') {
-    if (S.focus) { S.focus = 0; refreshEmphasis(); renderPanel(); invalidate(); }
+    if (S.impact) setImpact(false);
+    else if (S.focus) { S.focus = 0; refreshEmphasis(); renderPanel(); invalidate(); }
     else if (S.sel) select(null);
     else if (S.full) exitSubset();
     else if (S.pick.size) { S.pick = new Set(); afterPick(); }
@@ -1407,6 +1481,7 @@ if (params.get('sample')) {
     if (tb) {
       // ?center= seçmeden ortalar: vurgu ve panel olmadan bir bölgeyi göstermek için
       if (params.get('select')) select(tb);
+      if (params.get('select') && params.get('impact') === '1') setImpact(true);
       const k = zoom > 0 ? zoom : Math.max(S.cam.k, 0.85);
       const offset = !$('#panel').hidden && S.w > 820 ? 190 : 0;
       S.anim = null;

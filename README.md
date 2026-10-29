@@ -132,6 +132,15 @@ Ayrıntı panelinde kolonlar, açıklamalar, tanımın geçtiği dosya ve satır
 
 <img src="docs/images/tr/alt-diyagram.png" alt="Alt diyagram: iki tablo ve komşuları kendi yerleşimiyle" width="900">
 
+**Etki analizi.** "Bu tabloyu değiştirirsem ya da bir satırını silersem ne etkilenir?" Paneldeki **Etki analizi** düğmesiyle açılır:
+- **Etkilenenler:** tabloya bağlanan bütün tablolar derece derece listelenir (1. derece doğrudan bağlananlar, 2. derece onlara bağlananlar …). Haritada etkilenmeyenler söner, etkilenenler dereceye göre renkli halkayla işaretlenir.
+- **Silmede ne olur:** her bağlantının yanında yazar: **birlikte silinir** (`ON DELETE CASCADE`), **boşaltılır** (`SET NULL`), **silmeyi engeller** (eylemsiz FK), **denetlenmez** (`@ref`, tahmini ya da devre dışı FK: veritabanı korumaz, yetim satır kalabilir).
+- **Birlikte silinenler:** bir satır silinince CASCADE zinciriyle giden tablolar ayrıca gösterilir.
+- **Kolon düzeyi:** analiz açıkken paneldeki bir kolona tıklamak yalnızca o kolona bağlananları bırakır (ör. PK'nin tipini değiştirmeden önce).
+- **Paylaşım:** **Markdown indir** sonucu değişiklik öncesi ekiple paylaşmak için dosyaya yazar. Kip seçimi izler; başka bir tabloya geçince analiz onun için yenilenir. `Esc` kapatır.
+
+<img src="docs/images/tr/etki-analizi.png" alt="Etki analizi: CUSTOMER tablosuna bağlananlar ve silmedeki davranışları" width="900">
+
 <img src="docs/images/tr/yakin-plan.png" alt="Yakın plan: kolon satırlarına bağlanan çizgiler ve karga ayağı uçları" width="900">
 
 #### Karga ayağı
@@ -614,6 +623,15 @@ The detail panel lists:
 - **Saved views:** while in a sub-diagram, **Save** gives it a name. Views are kept in the browser per set of opened files; when the same files are opened again they are listed under **View → Saved views**. **Export** writes them to a `.sqlschema.json` file and **Import** reads it back. The file carries only the view (table names), not the schema, so it is safe to share within a team.
 
 <img src="docs/images/en/alt-diyagram.png" alt="Sub-diagram: two tables and their neighbours with a layout of their own" width="900">
+
+**Impact analysis.** "What is affected if I change this table or delete one of its rows?" Opened with the **Impact** button in the panel:
+- **Affected tables:** every table that points to it is listed level by level (level 1 points directly, level 2 points to those …). On the map unaffected tables fade and affected ones get a ring coloured by level.
+- **What happens on delete:** each link says whether rows are **deleted too** (`ON DELETE CASCADE`), **set to NULL** (`SET NULL`), whether it **blocks the delete** (an FK without an action) or is **not enforced** (`@ref`, inferred or disabled FK: the database does not protect it and orphan rows may remain).
+- **Deleted together:** tables reached through the CASCADE chain when a row is deleted are shown separately.
+- **Column level:** with the analysis on, clicking a column in the panel keeps only the tables pointing to that column (for example before changing a PK type).
+- **Sharing:** **Download Markdown** writes the result to a file to share with the team before a change. The mode follows the selection; moving to another table recomputes it. `Esc` closes it.
+
+<img src="docs/images/en/etki-analizi.png" alt="Impact analysis: tables pointing to CUSTOMER and what happens to them on delete" width="900">
 
 <img src="docs/images/en/yakin-plan.png" alt="Close-up: lines attached to column rows, with crow's foot ends" width="900">
 

@@ -77,6 +77,16 @@ const EXPECT = {
     check('kucuk: devre dışı FK', rel(m, 'INVOICE_LINE', 'SUBSCRIPTION_ID', 'SUBSCRIPTION').disabled);
     check('kucuk: 1:1 profil', rel(m, 'CUSTOMER_PROFILE', 'CUSTOMER_ID', 'CUSTOMER').childEnd === 'zeroOne');
     check('kucuk: CDR tahmini ilişki', rel(m, 'VOICE_CDR', 'SUBSCRIPTION_ID', 'SUBSCRIPTION', 'implicit'));
+    // etki analizi: CUSTOMER silinince CUSTOMER_PROFILE CASCADE ile gider, diğer FK'ler silmeyi engeller
+    const imp = NS.impactOf(find(m, 'CUSTOMER'));
+    const d1 = Object.fromEntries(imp.levels[0].map(x => [x.t.name, x.action]));
+    check('kucuk: etki 1. derece ve silme eylemleri', d1.CUSTOMER_PROFILE === 'cascade' && d1.SUBSCRIPTION === 'restrict' && imp.levels[0].length === 5, d1);
+    check('kucuk: CASCADE zinciri', imp.cascade.map(x => x.t.name).join() === 'CUSTOMER_PROFILE', imp.cascade.map(x => x.t.name));
+    check('kucuk: tahmini ilişki denetlenmez sayılır', imp.levels[1].some(x => x.t.name === 'VOICE_CDR' && x.action === 'unenforced'));
+    const noImp = NS.impactOf(find(m, 'CUSTOMER'), { accept: r => r.kind !== 'implicit' });
+    check('kucuk: tahmini ilişkiler kapalıyken etki daralır', noImp.total < imp.total && !noImp.levels.flat().some(x => x.t.name === 'VOICE_CDR'), [noImp.total, imp.total]);
+    const colImp = NS.impactOf(find(m, 'SUBSCRIPTION'), { col: 'NOPE' });
+    check('kucuk: kolon düzeyi etki yalnızca o kolona bağlananlar', colImp.total === 0, colImp.total);
   },
   telekom({ model: m }) {
     check('telekom: 300+ tablo', m.stats.tables >= 300, m.stats.tables);
@@ -118,6 +128,8 @@ const EXPECT = {
     check('sigorta: hasar dosyası → poliçe', rel(m, 'HASAR_DOSYA', 'POLICE_NO', 'POLICE', 'implicit'));
     check('sigorta: poliçe aracı 1:1 poliçe', (rel(m, 'POLICE_ARAC', 'POLICE_NO', 'POLICE') || {}).childEnd === 'zeroOne');
     check('sigorta: tek şema', new Set(m.tables.map(t => t.schema)).size === 1);
+    const pImp = NS.impactOf(find(m, 'POLICE'));
+    check('sigorta: POLICE\'e en az 15 tablo bağlı, hepsi denetlenmez (FK yok)', pImp.total >= 15 && pImp.levels.flat().every(x => x.action === 'unenforced') && !pImp.cascade.length, [pImp.total]);
     const pd = rel(m, 'POLICE', 'POLICE_DURUM', 'KOD_TABLO', 'ref');
     check('sigorta: @ref ile sözlük tablosuna koşullu ilişki', pd && pd.refCols[0] === 'KOD' && pd.filter === "KOD_TIP = 'POLICE_DURUM'", pd && [pd.refCols, pd.filter]);
     check('sigorta: 4 @ref ilişkisi, uyarı yok', m.stats.refs === 4 && !m.stats.warnings.length, [m.stats.refs, m.stats.warnings]);

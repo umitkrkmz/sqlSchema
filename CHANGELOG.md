@@ -13,6 +13,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
   Sub-diagram: tables picked with `Ctrl`/`Cmd` + click, the panel or the table list (optionally with their neighbours) on a separate map with a layout of their own; the panel, search, list and naming profile look only at them. **Back to all** or `Esc`; `?sub=A,B&near=1`.
 - **Kayıtlı görünümler:** alt diyagram bir adla kaydedilir; dosya kümesine göre tarayıcıda saklanır, Görünüm menüsünden açılır, silinir; `.sqlschema.json` olarak dışa/içe aktarılır (şemayı içermez).
   Saved views: a sub-diagram is saved under a name; kept in the browser per set of files, opened and deleted from the View menu; exported and imported as `.sqlschema.json` (without the schema).
+- **Etki analizi:** seçili tabloya bağlananlar derece derece; her bağlantının silmedeki davranışı (birlikte silinir, boşaltılır, silmeyi engeller, denetlenmez), CASCADE zinciri, kolon düzeyi daraltma, haritada dereceye göre renk, Markdown rapor; `?impact=1`.
+  Impact analysis: tables pointing to the selected table, level by level; what each link does on delete (deleted too, set to NULL, blocks the delete, not enforced), the CASCADE chain, column-level narrowing, level colours on the map and a Markdown report; `?impact=1`.
 
 ### Değişti · Changed
 

@@ -38,6 +38,7 @@ const S = {
   hover: null, sel: null, selCol: null, focus: 0,
   implicit: true, grid: true, columns: true, dictLines: false,
   pick: new Set(), relSet: null,   // çoklu seçim (tablo anahtarları) · alt diyagramda görünen ilişkiler
+  impact: false, impactRes: null, impactDepth: null,   // etki analizi kipi, sonucu, tablo → derece
   em: { active: null, near: null, hiRels: null, focus: null },
   anim: null, frame: 0, title: '', parseMs: 0,
 };
@@ -239,6 +240,16 @@ function refreshEmphasis() {
       em.near.add(r.child);
       em.near.add(r.parent);
     }
+  }
+  // etki analizi açıkken yalnızca kök ve etkilenenler parlak, aradaki bağlantılar vurgulu
+  if (S.impactRes) {
+    const f = new Set([S.impactRes.root]);
+    em.hiRels = new Set();
+    for (const level of S.impactRes.levels) for (const x of level) { f.add(x.t); em.hiRels.add(x.via); }
+    em.focus = f;
+    em.near = f;
+    S.em = em;
+    return;
   }
   if (S.sel && S.focus) {
     const f = new Set([S.sel]);
@@ -664,14 +675,19 @@ function drawStars(lv) {
       }
     }
     if (S.pick.has(t.key)) drawPickRing(x, y, r + 4);
+    const d = S.impactDepth && S.impactDepth.get(t);
+    if (d) drawPickRing(x, y, r + 4, impactColor(d));
   }
   ctx.globalAlpha = 1;
   if (S.sel) drawReticle(sx(S.sel.x), sy(S.sel.y), starR(S.sel) + 7);
 }
 
-// çoklu seçime eklenmiş tablo: vurgu renginde ince halka
-function drawPickRing(x, y, r) {
-  ctx.strokeStyle = 'rgba(242,180,90,0.95)';
+// etki derecesi: 1. derece en sıcak renk
+const impactColor = d => (d === 1 ? 'rgba(239,123,134,0.95)' : d === 2 ? 'rgba(242,180,90,0.9)' : 'rgba(138,150,184,0.85)');
+
+// çoklu seçime eklenmiş tablo: vurgu renginde ince halka (etki analizinde dereceye göre renk)
+function drawPickRing(x, y, r, color) {
+  ctx.strokeStyle = color || 'rgba(242,180,90,0.95)';
   ctx.lineWidth = 1.4;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -781,8 +797,9 @@ function drawCards() {
     ctx.shadowBlur = 0;
     ctx.setLineDash(t.external ? [3, 3] : t.embedded ? [5, 2] : []);
     const picked = S.pick.has(t.key);
-    ctx.strokeStyle = isSel ? '#ffffff' : picked ? 'rgba(242,180,90,0.95)' : rgba(col, isAct ? 0.95 : 0.55);
-    ctx.lineWidth = isSel || picked ? 1.6 : 1;
+    const depth = S.impactDepth && S.impactDepth.get(t);
+    ctx.strokeStyle = isSel ? '#ffffff' : depth ? impactColor(depth) : picked ? 'rgba(242,180,90,0.95)' : rgba(col, isAct ? 0.95 : 0.55);
+    ctx.lineWidth = isSel || picked || depth ? 1.6 : 1;
     ctx.stroke();
     ctx.setLineDash([]);
     // başlık
