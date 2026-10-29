@@ -271,6 +271,13 @@ function buildModel(inputs, opts = {}) {
   }
 
   // false: tablo henüz yok, işlem sona saklanır
+  function dropIndex(t, name) {
+    const n = U(name), before = t.indexes.length + t.uniques.length;
+    t.indexes = t.indexes.filter(x => U(x.name) !== n);
+    t.uniques = t.uniques.filter(u => !(u.index && U(u.name) === n));
+    return t.indexes.length + t.uniques.length < before;
+  }
+
   function apply(op, input, last) {
     const db = input.db;
     if (op.op === 'create') {
@@ -286,6 +293,13 @@ function buildModel(inputs, opts = {}) {
     }
     if (op.op === 'embed') { embeds.push({ ...op, db }); return true; }
     if (op.op === 'state') { states.push({ ...op, db }); return true; }
+    // DROP INDEX ad (Oracle, PostgreSQL): tablo yazılmaz; adı taşıyan indeks hangi tablodaysa ondan düşer.
+    // Bulunamazsa indeksi kuran dosya sonra gelebilir; ALTER'lar gibi sona saklanır.
+    if (op.op === 'dropindex' && !op.t) {
+      let found = false;
+      for (const tb of new Set(tables.values())) if (tb.db === db && dropIndex(tb, op.name)) found = true;
+      return found || last;
+    }
     const t = find(db, op.t);
     // DROP TABLE IF EXISTS çoğu dökümde CREATE'ten hemen önce gelir; olmayan tabloyu silmek bir şey yapmaz
     if (!t) return op.op === 'drop';
@@ -392,9 +406,13 @@ function buildModel(inputs, opts = {}) {
         const n = U(op.name);
         t.fkDefs = t.fkDefs.filter(f => U(f.name) !== n);
         t.uniques = t.uniques.filter(u => U(u.name) !== n);
+        t.indexes = t.indexes.filter(x => U(x.name) !== n);
         if (t.pkName && U(t.pkName) === n) { t.pk = []; t.pkName = null; }
         break;
       }
+      case 'dropindex':
+        dropIndex(t, op.name);
+        break;
       case 'droppk':
         t.pk = [];
         t.pkName = null;

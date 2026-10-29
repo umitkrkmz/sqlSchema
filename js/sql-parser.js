@@ -8,6 +8,7 @@
  *   create    { t, def: { columns, comment, noColumns } }
  *   pk / uq   { t, cols, name, partition? }   uq: UNIQUE kısıtı ya da benzersiz indeks (index: true)
  *   index     { t, cols, name }       benzersiz olmayan indeks (denetim: FK indeksi, yinelenen indeks)
+ *   dropindex { name, t? }            DROP INDEX ad [ON tablo]; Oracle ve PostgreSQL'de tablo yazılmaz
  *   fk        { t, cols, ref, refCols, name, disabled, onDelete }
  *   addcol    { t, col }              dropcol   { t, col }
  *   null      { t, col, nullable }    type      { t, col, type }
@@ -543,6 +544,15 @@ function parseExec(c, P) {
 }
 
 function parseDrop(c, P) {
+  if (c.acceptW('INDEX')) {
+    c.acceptW('CONCURRENTLY');
+    c.acceptSeq('IF', 'EXISTS');
+    const name = readName(c);
+    if (!name) return;
+    const t = c.acceptW('ON') ? readName(c) : null;
+    P.op(t ? { op: 'dropindex', name: name[name.length - 1], t: P.qn(t) } : { op: 'dropindex', name: name[name.length - 1] });
+    return;
+  }
   if (!c.acceptW('TABLE')) return P.skip('DROP ' + (c.peek() && c.peek().u || ''));
   c.acceptSeq('IF', 'EXISTS');
   for (const it of splitTopLevel(c.rest())) {

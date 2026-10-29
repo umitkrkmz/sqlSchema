@@ -30,6 +30,7 @@ Betikler `index.html`'de şu sırayla yüklenir ve her biri `globalThis.sqlSchem
 | `js/files.js` | dosya sıralama (Flyway, golang-migrate), ayrıştırıcı seçimi, ayrı veritabanı adları; `*.sqlschema.json` proje dosyası şema sayılmaz | yok |
 | `js/model.js` | işlemleri dosya sırasıyla uygular; FK çözümleme, kardinalite, ara tablo, tahmini ilişki | yok |
 | `js/diff.js` | iki modelin farkı (tablo, kolon, PK, FK), ad değişikliği tahmini; zaman çizelgesi (sürüm adımları, tablo soyu, geçmiş) | yok |
+| `js/fixes.js` | bulgu başına lehçeye uygun düzeltme SQL'i, risk düzeyi; notlar kod (`FIX_NOTES`), metinleri `fixNotes` | yok |
 | `js/layout.js` | veritabanı → şema → takımyıldız (dosyaya ya da ada göre) → yıldız, deterministik kuvvet yerleşimi | yok |
 | `js/conventions.js` | adlandırma profili: boyutlar, kovalar, oranlar, baskın kalıba uymayanlar (kod döndürür, metin değil) | yok |
 | `js/audit.js` | tasarım denetimi: kurallar (`AUDIT_RULES`), bulgular kod olarak; metinleri `i18n.js`'teki `auditRules`. Bulgu anahtarı (`findingKey`) ve borç kaydı | yok |
@@ -46,7 +47,7 @@ Bunları bozan bir değişiklik yapmayın; gerekirse önce bir issue açın.
 
 1. **Bağımlılık ve derleme yok.** npm paketi, paketleyici, TypeScript derlemesi ya da CDN betiği eklenmez. Yalnızca Google Fonts bağlantısı vardır ve olmadan da çalışır.
 2. **Klasik betikler, ES modülü değil.** `type="module"` ve `import` kullanılmaz; sayfa `file://` ile açıldığında da çalışmalıdır. Her dosya `(function (NS) { ... })(globalThis.sqlSchema = globalThis.sqlSchema || {})` kalıbını izler ve dışa açtıklarını `Object.assign(NS, {...})` ile verir.
-3. **Çekirdek DOM'a dokunmaz.** `lexer`, `sql-parser`, `mongo`, `files`, `model`, `diff`, `layout`, `conventions`, `audit` Node'da `require` edilebilmelidir; testler buna dayanır.
+3. **Çekirdek DOM'a dokunmaz.** `lexer`, `sql-parser`, `mongo`, `files`, `model`, `diff`, `layout`, `conventions`, `audit`, `fixes` Node'da `require` edilebilmelidir; testler buna dayanır.
 4. **Yerleşim deterministiktir.** `Math.random` yoktur; aynı girdi her zaman aynı haritayı verir.
 5. **Kart boyutu ile yerleşim yarıçapı bağlıdır.** `render.js`'teki `CARD` (164 × en fazla 127) ile `layout.js`'teki `L.nodeR` (105) birlikte değişir; testler kart çakışmasını denetler.
 6. **Her arayüz metni iki dilde.** Kullanıcıya görünen her metin `js/i18n.js`'te hem `tr` hem `en` sözlüğünde bulunur ve `t('anahtar')` ile kullanılır. HTML'de `data-i18n`, `data-i18n-html`, `data-i18n-attr` kullanılır. Testler eksik anahtarı yakalar. Çekirdek modüller metin değil kod döndürür (ör. `skip: 'config'`, `warnings: [{ kind: 'dup', ... }]`); çeviri arayüzde yapılır.
@@ -73,7 +74,7 @@ Bunları bozan bir değişiklik yapmayın; gerekirse önce bir issue açın.
 
 Sonra `tools/gen-samples.js`'teki `SPECS` listesine ekleyin, üreticiyi çalıştırın ve `tests/run.js`'teki `EXPECT`'e beklentileri yazın.
 
-**Yeni bir denetim kuralı.** `js/audit.js`'teki `AUDIT_RULES`'a kimlik, grup ve önemi ekleyin, kuralı `auditModel` içinde yazın. `js/i18n.js`'teki `auditRules`'a iki dilde `title`, `why`, `fix` ve `what` ekleyin. `tools/specs/hatali.js`'e kuralı tetikleyen bir tablo ekleyin, üreticiyi çalıştırın ve `tests/run.js`'teki `hatali` bulgu listesini güncelleyin; mevcut örneklerde yanlış alarm çıkmadığına bakın.
+**Yeni bir denetim kuralı.** `js/audit.js`'teki `AUDIT_RULES`'a kimlik, grup ve önemi ekleyin, kuralı `auditModel` içinde yazın. `js/i18n.js`'teki `auditRules`'a iki dilde `title`, `why`, `fix` ve `what` ekleyin. `tools/specs/hatali.js`'e kuralı tetikleyen bir tablo ekleyin, üreticiyi çalıştırın ve `tests/run.js`'teki `hatali` bulgu listesini güncelleyin; mevcut örneklerde yanlış alarm çıkmadığına bakın. SQL ile düzeltilebiliyorsa `js/fixes.js`'teki `RULES`'a lehçe lehçe ekleyin; `fixesRoundTrip` testi betiği örneklere uygulayıp bulgunun kaybolduğunu denetler.
 
 **Yeni bir arayüz metni.** Anahtarı `js/i18n.js`'te iki sözlüğe de ekleyin, `t()` ile kullanın, testleri çalıştırın.
 

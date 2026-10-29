@@ -149,14 +149,18 @@ function auditModel(model, opts = {}) {
 
   // Anahtarlar ve bütünlük
   // Kayıt, geçmiş ve olgu tabloları (log, CDR, _HIST, FACT_) çoğu zaman bilinçli olarak PK'siz ve FK'siz tutulur
-  for (const tb of sql) if (!tb.pk.length && !tb.noColumns) add('no-pk', tb, null, APPEND_ONLY.test(tb.name) ? { appendOnly: true } : {}, null, APPEND_ONLY.test(tb.name) ? 'info' : null);
+  // pkStyle: baskın PK adlandırması (düzeltme önerisi eklenecek kolonu buna göre adlandırır)
+  const profile = NS.namingProfile && sql.length >= 3 ? NS.namingProfile({ ...model, tables: sql }) : null;
+  const pkDim = profile && profile.dims.find(d => d.id === 'pkStyle');
+  const pkStyle = pkDim && pkDim.clear ? pkDim.dominant : null;
+  for (const tb of sql) if (!tb.pk.length && !tb.noColumns) add('no-pk', tb, null, APPEND_ONLY.test(tb.name) ? { appendOnly: true } : { pkStyle }, null, APPEND_ONLY.test(tb.name) ? 'info' : null);
   for (const r of fks) {
     r.cols.forEach((c, i) => {
       const a = colOf(r.child, c), b = r.refCols[i] && colOf(r.parent, r.refCols[i]);
       if (!a || !b || !a.type || !b.type) return;
       if (typeMismatch(typeInfo(a.type), typeInfo(b.type))) add('fk-type-mismatch', r.child, a.name, { type: a.type, parent: r.parent, refCol: b.name, refType: b.type });
     });
-    if (r.disabled) add('disabled-fk', r.child, r.cols.join(', '), { parent: r.parent, name: r.name });
+    if (r.disabled) add('disabled-fk', r.child, r.cols.join(', '), { parent: r.parent, name: r.name, refCols: r.refCols });
   }
   for (const w of (model.stats && model.stats.warnings) || []) if (w.kind === 'ref' && w.t && inSql.has(w.t)) add('ref-broken', w.t, w.col, { target: w.target });
   for (const r of rels) if (r.kind === 'implicit' && !APPEND_ONLY.test(r.child.name)) add('fk-missing', r.child, r.cols.join(', '), { parent: r.parent, refCol: r.refCols[0] });
@@ -285,8 +289,7 @@ function auditModel(model, opts = {}) {
   }
   // Baskın kalıp belirginse (%60 ve üstü) ona uymayanlar; kural dosyası gelince standart oradan okunacak
   const samePk = it => it.ref && it.ref.pk.length === 1 && U(it.ref.pk[0]) === U(it.c);
-  if (NS.namingProfile && sql.length >= 3) {
-    const profile = NS.namingProfile({ ...model, tables: sql });
+  if (profile) {
     const dimRule = { pkStyle: 'pk-style', fkStyle: 'fk-style', tableCase: 'naming-case', columnCase: 'naming-case' };
     for (const d of profile.dims) {
       const rule = dimRule[d.id];

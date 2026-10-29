@@ -29,6 +29,7 @@ const SCENES = {
   'sema-farki': 'sample=lojistik&diff=V3&select=shipments&zoom=1.3&legend=0',
   'zaman-cizelgesi': 'sample=lojistik&time=V4&select=shipments&zoom=0.85&legend=0',
   'tasarim-denetimi': 'sample=hatali&audit=1&select=KAMPANYA&zoom=1.1&legend=0',
+  'duzeltme-onerileri': 'sample=hatali&fix=1&legend=0',
 };
 
 const CANDIDATES = [

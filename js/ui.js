@@ -8,7 +8,7 @@
  *   ?pop=naming|report|files|diff|audit   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
  *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)   ?impact=1 (select ile)
  *   ?diff=V3 (migration klasöründe bu sürümle karşılaştır)   ?time=V4 (zaman çizelgesi bu sürümde; ?time=1 baştan)
- *   ?audit=1 (tasarım denetimi haritada)
+ *   ?audit=1 (tasarım denetimi haritada)   ?fix=1 (düzeltme önerileri penceresi)
  */
 (function (NS) {
 'use strict';
@@ -578,6 +578,7 @@ function renderAudit() {
       `<li data-go="${esc(tb.key)}" tabindex="0"><b>${esc(tb.name)}</b><span class="au-chips">${sevCounts(countSev(fs))}</span></li>`).join('')}</ul>` : ''}
     <div class="df-row">
       ${fresh.length ? `<button class="btn sm ${S.auditMap ? '' : 'ghost'}" data-act="audit-map">${esc(t(S.auditMap ? 'auditMapOff' : 'auditMap'))}</button>` : ''}
+      ${a.findings.some(f => NS.FIXABLE.includes(f.rule)) ? `<button class="btn sm ghost" data-act="audit-fix">${esc(t('fixBtn'))}</button>` : ''}
       ${a.findings.length ? `<button class="btn sm ghost" data-act="audit-md">${esc(t('namingMd'))}</button>` : ''}
     </div>`;
 }
@@ -589,6 +590,7 @@ $('#auditPop').addEventListener('click', e => {
     const act = b.dataset.act;
     if (act === 'audit-map') setAuditMap(!S.auditMap);
     else if (act === 'audit-md') downloadText(auditMarkdown(), fileStem() + '-' + t('auditFile') + '.md', 'text/markdown;charset=utf-8');
+    else if (act === 'audit-fix') openFix();
     else if (act === 'debt-accept') acceptDebt();
     else if (act === 'debt-clear') clearDebt();
     else if (act === 'debt-file') downloadProject();
@@ -613,7 +615,9 @@ function auditPanelHtml(tb) {
   return `<section class="auditsec"><details${S.auditMap ? ' open' : ''}><summary><h3>${esc(t('auditHead'))} <span class="au-chips">${sevCounts(countSev(fresh))}${owed ? `<i class="debt">${esc(t('debtCount', { n: owed }))}</i>` : ''}</span></h3></summary>
     <ul class="au-items">${sorted.map(f => {
       const R = ruleText(f.rule), what = auditWhat(f);
-      return `<li class="sev-${f.severity}${f.debt ? ' debt' : ''}"><b>${esc(R.title)}</b>${f.debt ? ` <em>${esc(t('debtTag'))}</em>` : ''}${f.col ? ` <code>${esc(f.col)}</code>` : ''}${what ? ` <span>${esc(what)}</span>` : ''}<small>${esc(t('auditFix'))}: ${esc(R.fix)}</small></li>`;
+      const fx = NS.fixFor(f, fixOptions(a));
+      const sql = fx ? `<details class="au-sql"><summary>${esc(t('fixSql'))} · ${esc(t('fixRisk')[fx.risk])}</summary><pre>${esc(fixText(f, fx))}</pre></details>` : '';
+      return `<li class="sev-${f.severity}${f.debt ? ' debt' : ''}"><b>${esc(R.title)}</b>${f.debt ? ` <em>${esc(t('debtTag'))}</em>` : ''}${f.col ? ` <code>${esc(f.col)}</code>` : ''}${what ? ` <span>${esc(what)}</span>` : ''}<small>${esc(t('auditFix'))}: ${esc(R.fix)}</small>${sql}</li>`;
     }).join('')}</ul></details></section>`;
 }
 
@@ -747,6 +751,93 @@ function debtHtml(a, owed, open) {
       <button class="btn sm ghost" data-act="debt-clear">${esc(t('debtClear'))}</button>
     </div></div>`;
 }
+
+/* ─── Düzeltme önerileri ─── */
+
+// SQL js/fixes.js'te üretilir (notlar kod döner); burada betik metni, pencere ve panelde bulgu başına öneri.
+// Varsayılan seçim güvenli ve gözden geçirilecek öneriler; riskliler (veri dönüşümü, ad değişikliği) elle açılır.
+S.fixOpts = { safe: true, review: true, risky: false, onlyNew: true, novalidate: true };
+const FIX_RISKS = ['safe', 'review', 'risky'];
+
+const fixOptions = a => ({ indexesKnown: !a.skipped.some(x => x.rule === 'fk-no-index'), novalidate: S.fixOpts.novalidate });
+
+// Bir önerinin metni: başlık, notlar ve adımlar (sonra çalıştırılacak adımlar yorum olarak)
+function fixText(f, fix) {
+  const R = ruleText(f.rule), label = auditLabel(f), notes = t('fixNotes');
+  const out = [`-- [${t('fixRisk')[fix.risk]}] ${R.title}${label ? ' · ' + label : ''}`];
+  for (const st of fix.steps) {
+    for (const n of [].concat(st.note || [])) out.push('-- ' + notes[n]);
+    out.push(st.comment ? '-- ' + st.sql : st.sql);
+  }
+  return out.join('\n');
+}
+
+function fixItems() {
+  const a = getAudit();
+  if (!a) return { a, all: [], picked: [], manual: 0 };
+  const pool = S.fixOpts.onlyNew ? a.findings.filter(f => !f.debt) : a.findings;
+  const all = NS.fixAll(pool, fixOptions(a));
+  return { a, all, picked: all.filter(x => S.fixOpts[x.fix.risk]), manual: pool.length - all.length };
+}
+const riskCounts = items => { const c = { n: items.length, safe: 0, review: 0, risky: 0 }; for (const x of items) c[x.fix.risk]++; return c; };
+
+function fixScript(items) {
+  const dialects = [...new Set(items.map(x => x.f.t.dialect).filter(Boolean))].map(d => DIALECTS[d] || d);
+  const head = [
+    '-- ' + t('fixHeader', { title: S.title || '', dialect: dialects.join(', '), date: new Date().toISOString().slice(0, 10) }),
+    '-- ' + t('fixWarn'),
+    '-- ' + t('fixCount', riskCounts(items)),
+    '',
+  ];
+  return head.join('\n') + '\n' + (items.length ? items.map(x => fixText(x.f, x.fix)).join('\n\n') : t('fixNone')) + '\n';
+}
+
+function openFix() {
+  renderFix();
+  const d = $('#fixDlg');
+  if (!d.open) d.showModal();
+}
+
+function renderFix() {
+  const { a, all, picked, manual } = fixItems();
+  const n = r => all.filter(x => x.fix.risk === r).length;
+  $('#fixBody').innerHTML = `<h3>${esc(t('fixTitle'))}</h3>
+    <p>${esc(t('fixIntro'))}</p>
+    <div class="fx-opts">
+      ${FIX_RISKS.map(r => `<label class="fx-${r}" title="${esc(t('fixRiskTitle')[r])}"><input type="checkbox" data-fix="${r}" ${S.fixOpts[r] ? 'checked' : ''}> ${esc(t('fixRisk')[r])} <i>${n(r)}</i></label>`).join('')}
+      ${a && a.debt ? `<label><input type="checkbox" data-fix="onlyNew" ${S.fixOpts.onlyNew ? 'checked' : ''}> ${esc(t('fixOnlyNew'))}</label>` : ''}
+      ${all.some(x => x.f.rule === 'fk-missing') ? `<label><input type="checkbox" data-fix="novalidate" ${S.fixOpts.novalidate ? 'checked' : ''}> ${esc(t('fixNovalidate'))}</label>` : ''}
+    </div>
+    ${manual ? `<p class="fx-note">${esc(t('fixManual', { n: manual }))}</p>` : ''}
+    <pre id="fixPre" tabindex="0">${esc(fixScript(picked))}</pre>
+    <div class="row">
+      <span class="grow">${esc(t('fixCount', riskCounts(picked)))}</span>
+      <button class="btn ghost" data-fix-act="copy" ${picked.length ? '' : 'disabled'}>${esc(t('fixCopy'))}</button>
+      <button class="btn ghost" data-fix-act="download" ${picked.length ? '' : 'disabled'}>${esc(t('fixDownload'))}</button>
+      <button class="btn" data-fix-act="close">${esc(t('fixClose'))}</button>
+    </div>`;
+}
+
+$('#fixDlg').addEventListener('change', e => {
+  const k = e.target.dataset && e.target.dataset.fix;
+  if (!k) return;
+  S.fixOpts[k] = e.target.checked;
+  renderFix();
+});
+$('#fixDlg').addEventListener('click', e => {
+  const b = e.target.closest('[data-fix-act]');
+  if (!b) return;
+  const script = $('#fixPre').textContent;
+  if (b.dataset.fixAct === 'close') $('#fixDlg').close();
+  else if (b.dataset.fixAct === 'download') downloadText(script, fileStem() + '-' + t('fixFile') + '.sql', 'application/sql;charset=utf-8');
+  else if (b.dataset.fixAct === 'copy') {
+    // file:// sayfalarında pano API'si olmayabilir: metin seçilir, kullanıcı kopyalar
+    const done = () => toast(t('fixCopied'), 2500);
+    const select = () => { const r = document.createRange(); r.selectNodeContents($('#fixPre')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); let ok = false; try { ok = document.execCommand('copy'); } catch (err) { /* desteklenmiyor */ } if (ok) done(); else toast(t('fixSelected'), 4000); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(script).then(done, select);
+    else select();
+  }
+});
 
 function downloadText(text, name, type) {
   const a = document.createElement('a');
@@ -2098,6 +2189,7 @@ NS.onLangChange(() => {
     $('#timeBar').innerHTML = '';
     renderTimeBar();
     renderAudit();
+    if ($('#fixDlg').open) renderFix();
     resetHud();
   }
   if (S.title && S.files.length > 1 && /^\d+ /.test(S.title)) $('#fileName').textContent = t('nFiles', { n: S.files.filter(f => f.text != null).length });
@@ -2190,6 +2282,8 @@ if (params.get('sample')) {
     if (params.get('audit') === '1') setAuditMap(true);
     const pop = { naming: '#namingPop', report: '#report', files: '#filesPop', diff: '#diffPop', audit: '#auditPop' }[params.get('pop')];
     if (pop) { togglePop(pop); if (pop === '#auditPop') renderAudit(); }
+    // ?fix=1: düzeltme önerileri penceresi
+    if (params.get('fix') === '1') openFix();
     invalidate();
   });
 }

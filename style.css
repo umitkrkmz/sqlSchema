@@ -803,6 +803,20 @@ body:not(.loaded) .legend, body:not(.loaded) .hud { display: none; }
   resize: vertical;
 }
 .paste .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+#fixBody { padding: 18px; }
+.fix-dlg { width: min(900px, calc(100% - 32px)); }
+.fix-dlg .fx-opts { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 8px; font-size: 12.5px; }
+.fix-dlg .fx-opts label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.fix-dlg .fx-opts label i { font: normal 11px var(--mono); padding: 0 6px; border-radius: 4px; border: 1px solid currentColor; }
+.fix-dlg .fx-safe { color: #7fd49a; }
+.fix-dlg .fx-review { color: var(--accent); }
+.fix-dlg .fx-risky { color: var(--rose); }
+.fix-dlg .fx-note { margin: 0 0 8px; color: var(--faint); font-size: 12px; }
+.fix-dlg pre { margin: 0; height: 46vh; overflow: auto; padding: 12px; border-radius: 9px; border: 1px solid var(--line-2); background: #050816; font: 12px/1.5 var(--mono); white-space: pre; }
+.fix-dlg .row { align-items: center; }
+.fix-dlg .row .grow { margin-right: auto; color: var(--dim); font-size: 12px; }
+.au-sql summary { cursor: pointer; font: 10.5px var(--mono); color: var(--accent); }
+.au-sql pre { margin: 4px 0 2px; padding: 6px 8px; border-radius: 6px; background: #050816; border: 1px solid var(--line); font: 10.5px/1.45 var(--mono); white-space: pre-wrap; word-break: break-word; color: var(--text); }
 
 /* ─── Dar ekran ─── */
 @media (max-width: 1200px) {

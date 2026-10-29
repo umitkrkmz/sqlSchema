@@ -431,6 +431,23 @@ Kurallar dört grupta toplanır:
 - **Saklama:** kayıt tarayıcıda proje adına göre de tutulur; yeni migration eklenince kaybolmaz. Klasördeki dosya ile tarayıcıdaki kayıttan daha yeni olanı geçerlidir.
 - **Kimlik:** bir bulgu kural, tablo ve kolon adıyla eşleşir. Tablonun adı değişirse bulgu yeni sayılır.
 
+**Düzeltme önerileri.** Pencerede **Düzeltme betiği** düzeltilebilen bulgular için lehçeye uygun SQL üretir (Oracle, PostgreSQL, SQL Server, MySQL / MariaDB, SQLite):
+- **Ne üretilir:**
+  - eksik FK ve FK indeksi; Oracle'da `ENABLE NOVALIDATE`, PostgreSQL'de `NOT VALID`, SQL Server'da `WITH NOCHECK` seçeneğiyle
+  - devre dışı FK'yi açma (önce yetim kayıtları bulan sorgu)
+  - gereksiz indeksi kaldırma
+  - PK ekleme (kolon adı şemanın baskın PK adlandırmasını izler)
+  - FK kolonunu genişletme
+  - metin tarih, metin sayı, `FLOAT` tutar ve `CLOB` dönüşümü: yeni kolon, kopyalama, doğrulama, eski kolonu kaldırma, yeniden adlandırma
+  - sistem adlı kısıtları ve Türkçe karakterli, harf düzeni farklı ya da belirsiz adlı kolonları yeniden adlandırma
+- **Risk:** her öneri **güvenli** (indeks, FK, kısıt adı), **gözden geçirin** (PK ekleme, indeks kaldırma, tip genişletme) ya da **riskli** (veri dönüşümü, ad değişikliği) olarak işaretlenir. Riskliler varsayılan olarak betiğe girmez.
+- **Notlar:** her adımın üstünde açıklama vardır ("tarih biçimini verinize göre değiştirin", "bu adı kullanan uygulama kodu da güncellenmeli"). Veri temizlendikten sonra çalıştırılacak doğrulama adımları yorum olarak yazılır. Tablo adını değiştiren adımlar en sondadır.
+- **Elle düzeltilenler:** döngü, EAV, tekrarlayan kolonlar ya da yeni bir ad seçmeyi gerektiren bulgular için SQL üretilmez; tasarım kararı gerektirir.
+- **Kullanım:** borç kaydı varsa yalnızca yeni bulgular için üretilir. Betik kopyalanır ya da `.sql` olarak indirilir. Panelde her bulgunun altında kendi SQL'i de görünür.
+- **Sınama:** testler üretilen betiği örneklere yeni bir migration olarak ekleyip yeniden denetler; düzeltilen bulguların kaybolduğunu ve yeni bulgu çıkmadığını doğrular.
+
+<img src="docs/images/tr/duzeltme-onerileri.png" alt="Düzeltme önerileri: risk seçimi ve Oracle betiği" width="900">
+
 <img src="docs/images/tr/tasarim-denetimi.png" alt="Tasarım denetimi: hatalı tablolar haritada kırmızı, panelde KAMPANYA tablosunun bulguları" width="900">
 
 **Hatalı tasarım (DBA incelemesi)** örneği bu özellik için hazırlanmıştır: düzgün bir başlangıç şemasına üç geliştiricinin özensiz eklediği migration'lar. Her kural en az bir kez tetiklenir.
@@ -522,6 +539,7 @@ js/                 tarayıcıda bu sırayla yüklenir; hepsi globalThis.sqlSche
   layout.js         veritabanı → şema → takımyıldız → yıldız, hiyerarşik kuvvet yerleşimi
   conventions.js    adlandırma profili: kalıplar, oranlar, baskın kalıba uymayanlar
   audit.js          tasarım denetimi: kurallar, bulgular (kod döner, metin arayüzde)
+  fixes.js          düzeltme önerileri: lehçeye uygun SQL, risk düzeyi
   sample-small.js   gömülü küçük örnek
   render.js         canvas çizimi, kamera, karga ayağı
   ui.js             yükleme, dosya listesi, arama, panel, rapor, URL parametreleri
@@ -990,6 +1008,23 @@ The rules fall into four groups:
 - **Storage:** the register is also kept in the browser under the project name, so it survives new migrations. Between the folder's file and the browser's copy, the newer one wins.
 - **Identity:** a finding is matched by rule, table and column name. If a table is renamed, its findings count as new.
 
+**Fix suggestions.** **Fix script** in the window generates dialect-specific SQL for the findings that can be fixed (Oracle, PostgreSQL, SQL Server, MySQL / MariaDB, SQLite):
+- **What is generated:**
+  - missing FKs and FK indexes, with `ENABLE NOVALIDATE` on Oracle, `NOT VALID` on PostgreSQL and `WITH NOCHECK` on SQL Server as an option
+  - enabling a disabled FK (with a query that finds orphan rows first)
+  - dropping a redundant index
+  - adding a PK (the column name follows the schema's dominant PK naming)
+  - widening an FK column
+  - converting text dates, text numbers, `FLOAT` amounts and `CLOB`s: new column, copy, verify, drop the old column, rename
+  - renaming system-named constraints and columns with Turkish characters, a different case or an unclear name
+- **Risk:** each suggestion is marked **safe** (indexes, FKs, constraint names), **review** (adding a PK, dropping an index, widening a type) or **risky** (data conversion, renames). Risky ones are left out of the script by default.
+- **Notes:** each step carries an explanation ("change the date format to match your data", "application code using this name must be updated too"). Validation steps to run after the data is cleaned are written as comments. Steps that rename a table come last.
+- **Fixed by hand:** no SQL is generated for cycles, EAV, repeating columns or findings that need a new name to be chosen; they need a design decision.
+- **Use:** with a debt register, SQL is generated for new findings only. The script is copied or downloaded as `.sql`. In the panel, each finding also shows its own SQL.
+- **Tested:** the tests add the generated script to the samples as a new migration and audit again, checking that the fixed findings disappear and no new ones appear.
+
+<img src="docs/images/en/duzeltme-onerileri.png" alt="Fix suggestions: risk selection and an Oracle script" width="900">
+
 <img src="docs/images/en/tasarim-denetimi.png" alt="Design audit: tables with errors in red on the map, findings of the KAMPANYA table in the panel" width="900">
 
 The **Flawed design (DBA review)** sample was made for this feature: migrations three developers carelessly added to a clean baseline. Every rule fires at least once.
@@ -1081,6 +1116,7 @@ js/                 loaded in this order; each file adds to the globalThis.sqlSc
   layout.js         database → schema → constellation → star, hierarchical force layout
   conventions.js    naming profile: patterns, shares, names that depart from the dominant pattern
   audit.js          design audit: rules and findings (returns codes; text lives in the UI)
+  fixes.js          fix suggestions: dialect-specific SQL, risk level
   sample-small.js   embedded small sample
   render.js         canvas drawing, camera, crow's feet
   ui.js             loading, file list, search, panel, report, URL parameters

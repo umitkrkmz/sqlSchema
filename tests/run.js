@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'files', 'model', 'diff', 'layout', 'conventions', 'audit', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
+for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'files', 'model', 'diff', 'layout', 'conventions', 'audit', 'fixes', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
 require(path.join(ROOT, 'samples', 'catalog.js'));
 const NS = globalThis.sqlSchema;
 
@@ -319,6 +319,58 @@ const EXPECT = {
     const ad = NS.auditModel(all.eticaret.model);
     check('eticaret denetim: dökümde indeks yoksa FK indeksi denetlenmez', ad.skipped.some(x => x.rule === 'fk-no-index'));
   },
+  // Düzeltme SQL'i: üretilen betik dosyalara yeni bir sürüm olarak eklenip yeniden denetlenince düzeltilen bulgular
+  // kaybolur, yeni bulgu çıkmaz ve ayrıştırma hatası olmaz
+  fixesRoundTrip(all) {
+    const round = (id, extra) => {
+      const s = NS.SAMPLES.find(x => x.id === id);
+      const files = s.files.map(p => ({ path: id + '/' + p, text: decode(fs.readFileSync(path.join(ROOT, 'samples', id, p))) }));
+      const a = NS.auditModel(all[id].model);
+      const fixes = NS.fixAll(a.findings, { indexesKnown: !a.skipped.some(x => x.rule === 'fk-no-index'), ...extra });
+      const script = fixes.flatMap(x => x.fix.steps.filter(st => !st.comment).map(st => st.sql)).join('\n');
+      const dir = files[0].path.includes('/db/migration/') ? id + '/db/migration/' : files[0].path.replace(/[^/]*$/, '');
+      const name = /\/V\d+__/.test(files.map(f => f.path).join()) ? 'V99__duzeltme.sql' : 'zz_duzeltme.sql';
+      const m2 = build(files.concat([{ path: dir + name, text: script }]), s.separate).model;
+      const a2 = NS.auditModel(m2);
+      const before = new Set(a.findings.map(f => f.key)), after = new Set(a2.findings.map(f => f.key));
+      const fixedKeys = fixes.map(x => x.f.key);
+      return { fixes, script, errors: m2.stats.errors, gone: fixedKeys.filter(k => !after.has(k)).length, stay: fixedKeys.filter(k => after.has(k)), fresh: [...after].filter(k => !before.has(k)) };
+    };
+    const h = round('hatali');
+    check('düzeltme hatali: 22 öneri, hepsi uygulanınca bulgu kayboluyor', h.fixes.length === 22 && h.gone === 22 && !h.errors.length, [h.fixes.length, h.gone, h.stay, h.errors.slice(0, 2)]);
+    check('düzeltme hatali: yeni bulgu çıkmıyor', !h.fresh.length, h.fresh);
+    const risks = {};
+    for (const x of h.fixes) risks[x.fix.risk] = (risks[x.fix.risk] || 0) + 1;
+    check('düzeltme hatali: risk dağılımı', same(risks, { review: 6, safe: 5, risky: 11 }), risks);
+    const sql = f => h.fixes.find(x => x.f.key === f).fix.steps.map(st => (st.comment ? '-- ' : '') + st.sql);
+    check('düzeltme: FK, NOVALIDATE ve indeks', same(sql('fk-missing:URUN.URUN_GRUBU_ID'), [
+      'ALTER TABLE URUN ADD CONSTRAINT FK_URUN_URUN_GRUBU FOREIGN KEY (URUN_GRUBU_ID) REFERENCES URUN_GRUBU (URUN_GRUBU_ID) ENABLE NOVALIDATE;',
+      '-- ALTER TABLE URUN MODIFY CONSTRAINT FK_URUN_URUN_GRUBU VALIDATE;',
+      'CREATE INDEX IX_URUN_URUN_GRUBU_ID ON URUN (URUN_GRUBU_ID);']), sql('fk-missing:URUN.URUN_GRUBU_ID'));
+    check('düzeltme: Oracle ad sınırı 30', sql('fk-no-index:KAMPANYA_KATILIM.KAMPANYA_ID')[0] === 'CREATE INDEX IX_KAMPANYA_KATILIM_KAMPANYA_I ON KAMPANYA_KATILIM (KAMPANYA_ID);', sql('fk-no-index:KAMPANYA_KATILIM.KAMPANYA_ID'));
+    check('düzeltme: metin tarih yeni kolonla taşınır', same(sql('date-as-text:KAMPANYA.BASLANGIC_TAR'), [
+      'ALTER TABLE KAMPANYA ADD (BASLANGIC_TAR_YENI DATE);', "UPDATE KAMPANYA SET BASLANGIC_TAR_YENI = TO_DATE(BASLANGIC_TAR, 'YYYY-MM-DD');",
+      'ALTER TABLE KAMPANYA DROP COLUMN BASLANGIC_TAR;', 'ALTER TABLE KAMPANYA RENAME COLUMN BASLANGIC_TAR_YENI TO BASLANGIC_TAR;']), sql('date-as-text:KAMPANYA.BASLANGIC_TAR'));
+    check('düzeltme: tırnaklı adlar ve harf düzeni', sql('naming-case:BAYIPERFORMANS.BAYIID')[0] === 'ALTER TABLE "BayiPerformans" RENAME COLUMN "BayiId" TO BAYI_ID;' && sql('non-ascii-name:KAMPANYA.İNDİRİM_ORANI')[0] === 'ALTER TABLE KAMPANYA RENAME COLUMN "İNDİRİM_ORANI" TO INDIRIM_ORANI;');
+    check('düzeltme: tablo adını değiştirenler en sonda', h.fixes[h.fixes.length - 1].f.key === 'naming-case:BAYIPERFORMANS', h.fixes.slice(-2).map(x => x.f.key));
+    check('düzeltme: sistem adlı PK ve indeksi', same(sql('system-name:ESKI_FIYAT_LISTESI.SYS_C0012345'), ['ALTER TABLE ESKI_FIYAT_LISTESI RENAME CONSTRAINT SYS_C0012345 TO PK_ESKI_FIYAT_LISTESI;', 'ALTER INDEX SYS_C0012345 RENAME TO PK_ESKI_FIYAT_LISTESI;']));
+    const plain = round('hatali', { novalidate: false });
+    check('düzeltme: NOVALIDATE kapatılabilir', !plain.script.includes('NOVALIDATE'));
+    // lehçeler
+    const lj = round('lojistik');
+    check('düzeltme lojistik (PostgreSQL): küçük harfli adlar, hepsi uygulanıyor', lj.fixes.length === 25 && lj.gone === 25 && !lj.fresh.length && !lj.errors.length && lj.script.includes('CREATE INDEX ix_customer_addresses_address_id ON customer_addresses (address_id);'), [lj.fixes.length, lj.gone, lj.fresh]);
+    const bk = round('banka');
+    check('düzeltme banka (SQL Server): WITH NOCHECK, indeks bilgisi yokken indeks önerilmez', bk.script.includes('ALTER TABLE aml.Alert WITH NOCHECK ADD CONSTRAINT FK_ALERT_TRANSACTION FOREIGN KEY (TransactionId) REFERENCES acc.[Transaction] (TransactionId);') && !bk.script.includes('CREATE INDEX') && !bk.fresh.length, bk.script.split('\n').slice(0, 2));
+    const sg = round('sigorta');
+    check('düzeltme sigorta: eklenen PK baskın adlandırmayı izler', sg.gone === sg.fixes.length && !sg.fresh.length && !sg.errors.length, [sg.stay, sg.fresh]);
+    const kr = round('karisik');
+    check('düzeltme karisik: Türkçe karakterli tablo en son yeniden adlandırılır', /RENAME COLUMN "İMZA_TAR" TO IMZA_TAR;\nALTER TABLE SAHA."SÖZLEŞME" RENAME TO SOZLESME;/.test(kr.script) && !kr.fresh.length && kr.gone === kr.fixes.length, kr.fresh);
+    const tk = round('telekom');
+    check('düzeltme telekom: tip uyuşmazlığı olan FK önerisi gözden geçirilecek', tk.fixes.filter(x => [].concat(x.fix.steps[0].note || []).includes('typeMismatch')).every(x => x.fix.risk === 'review') && !tk.errors.length && tk.gone === tk.fixes.length);
+    // her not kodunun iki dilde metni var
+    const noText = ['tr', 'en'].flatMap(l => NS.FIX_NOTES.filter(n => !(NS.i18nRaw(l, 'fixNotes') || {})[n]).map(n => l + ':' + n));
+    check('i18n: her düzeltme notunun metni iki dilde', !noText.length, noText);
+  },
   karisik({ model: m }) {
     const p = NS.namingProfile(m);
     check('karisik: 25 tablo, 29 FK', p.tables === 25 && p.fks === 29, [p.tables, p.fks]);
@@ -349,6 +401,7 @@ for (const s of NS.SAMPLES) {
   const before = failed;
   common(s, res);
   if (EXPECT[s.id]) EXPECT[s.id](res, all, s);
+  if (s.id === NS.SAMPLES[NS.SAMPLES.length - 1].id) EXPECT.fixesRoundTrip(all);
   const st = res.model.stats;
   console.log(`${failed === before ? '✓' : '✗'} ${s.id.padEnd(18)} ${String(st.tables).padStart(4)} tablo ${String(st.fk).padStart(4)} FK ${String(st.implicit).padStart(4)} tahmini ${String(st.embedded).padStart(3)} uydu  ${st.dialects.join('+').padEnd(26)} ${Date.now() - t0} ms`);
 }
