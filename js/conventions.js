@@ -195,5 +195,32 @@ function namingProfile(model, opts = {}) {
   return { tables: tables.length, columns, fks, score, dims, nameLimit: NAME_LIMIT, clearAt };
 }
 
-Object.assign(NS, { namingProfile, caseOf, isPlural, isAudit, pkStyleOf, fkStyleOf });
+// Standart önerisi: her boyutta baskın kalıp belirginse (%60 ve üstü) o önerilir; değilse öneri boş kalır, seçenekler
+// oranlarıyla döner ve karar ekibindir. Profilin fotoğrafından bir başlangıç noktası; kendisi kural koymaz.
+// Standart olamayacak kovalar (karışık harf düzeni, tablo adıyla ilgisiz PK, belirsiz FK adı, rol önekli FK) seçenek değildir:
+// rol önekli FK her standartta kabul edilir (aynı tabloya iki FK).
+//   proposeStandard(profile, { dialects }) → {
+//     standard: { tableCase, columnCase, pkStyle, fkStyle, tableNumber, ascii, nameLimit, comments, auditColumns },
+//     choices: { boyut: [{ key, pct, n }] }, clear: { boyut: bool }
+//   }
+const STD_DIMS = ['tableCase', 'columnCase', 'pkStyle', 'fkStyle', 'tableNumber'];
+const NOT_STANDARD = { tableCase: ['mixed'], columnCase: ['mixed'], pkStyle: ['other'], fkStyle: ['role', 'roleOnly', 'other'] };
+function proposeStandard(profile, opts = {}) {
+  const standard = {}, choices = {}, clear = {};
+  for (const id of STD_DIMS) {
+    const d = profile.dims.find(x => x.id === id);
+    const skip = NOT_STANDARD[id] || [];
+    choices[id] = d ? d.buckets.filter(b => !b.neutral && b.n && !skip.includes(b.key)).sort((a, b) => b.n - a.n).map(b => ({ key: b.key, pct: b.pct, n: b.n })) : [];
+    clear[id] = !!(d && d.clear);
+    standard[id] = d && d.clear && choices[id].some(c => c.key === d.dominant) ? d.dominant : null;
+  }
+  const cs = profile.dims.find(x => x.id === 'charset');
+  standard.ascii = !cs || cs.dominant !== 'nonAscii';
+  standard.nameLimit = (opts.dialects || []).includes('oracle') ? NAME_LIMIT : null;
+  standard.comments = null;
+  standard.auditColumns = [];
+  return { standard, choices, clear };
+}
+
+Object.assign(NS, { namingProfile, proposeStandard, STD_DIMS, caseOf, isPlural, isAudit, pkStyleOf, fkStyleOf });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});

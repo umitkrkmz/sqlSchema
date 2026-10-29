@@ -8,7 +8,7 @@
  *   ?pop=naming|report|files|diff|audit   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
  *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)   ?impact=1 (select ile)
  *   ?diff=V3 (migration klasöründe bu sürümle karşılaştır)   ?time=V4 (zaman çizelgesi bu sürümde; ?time=1 baştan)
- *   ?audit=1 (tasarım denetimi haritada)   ?fix=1 (düzeltme önerileri penceresi)   ?review=1 (değişiklik incelemesi; diff ya da time ile)
+ *   ?audit=1 (tasarım denetimi haritada)   ?fix=1 (düzeltme önerileri penceresi)   ?std=1 (standart ve kurallar)   ?review=1 (değişiklik incelemesi; diff ya da time ile)
  */
 (function (NS) {
 'use strict';
@@ -411,7 +411,8 @@ function renderNaming() {
     ${scopeSel}
     <div class="nscore" title="${esc(t('namingScoreTitle'))}"><span>${esc(t('namingScore'))}</span><strong>${p.score == null ? '–' : esc(fmtPct(p.score))}</strong><small>${esc(t('namingCounts', p))}</small></div>
     ${p.tables ? dims : `<p class="nn">${esc(t('namingEmpty'))}</p>`}
-    <button class="btn sm ghost" data-act="naming-md" title="${esc(t('namingMdTitle'))}">${esc(t('namingMd'))}</button>`;
+    <div class="df-row"><button class="btn sm ghost" data-act="naming-md" title="${esc(t('namingMdTitle'))}">${esc(t('namingMd'))}</button>
+    <button class="btn sm ghost" data-act="std-open">${esc(t('stdBtn'))}</button></div>`;
 }
 
 $('#namingPop').addEventListener('change', e => {
@@ -469,11 +470,11 @@ const AUDIT_GROUPS = ['keys', 'types', 'norm', 'naming'];
 function getAudit() {
   const src = S.full ? S.full.model : S.model;
   if (!src) return null;
-  const debt = currentDebt();
-  const stamp = debt ? debt.updated : '';
+  const debt = currentDebt(), rules = auditRules();
+  const stamp = (debt ? debt.updated : '') + '|' + rules.stamp;
   if (!S.audit || S.audit.src !== src || S.audit.stamp !== stamp) {
     const m = S.diffRes ? { ...src, tables: src.tables.filter(tb => S.diffRes.byAfter.has(tb)) } : src;
-    S.audit = { src, stamp, res: NS.auditModel(m, { debt: debt ? debt.keys : null }) };
+    S.audit = { src, stamp, res: NS.auditModel(m, { debt: debt ? debt.keys : null, standard: rules.standard, severity: rules.severity }) };
     applyAuditMap();
   }
   return S.audit.res;
@@ -558,7 +559,7 @@ function renderAudit() {
   const skipped = a.skipped.map(s => `<p class="nn">${esc(t(s.reason === 'noIndexes' ? 'auditSkipNoIndexes' : 'auditNone'))}</p>`).join('');
   el.innerHTML = `<h4>${esc(t('auditTitle'))}</h4>
     <p class="intro">${esc(t('auditIntro'))}</p>
-    <p class="au-sum">${esc(t('auditSummary', a))}</p>
+    <p class="au-sum">${esc(t('auditSummary', a))}${currentRules() ? ` <em class="au-std" title="${esc(t('stdActiveTitle'))}">${esc(t('stdActive', { date: currentRules().updated.slice(0, 10) }))}</em>` : ''}</p>
     <p class="au-chips">${sevCounts(a.counts) || `<span class="nn">${esc(t(a.debt ? 'debtNoNew' : 'auditNone'))}</span>`}</p>
     ${reviewBoxHtml()}${debtHtml(a, owed, open)}
     ${skipped}${auditRulesHtml(fresh, open, '')}
@@ -567,6 +568,7 @@ function renderAudit() {
     <div class="df-row">
       ${fresh.length ? `<button class="btn sm ${S.auditMap ? '' : 'ghost'}" data-act="audit-map">${esc(t(S.auditMap ? 'auditMapOff' : 'auditMap'))}</button>` : ''}
       ${a.findings.some(f => NS.FIXABLE.includes(f.rule)) ? `<button class="btn sm ghost" data-act="audit-fix">${esc(t('fixBtn'))}</button>` : ''}
+      <button class="btn sm ghost" data-act="std-open">${esc(t('stdOpen'))}</button>
       ${a.findings.length ? `<button class="btn sm ghost" data-act="audit-md">${esc(t('namingMd'))}</button>` : ''}
     </div>`;
 }
@@ -579,6 +581,7 @@ $('#auditPop').addEventListener('click', e => {
     if (act === 'audit-map') setAuditMap(!S.auditMap);
     else if (act === 'audit-md') downloadText(auditMarkdown(), fileStem() + '-' + t('auditFile') + '.md', 'text/markdown;charset=utf-8');
     else if (act === 'audit-fix') openFix();
+    else if (act === 'std-open') openStd();
     else if (act === 'review-open') openReview();
     else if (act === 'debt-accept') acceptDebt();
     else if (act === 'debt-clear') clearDebt();
@@ -692,10 +695,10 @@ function clearDebt() {
   toast(t('debtCleared'), 3000);
 }
 
-// Proje dosyası: borç ve kayıtlı görünümler; şemayı içermez
+// Proje dosyası: standart ve kural önemleri, borç ve kayıtlı görünümler; şemayı içermez
 function downloadProject() {
-  const d = currentDebt();
-  const data = { app: 'sqlSchema', kind: 'project', version: 1, debt: d || { keys: [], accepted: '', updated: new Date().toISOString() }, views: loadViews() };
+  const d = currentDebt(), r = currentRules();
+  const data = { app: 'sqlSchema', kind: 'project', version: 1, rules: r || undefined, debt: d || { keys: [], accepted: '', updated: new Date().toISOString() }, views: loadViews() };
   downloadText(JSON.stringify(data, null, 2) + '\n', fileStem() + '.sqlschema.json', 'application/json');
   toast(t('debtFileTip'), 6000);
 }
@@ -710,6 +713,111 @@ function readProject(files) {
     } catch (err) { /* bozuk dosya: yok sayılır */ }
   }
 }
+
+
+/* ─── Standart ve kurallar ─── */
+
+// Ekibin standardı ve kural önemleri. Öneri adlandırma profilinden gelir (conventions.js proposeStandard); DBA her maddeyi
+// kabul eder ya da değiştirir. Borç kaydı gibi saklanır: tarayıcıda proje adına göre ve proje dosyasında (rules); daha yeni
+// olan geçerli. Kaydedilince denetim, inceleme ve komut satırı baskın kalıp yerine bu standarda göre denetler.
+S.stdDraft = null;
+const rulesStoreKey = () => 'sqlschema.rules.' + hash36(String(S.title || ''));
+const validRules = r => (r && typeof r.updated === 'string'
+  ? { standard: r.standard && typeof r.standard === 'object' ? r.standard : null, severity: r.severity && typeof r.severity === 'object' ? r.severity : {}, updated: r.updated } : null);
+
+function currentRules() {
+  let local = null;
+  try { local = validRules(JSON.parse(localStorage.getItem(rulesStoreKey()) || 'null')); } catch (err) { /* depolama kapalı */ }
+  const file = S.project && validRules(S.project.data.rules);
+  const r = local && file ? (local.updated >= file.updated ? local : file) : local || file;
+  return r && (r.standard || Object.keys(r.severity).length) ? r : null;
+}
+function storeRules(r) {
+  try { localStorage.setItem(rulesStoreKey(), JSON.stringify(r)); } catch (err) { toast(t('viewsNoStorage')); }
+  S.review = null;
+  refreshAfterDebt();
+  renderNaming();
+}
+// denetime giden ayarlar ve önbellek damgası
+const auditRules = () => { const r = currentRules(); return { standard: r ? r.standard : null, severity: r ? r.severity : null, stamp: r ? r.updated : '' }; };
+
+function stdProposal() {
+  const m = S.full ? S.full.model : S.model;
+  const tables = m.tables.filter(tb => tb.dialect !== 'mongodb' && tb.dialect !== 'cassandra');
+  return NS.proposeStandard(NS.namingProfile({ ...m, tables }), { dialects: m.stats.dialects });
+}
+
+function openStd() {
+  if (!S.model) return;
+  const saved = currentRules();
+  const prop = stdProposal();
+  S.stdDraft = { standard: { ...prop.standard, ...(saved && saved.standard) }, severity: { ...(saved && saved.severity) } };
+  renderStd();
+  const d = $('#stdDlg');
+  if (!d.open) d.showModal();
+}
+
+function renderStd() {
+  const prop = stdProposal(), dr = S.stdDraft, st = dr.standard, saved = currentRules();
+  const sel = (key, opts) => `<select data-std="${key}">${opts.map(([v, label]) => `<option value="${esc(v)}" ${String(st[key] == null ? '' : st[key]) === v ? 'selected' : ''}>${esc(label)}</option>`).join('')}</select>`;
+  const dims = NS.STD_DIMS.map(id => {
+    const opts = [['', '\u{2014} ' + t('stdFree')], ...prop.choices[id].map(c => [c.key, `${t('nk_' + id + '_' + c.key, { n: 30 })}${c.pct != null ? ` (%${c.pct})` : ''}${prop.standard[id] === c.key ? ' · ' + t('stdProposed') : ''}`])];
+    return `<label class="std-row"><span>${esc(t('nd_' + id))}</span>${sel(id, opts)}${prop.clear[id] ? '' : `<small>${esc(t('stdNoClear'))}</small>`}</label>`;
+  }).join('');
+  const sevs = ['error', 'warning', 'info', 'off'], names = t('stdSevNames');
+  const groups = AUDIT_GROUPS.map(g => `<h6>${esc(t('auditGroups')[g])}</h6>${NS.AUDIT_RULES.filter(r => r.group === g).map(r => `<label class="std-row"><span>${esc(ruleText(r.id).title)}</span>
+    <select data-sev="${r.id}"><option value="">${esc(names[r.severity] + ' · ' + t('stdDefaultMark'))}</option>${sevs.filter(s => s !== r.severity).map(s => `<option value="${s}" ${dr.severity[r.id] === s ? 'selected' : ''}>${esc(names[s])}</option>`).join('')}</select></label>`).join('')}`).join('');
+  $('#stdBody').innerHTML = `<h3>${esc(t('stdTitle'))}</h3>
+    <p>${esc(t('stdIntro'))}</p>
+    <div class="std-grid">
+      <h5>${esc(t('stdNaming'))}</h5>
+      ${dims}
+      <label class="std-row"><span>${esc(t('stdNameLimit'))}</span><input type="number" min="10" max="128" data-std="nameLimit" value="${st.nameLimit || ''}" placeholder="${esc(t('stdNameLimitHint'))}"></label>
+      <label class="std-row std-check"><input type="checkbox" data-std="ascii" ${st.ascii !== false ? 'checked' : ''}> <span>${esc(t('stdAscii'))}</span></label>
+      <h5>${esc(t('stdRequired'))}</h5>
+      <label class="std-row"><span>${esc(t('stdComments'))}</span>${sel('comments', Object.entries(t('stdCommentsOpts')))}</label>
+      <label class="std-row"><span>${esc(t('stdAuditCols'))}</span><input type="text" data-std="auditColumns" value="${esc((st.auditColumns || []).join(', '))}" placeholder="${esc(t('stdAuditColsHint'))}" spellcheck="false"></label>
+      <details class="std-sev"><summary><h5>${esc(t('stdSeverity'))}</h5></summary>${groups}</details>
+    </div>
+    <div class="row">
+      <span class="grow">${saved ? esc(t('stdActive', { date: saved.updated.slice(0, 10) })) : ''}</span>
+      ${saved ? `<button class="btn ghost" data-std-act="clear">${esc(t('stdClear'))}</button>` : ''}
+      <button class="btn ghost" data-std-act="reset">${esc(t('stdReset'))}</button>
+      <button class="btn ghost" data-std-act="file" title="${esc(t('debtFileTip'))}">${esc(t('debtFile'))}</button>
+      <button class="btn" data-std-act="save">${esc(t('stdSave'))}</button>
+      <button class="btn ghost" data-std-act="close">${esc(t('fixClose'))}</button>
+    </div>`;
+}
+
+function saveStd() {
+  const st = { ...S.stdDraft.standard };
+  for (const k of Object.keys(st)) if (st[k] === '' || st[k] == null) st[k] = null;
+  storeRules({ standard: st, severity: { ...S.stdDraft.severity }, updated: new Date().toISOString() });
+  toast(t('stdSaved'), 3000);
+  renderStd();
+}
+
+$('#stdDlg').addEventListener('change', e => {
+  const el = e.target, d = S.stdDraft;
+  if (!d) return;
+  if (el.dataset.sev) { if (el.value) d.severity[el.dataset.sev] = el.value; else delete d.severity[el.dataset.sev]; return; }
+  const k = el.dataset.std;
+  if (!k) return;
+  if (k === 'ascii') d.standard.ascii = el.checked;
+  else if (k === 'nameLimit') d.standard.nameLimit = Number(el.value) > 0 ? Math.round(Number(el.value)) : null;
+  else if (k === 'auditColumns') d.standard.auditColumns = el.value.split(/[,;\s]+/).map(x => x.trim()).filter(Boolean);
+  else d.standard[k] = el.value || null;
+});
+$('#stdDlg').addEventListener('click', e => {
+  const b = e.target.closest('[data-std-act]');
+  if (!b) return;
+  const act = b.dataset.stdAct;
+  if (act === 'close') $('#stdDlg').close();
+  else if (act === 'save') saveStd();
+  else if (act === 'reset') { S.stdDraft = { standard: { ...stdProposal().standard }, severity: {} }; renderStd(); }
+  else if (act === 'clear') { storeRules({ standard: null, severity: {}, updated: new Date().toISOString() }); toast(t('stdCleared'), 3000); $('#stdDlg').close(); }
+  else if (act === 'file') { saveStd(); downloadProject(); }
+});
 
 const debtVars = (a, d) => ({ accepted: d.accepted, total: a.debt.total, left: a.debt.left, paid: a.debt.paid.length, pct: a.debt.total ? Math.round(a.debt.paid.length * 100 / a.debt.total) : 0 });
 // ödenen bir borcun anahtarı: 'kural:TABLO.KOLON' → "Kural başlığı: TABLO.KOLON"
@@ -843,11 +951,11 @@ const SEV_ICON = { error: '\u{2717}', warning: '\u{26A0}', info: '\u{2139}' };
 function getReview() {
   if (!S.diffRes || !S.diffBefore) return null;
   const src = S.full ? S.full.model : S.model;
-  const debt = currentDebt();
-  const stamp = debt ? debt.updated : '';
+  const debt = currentDebt(), rules = auditRules();
+  const stamp = (debt ? debt.updated : '') + '|' + rules.stamp;
   if (!S.review || S.review.src !== src || S.review.stamp !== stamp) {
     const after = { ...src, tables: src.tables.filter(tb => S.diffRes.byAfter.has(tb)) };
-    S.review = { src, stamp, res: NS.reviewChange(S.diffBefore, after, { diff: S.diffRes, debt: debt ? debt.keys : null }) };
+    S.review = { src, stamp, res: NS.reviewChange(S.diffBefore, after, { diff: S.diffRes, debt: debt ? debt.keys : null, standard: rules.standard, severity: rules.severity }) };
   }
   return S.review.res;
 }
@@ -1191,6 +1299,8 @@ $('#viewFile').addEventListener('change', async () => {
     if (!data || data.app !== 'sqlSchema' || (data.kind !== 'views' && data.kind !== 'project')) throw new Error('kind');
     const debt = data.kind === 'project' && validDebt(data.debt);
     if (debt) storeDebt(debt);
+    const rules = data.kind === 'project' && validRules(data.rules);
+    if (rules) storeRules(rules);
     if (!Array.isArray(data.views) || !data.views.length) { if (debt) toast(t('debtImported', { n: debt.keys.length }), 3000); else throw new Error('empty'); return; }
     const incoming = data.views.filter(v => v && typeof v.name === 'string' && Array.isArray(v.tables)).map(v => ({ name: v.name.slice(0, 80), tables: v.tables.map(String), near: !!v.near }));
     const names = new Set(incoming.map(v => v.name));
@@ -2148,6 +2258,7 @@ document.addEventListener('click', e => {
     case 'naming': togglePop('#namingPop'); break;
     case 'audit': togglePop('#auditPop'); renderAudit(); break;
     case 'diff': togglePop('#diffPop'); break;
+    case 'std-open': $('#namingPop').hidden = true; openStd(); break;
     case 'naming-md': if (S.model) downloadText(namingMarkdown(), fileStem() + '-' + t('namingFile') + '.md', 'text/markdown;charset=utf-8'); break;
     case 'list-close': setList(false); break;
     case 'legend':
@@ -2270,6 +2381,7 @@ NS.onLangChange(() => {
     renderAudit();
     if ($('#fixDlg').open) renderFix();
     if ($('#reviewDlg').open) renderReview();
+    if ($('#stdDlg').open) renderStd();
     resetHud();
   }
   if (S.title && S.files.length > 1 && /^\d+ /.test(S.title)) $('#fileName').textContent = t('nFiles', { n: S.files.filter(f => f.text != null).length });
@@ -2364,6 +2476,8 @@ if (params.get('sample')) {
     if (pop) { togglePop(pop); if (pop === '#auditPop') renderAudit(); }
     // ?fix=1: düzeltme önerileri penceresi
     if (params.get('fix') === '1') openFix();
+    // ?std=1: standart ve kurallar düzenleyicisi
+    if (params.get('std') === '1') openStd();
     // ?review=1: karşılaştırma ya da zaman çizelgesiyle birlikte değişiklik incelemesi
     if (params.get('review') === '1' && getReview()) openReview();
     invalidate();

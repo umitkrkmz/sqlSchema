@@ -15,7 +15,12 @@
  *   yeni bulguları sayar; kayıtta olup artık bulunmayanlar ödenmiştir (paid).
  *   reviewChange(before, after, opts): bir değişikliğin getirdiği ve giderdiği bulgular (aşağıda)
  *   findingKey(f): kural, tablo (şemasıyla) ve kolonlardan kalıcı kimlik: 'fk-no-index:SATIS.SIPARIS.KAMPANYA_ID'
- *   AUDIT_RULES: [{ id, group, severity, guess }]   gruplar: keys, types, norm, naming; guess: bulgu addan tahmin
+ *   AUDIT_RULES: [{ id, group, severity, guess, standard }]   gruplar: keys, types, norm, naming; guess: bulgu addan tahmin;
+ *     standard: yalnızca standartta tanımlıysa çalışır (tekil / çoğul, açıklama, denetim kolonları)
+ *
+ *   opts.standard: ekibin standardı (conventions.js proposeStandard biçiminde). Verilince adlandırma kuralları baskın
+ *     kalıp yerine standarda göre denetler; nameLimit ad sınırını, ascii: false Türkçe karakter kuralını değiştirir.
+ *   opts.severity: { kural: error | warning | info | off } önem ayarı; off kuralı kapatır
  */
 (function (NS) {
 'use strict';
@@ -50,6 +55,9 @@ const AUDIT_RULES = [
   { id: 'fk-style', group: 'naming', severity: 'warning' },
   { id: 'naming-case', group: 'naming', severity: 'warning' },
   { id: 'system-name', group: 'naming', severity: 'info' },
+  { id: 'naming-number', group: 'naming', severity: 'info', guess: true, standard: true },
+  { id: 'missing-comment', group: 'naming', severity: 'info', standard: true },
+  { id: 'missing-audit', group: 'naming', severity: 'warning', standard: true },
 ];
 const SEVERITY = new Map(AUDIT_RULES.map(r => [r.id, r.severity]));
 const WIDE_AT = 100;
@@ -139,7 +147,9 @@ const SYSTEM_NAME = /^SYS_C\d+$|^(PK|FK|UQ|DF|CK)__.+__[0-9A-F]{6,}$/i;
 function auditModel(model, opts = {}) {
   const findings = [];
   const skipped = [];
-  const add = (rule, t, col, data, tables, severity) => findings.push({ rule, severity: severity || SEVERITY.get(rule), t: t || null, col: col || null, tables: tables || (t ? [t] : []), data: data || {} });
+  const std = opts.standard || {}, over = opts.severity || {};
+  // önem ayarı kuralın varsayılanını değiştirir; kayıt tablosundaki PK yokluğu gibi bilinçli düşürülenler bilgi kalır
+  const add = (rule, t, col, data, tables, severity) => over[rule] === 'off' ? null : findings.push({ rule, severity: severity || over[rule] || SEVERITY.get(rule), t: t || null, col: col || null, tables: tables || (t ? [t] : []), data: data || {} });
   // Dış ve gömülü tablolar dosyada tanımlı değil; MongoDB ve Cassandra'da PK, FK ve tip kuralları anlamsız
   const all = model.tables.filter(tb => !tb.external && !tb.embedded && !tb.dropped);
   const sql = all.filter(tb => tb.dialect !== 'mongodb' && tb.dialect !== 'cassandra');
@@ -279,24 +289,35 @@ function auditModel(model, opts = {}) {
     const cons = [tb.pkName, ...tb.uniques.map(u => u.name), ...tb.indexes.map(x => x.name), ...tb.out.filter(r => r.kind === 'fk').map(r => r.name)].filter(Boolean);
     for (const x of names.concat(cons.map(name => ({ kind: 'constraint', name, col: null })))) {
       const len = x.name.length;
-      if (max && len > max) add('name-too-long', tb, x.col, { name: x.name, kind: x.kind, len, max });
+      if (std.nameLimit && len > std.nameLimit) add('name-too-long', tb, x.col, { name: x.name, kind: x.kind, len, max: std.nameLimit, standard: true });
+      else if (std.nameLimit) continue;
+      else if (max && len > max) add('name-too-long', tb, x.col, { name: x.name, kind: x.kind, len, max });
       else if (tb.dialect === 'oracle' && len > ORACLE_OLD) add('name-too-long', tb, x.col, { name: x.name, kind: x.kind, len, max: ORACLE_OLD, old: true });
     }
     for (const x of names) if (reserved.has(U(x.name))) add('reserved-word', tb, x.col, { name: x.name, kind: x.kind });
     const nonAscii = names.filter(x => /[^\x00-\x7F]/.test(x.name)).map(x => x.name);
-    if (nonAscii.length) add('non-ascii-name', tb, null, { names: nonAscii });
+    if (nonAscii.length && std.ascii !== false) add('non-ascii-name', tb, null, { names: nonAscii });
+    // standart: açıklama ve denetim kolonları zorunluluğu
+    if (std.comments === 'tables' || std.comments === 'all') {
+      if (!tb.comment) add('missing-comment', tb, null, { kind: 'table' });
+      const cols = std.comments === 'all' ? tb.columns.filter(c => !c.comment).map(c => c.name) : [];
+      if (cols.length) add('missing-comment', tb, null, { kind: 'columns', cols });
+    }
+    const auditCols = (std.auditColumns || []).filter(c => !tb.colIdx.has(U(c)));
+    if (auditCols.length && !APPEND_ONLY.test(tb.name)) add('missing-audit', tb, null, { cols: auditCols });
     const sys = cons.filter(n => SYSTEM_NAME.test(n));
     if (sys.length) add('system-name', tb, null, { names: sys });
   }
-  // Baskın kalıp belirginse (%60 ve üstü) ona uymayanlar; kural dosyası gelince standart oradan okunacak
+  // Standart varsa ona, yoksa belirgin baskın kalıba (%60 ve üstü) uymayanlar
   const samePk = it => it.ref && it.ref.pk.length === 1 && U(it.ref.pk[0]) === U(it.c);
   if (profile) {
-    const dimRule = { pkStyle: 'pk-style', fkStyle: 'fk-style', tableCase: 'naming-case', columnCase: 'naming-case' };
+    const dimRule = { pkStyle: 'pk-style', fkStyle: 'fk-style', tableCase: 'naming-case', columnCase: 'naming-case', tableNumber: 'naming-number' };
     for (const d of profile.dims) {
       const rule = dimRule[d.id];
-      if (!rule || !d.clear) continue;
+      const target = std[d.id] || (d.clear && d.id !== 'tableNumber' ? d.dominant : null);
+      if (!rule || !target) continue;
       for (const b of d.buckets) {
-        if (b.neutral || b.key === d.dominant) continue;
+        if (b.neutral || b.key === target) continue;
         // Rol adlı FK (BILLING_ADDRESS_ID, NationalityId) ve hedefin PK adıyla aynı FK (CURRENCY_CODE) iyi uygulamadır; yalnızca
         // ID ile bitmeyen belirsiz adlar (CHZ_REF, MUSTERI_REF, ASSIGNED_TO) işaretlenir. Sözlüğe giden FK sözlüğün kendi kalıbını izler.
         // Metin tipli doğal anahtar (para birimi kodu) bilinçli bir seçimdir; pk-style'da sayılmaz.
@@ -304,7 +325,7 @@ function auditModel(model, opts = {}) {
         for (const it of b.items) {
           if (rule === 'fk-style' && ((it.ref && it.ref.dictionary) || last(it.c) === 'ID' || samePk(it))) continue;
           if (rule === 'pk-style' && it.c && typeInfo((it.t.colIdx.get(U(it.c)) || {}).type).family === 'text') continue;
-          add(rule, it.t, it.c, { dim: d.id, style: b.key, dominant: d.dominant, ref: it.ref || null });
+          add(rule, it.t, it.c, { dim: d.id, style: b.key, dominant: target, standard: !!std[d.id], ref: it.ref || null });
         }
       }
     }
@@ -367,13 +388,14 @@ function boolEncoding(c, ti, w) {
 
 // Değişiklik incelemesi (PR, yeni migration): "sonra"da olup "önce"de olmayan bulgular bu değişiklikle gelmiştir, tersi
 // giderilmiştir. Adı değişen tablolar farktan eşlenir; eski bulgu yeni adıyla "yeni" görünmez. Borç kaydındakiler sayılmaz.
-//   reviewChange(before, after, { diff, debt }) → { diff, findings, fixed, counts, before, after }
+//   reviewChange(before, after, { diff, debt, standard, severity }) → { diff, findings, fixed, counts, before, after }
 function reviewChange(before, after, opts = {}) {
   const diff = opts.diff || NS.diffModels(before, after);
   const renamed = new Map();
   for (const e of diff.tables) if (e.renamed && e.before && e.after) renamed.set(e.before, (e.after.schema ? e.after.schema + '.' : '') + e.after.name);
   const nameOf = tb => renamed.get(tb) || (tb.schema ? tb.schema + '.' : '') + tb.name;
-  const a0 = auditModel(before, { debt: opts.debt, nameOf }), a1 = auditModel(after, { debt: opts.debt });
+  const set = { debt: opts.debt, standard: opts.standard, severity: opts.severity };
+  const a0 = auditModel(before, { ...set, nameOf }), a1 = auditModel(after, set);
   const old = new Set(a0.findings.map(f => f.key)), now = new Set(a1.findings.map(f => f.key));
   // önce denetlenemeyen kural (dökümde indeks yoktu) sonra çalışırsa değişmeyen tablolardaki bulguları yeni değildir
   const skippedBefore = new Set(a0.skipped.map(x => x.rule));

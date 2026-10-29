@@ -6,7 +6,7 @@
  *
  *   --since V15            migration klasöründe V15 ve sonrasını incele (önce = V15'ten önceki sürümler)
  *   --baseline <yol>       bu dosya ya da klasörle karşılaştırarak incele (ör. ana dalın kopyası)
- *   --project <dosya>      borç kaydı (*.sqlschema.json); verilmezse taranan klasörde aranır
+ *   --project <dosya>      proje dosyası (*.sqlschema.json: standart, kural önemleri, borç); verilmezse klasörde aranır
  *   --format text|md|json|sarif   çıktı biçimi (varsayılan text)
  *   --out <dosya>          çıktıyı dosyaya yaz (varsayılan standart çıktı)
  *   --fix <dosya>          güvenli ve gözden geçirilecek düzeltme SQL'ini dosyaya yaz
@@ -146,18 +146,23 @@ function main() {
     scope = `${o.baseline} → ${o.paths.join(' ')}`;
   }
 
-  // borç kaydı: --project ya da taranan klasördeki *.sqlschema.json
-  let debt = null, projectName = null;
+  // proje dosyası (--project ya da taranan klasördeki *.sqlschema.json): standart, kural önemleri ve borç kaydı
+  let debt = null, projectName = null, standard = null, severity = null;
   const projFile = o.project ? { abs: path.resolve(o.project), path: o.project } : projects[0];
   if (projFile) {
     try {
       const data = JSON.parse(fs.readFileSync(projFile.abs, 'utf8'));
-      if (data && data.app === 'sqlSchema' && data.debt && Array.isArray(data.debt.keys)) { debt = data.debt.keys.map(String); projectName = path.basename(projFile.path); }
+      if (data && data.app === 'sqlSchema') {
+        projectName = path.basename(projFile.path);
+        if (data.debt && Array.isArray(data.debt.keys) && data.debt.keys.length) debt = data.debt.keys.map(String);
+        if (data.rules && typeof data.rules === 'object') { standard = data.rules.standard || null; severity = data.rules.severity || null; }
+      }
     } catch (err) { process.stderr.write(`sqlschema-lint: proje dosyası okunamadı: ${projFile.path}\n`); }
   }
 
-  const audit = NS.auditModel(after.model, { debt });
-  const review = before ? NS.reviewChange(before, after.model, { debt }) : null;
+  const set = { debt, standard, severity };
+  const audit = NS.auditModel(after.model, set);
+  const review = before ? NS.reviewChange(before, after.model, set) : null;
   const findings = review ? review.findings : audit.findings.filter(f => !f.debt);
   const counts = { error: 0, warning: 0, info: 0 };
   for (const f of findings) counts[f.severity]++;

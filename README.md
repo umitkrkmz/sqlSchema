@@ -424,6 +424,15 @@ Kurallar dört grupta toplanır:
 - **Zaman çizelgesiyle:** her sürümde denetim yeniden hesaplanır; bir bulgunun hangi migration'la geldiği görünür.
 - **Bağlantı:** `?audit=1` denetimi haritada açar, `?pop=audit` pencereyi açar.
 
+**Standart ve kurallar.** Adlandırma profili şemanın fotoğrafıdır; standart ise ekibin kararıdır. **adlandırma** penceresindeki **Standart öner** (ya da denetim penceresindeki **Standart ve kurallar**) profilden bir standart önerir:
+- **Öneri:** her boyutta baskın kalıp belirginse (%60 ve üstü) o önerilir: tablo ve kolon harf düzeni, PK adı, FK kolonu, tekil / çoğul. Değilse öneri boş kalır, seçenekler oranlarıyla gösterilir ve pencere "ekip karar vermeli" der. Rol önekli FK her standartta kabul edilir.
+- **Zorunlular:** ad uzunluğu sınırı (Oracle'da 30 önerilir), yalnızca ASCII, açıklama zorunluluğu (tablolar ya da tablolar ve kolonlar), denetim kolonları (ör. `CREATED_AT, CREATED_BY`).
+- **Kuralların önemi:** her denetim kuralı hata, uyarı, bilgi ya da kapalı yapılabilir.
+- **Etkisi:** kaydedilince denetim baskın kalıp yerine standarda göre yapılır ("PK adı kalıba uymuyor: <TABLO>_ID (standart: ID)"). Standarda bağlı üç kural yalnızca standartta tanımlıysa çalışır: tekil / çoğul, eksik açıklama, eksik denetim kolonu.
+- **Paylaşmak:** standart, borç kaydıyla aynı `<ad>.sqlschema.json` proje dosyasına yazılır. Klasörü açan herkes ve komut satırı aynı standardı kullanır. Yazılı bir standart belgesi bu dosyadan üretilecek.
+
+<img src="docs/images/tr/standart-ve-kurallar.png" alt="Standart ve kurallar: profilden önerilen standart, belirgin baskın kalıbı olmayan PK için ekip kararı" width="900">
+
 **Borç kaydı: geçmişi affet, geleceği denetle.** Dağınık bir veritabanında ilk denetim yüzlerce bulgu çıkarır; yüzlerce eski tabloyu bir anda düzeltmek de gerçekçi değildir.
 - **Kabul etmek:** pencerede **Mevcut bulguları borç olarak kabul et** o anki bulguları kaydeder. Kayıttaki bulgular ayrı bir **Kabul edilmiş borç** listesinde durur, hata sayılmaz ve haritada renk almaz. Bundan sonra yalnızca yeni bulgular öne çıkar: yeni bir migration'ın getirdiği PK'siz tablo hemen görünür.
 - **İlerleme:** düzeltilen bulgular **ödenen borç** olarak sayılır; çubuk borcun ne kadarının ödendiğini gösterir.
@@ -467,7 +476,7 @@ node tools/sqlschema-lint.js db/migration --since V15 --format md --fail-on erro
 | `<dosya\|klasör>...` | denetlenecek şema; klasörler özyinelemeli taranır |
 | `--since V15` | migration klasöründe V15 ve sonrasını incele (önce = V15'ten öncekiler) |
 | `--baseline <yol>` | bu kopyayla karşılaştırarak incele (ör. ana dalın şeması) |
-| `--project <dosya>` | borç kaydı; verilmezse klasördeki `*.sqlschema.json` okunur |
+| `--project <dosya>` | proje dosyası (standart, kural önemleri, borç); verilmezse klasördeki `*.sqlschema.json` okunur |
 | `--format text\|md\|json\|sarif` | metin, PR yorumu için Markdown, JSON ya da GitHub kod taraması için SARIF |
 | `--fail-on error\|warning\|info\|none` | bu önemde yeni bulgu varsa çıkış kodu 1 (varsayılan `error`) |
 | `--fix <dosya>` | güvenli ve gözden geçirilecek düzeltme SQL'ini dosyaya yaz |
@@ -1058,6 +1067,15 @@ The rules fall into four groups:
 - **With the timeline:** the audit is recomputed at each version, so you can see which migration brought a finding.
 - **Link:** `?audit=1` shows the audit on the map, `?pop=audit` opens the window.
 
+**Standard and rules.** The naming profile is a snapshot of the schema; a standard is the team's decision. **Propose a standard** in the **naming** window (or **Standard and rules** in the audit window) proposes one from the profile:
+- **Proposal:** where a dimension has a clear dominant pattern (60% or more), it is proposed: table and column case, PK name, FK column, singular / plural. Otherwise the proposal is left empty, the options are shown with their shares, and the window says the team should decide. Role-prefixed FKs are accepted under any standard.
+- **Requirements:** a name length limit (30 is proposed on Oracle), ASCII only, required comments (tables, or tables and columns), audit columns (e.g. `CREATED_AT, CREATED_BY`).
+- **Rule severity:** every audit rule can be set to error, warning, info or off.
+- **Effect:** once saved, the audit checks against the standard instead of the dominant patterns ("PK name does not follow the pattern: <TABLE>_ID (standard: ID)"). Three rules run only when the standard defines them: singular / plural, missing comments, missing audit columns.
+- **Sharing:** the standard is written to the same `<name>.sqlschema.json` project file as the debt register. Everyone who opens the folder, and the command line, use the same standard. A written standard document will be generated from this file.
+
+<img src="docs/images/en/standart-ve-kurallar.png" alt="Standard and rules: a standard proposed from the profile, a team decision for a PK without a clear dominant pattern" width="900">
+
 **Debt register: forgive the past, audit the future.** In a messy database the first audit finds hundreds of problems, and fixing hundreds of old tables at once is not realistic.
 - **Accepting:** **Accept current findings as debt** in the window records the current findings. Recorded findings sit in a separate **Accepted debt** list, are not counted as errors and are not coloured on the map. From then on only new findings stand out: a table without a PK brought by a new migration shows up at once.
 - **Progress:** fixed findings count as **paid-off debt**; a bar shows how much of the debt has been paid.
@@ -1101,7 +1119,7 @@ node tools/sqlschema-lint.js db/migration --since V15 --format md --fail-on erro
 | `<file\|folder>...` | the schema to check; folders are scanned recursively |
 | `--since V15` | review V15 and later in a migration folder (before = the versions before V15) |
 | `--baseline <path>` | review against this copy (e.g. the main branch's schema) |
-| `--project <file>` | debt register; by default `*.sqlschema.json` in the folder is read |
+| `--project <file>` | project file (standard, rule severities, debt); by default `*.sqlschema.json` in the folder is read |
 | `--format text\|md\|json\|sarif` | text, Markdown for PR comments, JSON, or SARIF for GitHub code scanning |
 | `--fail-on error\|warning\|info\|none` | exit code 1 if there are new findings at this severity (default `error`) |
 | `--fix <file>` | write the safe and review-level fix SQL to a file |

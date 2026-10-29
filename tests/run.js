@@ -291,7 +291,19 @@ const EXPECT = {
       'naming-case BayiPerformans.Donem', 'naming-case BayiPerformans.Id', 'system-name ESKI_FIYAT_LISTESI',
     ];
     check('hatali denetim: bulgu listesi birebir', same(got, want), got.filter(x => !want.includes(x)).concat(want.filter(x => !got.includes(x)).map(x => '-' + x)));
-    check('hatali denetim: her kural en az bir kez', NS.AUDIT_RULES.every(r => a.findings.some(f => f.rule === r.id)), NS.AUDIT_RULES.filter(r => !a.findings.some(f => f.rule === r.id)).map(r => r.id));
+    check('hatali denetim: her kural en az bir kez', NS.AUDIT_RULES.filter(r => !r.standard).every(r => a.findings.some(f => f.rule === r.id)), NS.AUDIT_RULES.filter(r => !r.standard && !a.findings.some(f => f.rule === r.id)).map(r => r.id));
+    // standart: profilden öneri; verilince adlandırma kuralları ona göre, standarda bağlı kurallar çalışır
+    const prop = NS.proposeStandard(NS.namingProfile(m), { dialects: ['oracle'] });
+    check('standart önerisi: belirgin kalıplar önerilir', prop.standard.tableCase === 'upperSnake' && prop.standard.pkStyle === 'id' && prop.standard.fkStyle === 'targetId' && prop.standard.nameLimit === 30 && prop.standard.ascii === true && prop.choices.fkStyle.every(c => !['role', 'roleOnly', 'other'].includes(c.key)), prop.standard);
+    const pk = NS.proposeStandard(NS.namingProfile(all.karisik.model));
+    check('standart önerisi: belirgin baskın yoksa öneri boş, seçenekler oranlarıyla', pk.standard.pkStyle === null && !pk.clear.pkStyle && pk.choices.pkStyle.length >= 2 && pk.choices.pkStyle[0].pct != null, [pk.standard.pkStyle, pk.choices.pkStyle]);
+    const as = NS.auditModel(m, { standard: { pkStyle: 'tableId', tableNumber: 'plural', comments: 'tables', auditColumns: ['CREATED_AT'], nameLimit: 25, ascii: false } });
+    const ofRule = id => as.findings.filter(f => f.rule === id);
+    check('standart: PK kuralı standarda göre', ofRule('pk-style').length >= 8 && ofRule('pk-style').every(f => f.data.standard && f.data.dominant === 'tableId') && !ofRule('pk-style').some(f => f.t.name === 'URUN_GRUBU'), ofRule('pk-style').map(f => f.key));
+    check('standart: tekil / çoğul, açıklama ve denetim kolonları', ofRule('naming-number').length > 0 && ofRule('missing-comment').length === 14 && ofRule('missing-audit').length === 14 && ofRule('missing-audit')[0].data.cols[0] === 'CREATED_AT', [ofRule('naming-number').length, ofRule('missing-comment').length, ofRule('missing-audit').length]);
+    check('standart: ad sınırı ve karakter kümesi', ofRule('name-too-long').length > 1 && ofRule('name-too-long').every(f => f.data.max === 25 && f.data.standard) && !ofRule('non-ascii-name').length);
+    const sv = NS.auditModel(m, { severity: { 'fk-no-index': 'error', 'orphan-table': 'off' } });
+    check('önem ayarı: yükseltme ve kapatma', sv.findings.filter(f => f.rule === 'fk-no-index').every(f => f.severity === 'error') && !sv.findings.some(f => f.rule === 'orphan-table') && sv.counts.error === 10, sv.counts);
     check('hatali denetim: sayılar ve temiz tablolar', same(a.counts, { error: 7, warning: 20, info: 8 }) && a.clean === 3 && !a.skipped.length, [a.counts, a.clean]);
     const bi = a.findings.find(f => f.rule === 'bool-inconsistent');
     check('hatali denetim: mantıksal kodlamalar', same(bi.data.encodings.map(e => e.enc), ['E/H', 'Y/N', 'NUMBER(1)']), bi.data.encodings.map(e => e.enc));
@@ -563,6 +575,13 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
     const r5 = lint(proj, '--format', 'json');
     const j5 = JSON.parse(r5.stdout);
     check('lint: borçtan sonra eklenen bulgu yakalanır', r5.status === 1 && j5.findings.length === 1 && j5.findings[0].key === 'date-as-text:KAMPANYA.ACIKLAMA_TAR' && j5.debt.left === 35, [r5.status, j5.findings.map(f => f.key)]);
+    // aynı proje dosyasında standart ve önem ayarı: metin tarih kapatılır, denetim kolonu zorunlu olur
+    const projData = JSON.parse(fs.readFileSync(path.join(proj, 'satis.sqlschema.json'), 'utf8'));
+    projData.rules = { standard: { auditColumns: ['CREATED_AT'] }, severity: { 'date-as-text': 'off', 'missing-audit': 'info' }, updated: '2026-10-29T00:00:00Z' };
+    fs.writeFileSync(path.join(proj, 'satis.sqlschema.json'), JSON.stringify(projData));
+    const r6 = lint(proj, '--format', 'json', '--fail-on', 'warning');
+    const j6 = JSON.parse(r6.stdout);
+    check('lint: proje dosyasındaki standart ve önem ayarı', r6.status === 0 && !j6.findings.some(f => f.rule === 'date-as-text') && j6.findings.filter(f => f.rule === 'missing-audit').length === 14 && j6.findings.every(f => f.severity === 'info'), [r6.status, j6.counts]);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

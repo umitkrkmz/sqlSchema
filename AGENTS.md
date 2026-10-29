@@ -33,8 +33,8 @@ Betikler `index.html`'de şu sırayla yüklenir ve her biri `globalThis.sqlSchem
 | `js/diff.js` | iki modelin farkı (tablo, kolon, PK, FK), ad değişikliği tahmini; zaman çizelgesi (sürüm adımları, tablo soyu, geçmiş) | yok |
 | `js/fixes.js` | bulgu başına lehçeye uygun düzeltme SQL'i, risk düzeyi; notlar kod (`FIX_NOTES`), metinleri `fixNotes` | yok |
 | `js/layout.js` | veritabanı → şema → takımyıldız (dosyaya ya da ada göre) → yıldız, deterministik kuvvet yerleşimi | yok |
-| `js/conventions.js` | adlandırma profili: boyutlar, kovalar, oranlar, baskın kalıba uymayanlar (kod döndürür, metin değil) | yok |
-| `js/audit.js` | tasarım denetimi: kurallar (`AUDIT_RULES`), bulgular kod olarak; metinleri `i18n.js`'teki `auditRules`. Bulgu anahtarı (`findingKey`), borç kaydı, değişiklik incelemesi (`reviewChange`) | yok |
+| `js/conventions.js` | adlandırma profili: boyutlar, kovalar, oranlar, baskın kalıba uymayanlar; profilden standart önerisi (`proposeStandard`) (kod döndürür, metin değil) | yok |
+| `js/audit.js` | tasarım denetimi: kurallar (`AUDIT_RULES`), bulgular kod olarak; metinleri `i18n.js`'teki `auditRules`. Bulgu anahtarı (`findingKey`), borç kaydı, değişiklik incelemesi (`reviewChange`); `opts.standard` ve `opts.severity` ile ekibin standardı ve kural önemleri | yok |
 | `js/sample-small.js` | gömülü küçük örnek | yok |
 | `samples/catalog.js` | örnek kataloğu (üretilir) | yok |
 | `js/render.js` | canvas çizimi, kamera, karga ayağı | var |

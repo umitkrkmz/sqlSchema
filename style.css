@@ -803,7 +803,20 @@ body:not(.loaded) .legend, body:not(.loaded) .hud { display: none; }
   resize: vertical;
 }
 .paste .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
-#fixBody, #reviewBody { padding: 18px; }
+#fixBody, #reviewBody, #stdBody { padding: 18px; }
+.std-dlg { width: min(720px, calc(100% - 32px)); }
+.std-grid { max-height: 58vh; overflow: auto; padding-right: 6px; }
+.std-grid h5 { margin: 12px 0 6px; font: 600 10.5px var(--cond); letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+.std-grid h6 { margin: 10px 0 4px; font: 600 11px var(--sans); color: var(--dim); }
+.std-row { display: grid; grid-template-columns: 1fr 240px; align-items: center; gap: 4px 12px; padding: 3px 0; font-size: 12.5px; }
+.std-row small { grid-column: 2; color: var(--accent); font-size: 11px; }
+.std-row select, .std-row input[type="text"], .std-row input[type="number"] { width: 100%; padding: 4px 6px; background: var(--bg-2); color: var(--text); border: 1px solid var(--line-2); border-radius: 6px; font: 12px var(--sans); }
+.std-check { grid-template-columns: auto 1fr; justify-content: start; }
+.std-sev summary { cursor: pointer; list-style: none; }
+.std-sev summary::-webkit-details-marker { display: none; }
+.std-sev summary h5::after { content: ' \25B8'; }
+.std-sev[open] summary h5::after { content: ' \25BE'; }
+.au-sum .au-std { font-style: normal; font-size: 10.5px; margin-left: 6px; padding: 0 5px; border: 1px solid var(--line-2); border-radius: 4px; color: var(--cyan); }
 #reviewPre { white-space: pre-wrap; word-break: break-word; }
 .au-review .au-chips i.paid { color: #7fd49a; }
 .fix-dlg { width: min(900px, calc(100% - 32px)); }
