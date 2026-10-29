@@ -517,21 +517,8 @@ function setAuditMap(on) {
   invalidate();
 }
 
-// Kural metinlerinin değişkenleri: tablo nesneleri ada, listeler metne
-function auditVars(f) {
-  const d = f.data, nm = x => (x && x.name) || '';
-  const style = k => (k ? t('nk_' + d.dim + '_' + k, { n: 30 }) : '');
-  return {
-    ...d, col: f.col, parent: nm(d.parent), ref: nm(d.ref),
-    cols: (d.cols || []).join(', '), names: (d.names || []).join(', '), byCols: (d.byCols || []).join(', '),
-    tables: f.tables.map(nm).join(' \u{2194} '),
-    variants: (d.variants || []).map(x => `${x.type}: ${x.tables.map(nm).join(', ')}`).join(' · '),
-    encodings: (d.encodings || []).map(e => `${e.enc} (${e.cols.map(c => c.t.name + '.' + c.c).join(', ')})`).join(' · '),
-    style: style(d.style), dominant: style(d.dominant),
-  };
-}
 const ruleText = id => t('auditRules')[id];
-const auditWhat = f => ruleText(f.rule).what(auditVars(f));
+const auditWhat = f => ruleText(f.rule).what(NS.auditVars(f, t));
 const auditLabel = f => (f.t ? f.t.name + (f.col ? '.' + f.col : '') : f.col || '');
 const sevCounts = c => ['error', 'warning', 'info'].filter(s => c[s]).map(s => `<i class="sev-${s}">${esc(t(SEV_KEY[s], { n: c[s] }))}</i>`).join('');
 const countSev = fs => { const c = { error: 0, warning: 0, info: 0 }; for (const f of fs) c[f.severity]++; return c; };

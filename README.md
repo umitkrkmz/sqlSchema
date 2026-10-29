@@ -456,6 +456,55 @@ Kurallar dört grupta toplanır:
 
 <img src="docs/images/tr/inceleme-raporu.png" alt="Değişiklik incelemesi: V1'den bugüne gelen bulgular, PR yorumu için Markdown" width="900">
 
+**Komut satırı ve CI.** Aynı denetim, borç kaydı ve değişiklik incelemesi tarayıcı olmadan da çalışır; böylece PR'lar elle incelenmeden atlanmaz:
+
+```bash
+node tools/sqlschema-lint.js db/migration --since V15 --format md --fail-on error
+```
+
+| Seçenek | Görevi |
+|---|---|
+| `<dosya\|klasör>...` | denetlenecek şema; klasörler özyinelemeli taranır |
+| `--since V15` | migration klasöründe V15 ve sonrasını incele (önce = V15'ten öncekiler) |
+| `--baseline <yol>` | bu kopyayla karşılaştırarak incele (ör. ana dalın şeması) |
+| `--project <dosya>` | borç kaydı; verilmezse klasördeki `*.sqlschema.json` okunur |
+| `--format text\|md\|json\|sarif` | metin, PR yorumu için Markdown, JSON ya da GitHub kod taraması için SARIF |
+| `--fail-on error\|warning\|info\|none` | bu önemde yeni bulgu varsa çıkış kodu 1 (varsayılan `error`) |
+| `--fix <dosya>` | güvenli ve gözden geçirilecek düzeltme SQL'ini dosyaya yaz |
+| `--out <dosya>`, `--lang tr\|en`, `--separate` | çıktı dosyası, dil, klasörleri ayrı veritabanı sayma |
+
+- Çıkış kodu: 0 eşiğin altında, 1 eşikte ya da üstünde yeni bulgu, 2 kullanım hatası ya da şema bulunamadı.
+- Borç kaydındaki bulgular ve (inceleme kipinde) değişiklikten önce de var olan bulgular eşiğe sayılmaz.
+- Node 18+ yeterlidir; bağımlılık yoktur. Dosyalar yalnızca okunur, ağ isteği yapılmaz; şema ekibin makinesinden ya da CI sunucusundan çıkmaz.
+
+GitHub Actions örneği: PR'ın getirdiği bulguları yorum olarak yazar, hata varsa kontrolü kırar ve SARIF'i kod taramasına yükler. GitLab CI ve Jenkins'te aynı komut çalışır.
+
+```yaml
+name: sqlSchema
+on: pull_request
+permissions: { contents: read, pull-requests: write, security-events: write }
+jobs:
+  schema-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      # bir sürüm etiketine sabitleyin
+      - run: git clone --depth 1 --branch main https://github.com/umitkrkmz/sqlSchema.git ../sqlschema
+      - run: git worktree add ../base origin/${{ github.base_ref }}
+      - run: node ../sqlschema/tools/sqlschema-lint.js db/migration --baseline ../base/db/migration --format md --out review.md --fail-on error
+      - if: always()
+        run: gh pr comment ${{ github.event.pull_request.number }} --body-file review.md
+        env: { GH_TOKEN: ${{ github.token }} }
+      - if: always()
+        run: node ../sqlschema/tools/sqlschema-lint.js db/migration --baseline ../base/db/migration --format sarif --out sqlschema.sarif --fail-on none
+      - if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with: { sarif_file: sqlschema.sarif }
+```
+
 <img src="docs/images/tr/tasarim-denetimi.png" alt="Tasarım denetimi: hatalı tablolar haritada kırmızı, panelde KAMPANYA tablosunun bulguları" width="900">
 
 **Hatalı tasarım (DBA incelemesi)** örneği bu özellik için hazırlanmıştır: düzgün bir başlangıç şemasına üç geliştiricinin özensiz eklediği migration'lar. Her kural en az bir kez tetiklenir.
@@ -1040,6 +1089,55 @@ The rules fall into four groups:
 - **Link:** `?diff=V14&review=1` opens the report.
 
 <img src="docs/images/en/inceleme-raporu.png" alt="Change review: findings since V1, as Markdown for a PR comment" width="900">
+
+**Command line and CI.** The same audit, debt register and change review run without a browser, so PRs are not skipped when reviewing by hand:
+
+```bash
+node tools/sqlschema-lint.js db/migration --since V15 --format md --fail-on error
+```
+
+| Option | Purpose |
+|---|---|
+| `<file\|folder>...` | the schema to check; folders are scanned recursively |
+| `--since V15` | review V15 and later in a migration folder (before = the versions before V15) |
+| `--baseline <path>` | review against this copy (e.g. the main branch's schema) |
+| `--project <file>` | debt register; by default `*.sqlschema.json` in the folder is read |
+| `--format text\|md\|json\|sarif` | text, Markdown for PR comments, JSON, or SARIF for GitHub code scanning |
+| `--fail-on error\|warning\|info\|none` | exit code 1 if there are new findings at this severity (default `error`) |
+| `--fix <file>` | write the safe and review-level fix SQL to a file |
+| `--out <file>`, `--lang tr\|en`, `--separate` | output file, language, treat folders as separate databases |
+
+- Exit code: 0 below the threshold, 1 for new findings at or above it, 2 for usage errors or when no schema is found.
+- Findings in the debt register and (in review mode) findings that existed before the change do not count towards the threshold.
+- Node 18+ is enough; there are no dependencies. Files are only read and no network requests are made; the schema does not leave the team's machine or CI server.
+
+GitHub Actions example: writes the findings a PR brings as a comment, fails the check on errors and uploads SARIF to code scanning. The same command runs in GitLab CI and Jenkins.
+
+```yaml
+name: sqlSchema
+on: pull_request
+permissions: { contents: read, pull-requests: write, security-events: write }
+jobs:
+  schema-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      # pin to a release tag
+      - run: git clone --depth 1 --branch main https://github.com/umitkrkmz/sqlSchema.git ../sqlschema
+      - run: git worktree add ../base origin/${{ github.base_ref }}
+      - run: node ../sqlschema/tools/sqlschema-lint.js db/migration --baseline ../base/db/migration --format md --out review.md --fail-on error
+      - if: always()
+        run: gh pr comment ${{ github.event.pull_request.number }} --body-file review.md
+        env: { GH_TOKEN: ${{ github.token }} }
+      - if: always()
+        run: node ../sqlschema/tools/sqlschema-lint.js db/migration --baseline ../base/db/migration --format sarif --out sqlschema.sarif --fail-on none
+      - if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with: { sarif_file: sqlschema.sarif }
+```
 
 <img src="docs/images/en/tasarim-denetimi.png" alt="Design audit: tables with errors in red on the map, findings of the KAMPANYA table in the panel" width="900">
 

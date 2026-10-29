@@ -530,5 +530,43 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   check('i18n: Node ortamında varsayılan dil seçildi', NS.LANGS.includes(NS.getLang()), NS.getLang());
 }
 
+// Komut satırı denetimi (tools/sqlschema-lint.js): alt süreçle, çıkış kodu ve çıktı biçimleri
+{
+  const { spawnSync } = require('child_process');
+  const os = require('os');
+  const lint = (...args) => spawnSync(process.execPath, [path.join(ROOT, 'tools', 'sqlschema-lint.js'), ...args], { cwd: ROOT, encoding: 'utf8' });
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sqlschema-'));
+  try {
+    const hat = path.join('samples', 'hatali');
+    const r1 = lint(hat);
+    check('lint: hata varken çıkış kodu 1, metin çıktı', r1.status === 1 && /\[no-pk\]/.test(r1.stdout) && /7 hata · 20 uyarı · 8 bilgi/.test(r1.stdout), [r1.status, r1.stderr]);
+    const r2 = lint(hat, '--format', 'json', '--fail-on', 'none', '--lang', 'en');
+    const j = JSON.parse(r2.stdout);
+    check('lint: JSON çıktı ve --fail-on none', r2.status === 0 && j.mode === 'audit' && same(j.counts, { error: 7, warning: 20, info: 8 }) && j.findings[0].location.file === 'hatali/db/migration/V2__kampanya.sql' && j.findings[0].title === 'Table without a primary key', [r2.status, j.counts]);
+    const r3 = lint(path.join(hat, 'db', 'migration'), '--since', 'V5', '--format', 'md');
+    check('lint: --since ile inceleme (Markdown)', r3.status === 1 && r3.stdout.includes('V4__bolge_sorumlusu → V5__raporlama') && r3.stdout.includes('(9)'), r3.stdout.slice(0, 200));
+    const r4 = lint(hat, '--format', 'sarif', '--fail-on', 'warning');
+    const sf = JSON.parse(r4.stdout);
+    check('lint: SARIF 2.1.0', r4.status === 1 && sf.version === '2.1.0' && sf.runs[0].results.length === 35 && sf.runs[0].tool.driver.rules.length === NS.AUDIT_RULES.length && sf.runs[0].results.every(x => x.locations.length && x.partialFingerprints.sqlSchemaKey));
+    const fixFile = path.join(tmp, 'fix.sql');
+    lint(hat, '--fix', fixFile, '--fail-on', 'none');
+    const fixSql = fs.readFileSync(fixFile, 'utf8');
+    check('lint: --fix güvenli ve gözden geçirilecek SQL', fixSql.includes('CREATE INDEX IX_SIPARIS_KAMPANYA_ID ON SIPARIS (KAMPANYA_ID);') && !fixSql.includes('TO INDIRIM_ORANI') && !fixSql.includes('BAYI_PERFORMANS'));
+    check('lint: kullanım hatasında çıkış kodu 2', lint(hat, '--since', 'V9').status === 2 && lint().status === 2 && lint(hat, '--format', 'xml').status === 2);
+    // borç kaydı: klasördeki proje dosyası; yalnızca sonradan eklenen bulgu sayılır
+    const proj = path.join(tmp, 'proj');
+    fs.mkdirSync(proj);
+    for (const f of fs.readdirSync(path.join(ROOT, hat, 'db', 'migration'))) fs.copyFileSync(path.join(ROOT, hat, 'db', 'migration', f), path.join(proj, f));
+    fs.writeFileSync(path.join(proj, 'satis.sqlschema.json'), JSON.stringify({ app: 'sqlSchema', kind: 'project', version: 1, debt: { keys: j.findings.map(f => f.key), accepted: '2026-10-29', updated: '2026-10-29T00:00:00Z' } }));
+    check('lint: borç tamamken bulgu yok', lint(proj).status === 0);
+    fs.writeFileSync(path.join(proj, 'V6__yeni.sql'), 'ALTER TABLE KAMPANYA ADD (ACIKLAMA_TAR VARCHAR2(20));\n');
+    const r5 = lint(proj, '--format', 'json');
+    const j5 = JSON.parse(r5.stdout);
+    check('lint: borçtan sonra eklenen bulgu yakalanır', r5.status === 1 && j5.findings.length === 1 && j5.findings[0].key === 'date-as-text:KAMPANYA.ACIKLAMA_TAR' && j5.debt.left === 35, [r5.status, j5.findings.map(f => f.key)]);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 console.log(`\n${passed} denetim geçti, ${failed} başarısız`);
 process.exitCode = failed ? 1 : 0;

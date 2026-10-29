@@ -12,6 +12,7 @@ sqlSchema, veritabanı şema dosyalarını (SQL DDL, Cassandra CQL, MongoDB doğ
 node tests/run.js                                  # bütün testler; her değişiklikten sonra geçmeli
 node tools/gen-samples.js                          # samples/ ve samples/catalog.js'i yeniden üretir
 node tools/screenshots.js http://localhost:8000/   # docs/images/ altındaki README görüntüleri (Chrome gerekir)
+node tools/sqlschema-lint.js samples/hatali        # komut satırı denetimi (CI); --since, --baseline, --format
 python -m http.server 8000                         # sayfayı yerelde sunmak için
 ```
 

@@ -328,6 +328,21 @@ function auditModel(model, opts = {}) {
   return { findings, byTable, counts, skipped, tables: sql.length, clean, debt };
 }
 
+// Kural metinlerinin (i18n auditRules[kural].what) değişkenleri: tablo nesneleri ada, listeler metne.
+// Metin üretmez; adlandırma kalıbı etiketleri için çeviri işlevi (tr) dışarıdan verilir. Arayüz ve komut satırı paylaşır.
+function auditVars(f, tr) {
+  const d = f.data, nm = x => (x && x.name) || '';
+  const style = k => (k && tr ? tr('nk_' + d.dim + '_' + k, { n: 30 }) : k || '');
+  return {
+    ...d, col: f.col, parent: nm(d.parent), ref: nm(d.ref),
+    cols: (d.cols || []).join(', '), names: (d.names || []).join(', '), byCols: (d.byCols || []).join(', '),
+    tables: f.tables.map(nm).join(' \u{2194} '),
+    variants: (d.variants || []).map(x => `${x.type}: ${x.tables.map(nm).join(', ')}`).join(' · '),
+    encodings: (d.encodings || []).map(e => `${e.enc} (${e.cols.map(c => c.t.name + '.' + c.c).join(', ')})`).join(' · '),
+    style: style(d.style), dominant: style(d.dominant),
+  };
+}
+
 // Bulgunun kalıcı kimliği: tablo nesneleri her kurulumda yenilenir, ad ve kolonlar kalır.
 // Tablo düzeyindeki toplu bulgularda kolon listesi de kimliğe girer: listeye yeni kolon eklenirse bulgu yeniden görünür.
 // nameOf: tablo → ad (değişiklik incelemesinde adı değişen tablonun eski bulguları yeni adıyla eşleşsin diye)
@@ -370,5 +385,5 @@ function reviewChange(before, after, opts = {}) {
   return { diff, findings, fixed, counts, before: a0, after: a1 };
 }
 
-Object.assign(NS, { auditModel, reviewChange, AUDIT_RULES, typeInfo, findingKey });
+Object.assign(NS, { auditModel, reviewChange, auditVars, AUDIT_RULES, typeInfo, findingKey });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});

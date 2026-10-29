@@ -13,6 +13,7 @@
     "test": "node tests/run.js",
     "samples": "node tools/gen-samples.js",
     "screenshots": "node tools/screenshots.js",
+    "lint": "node tools/sqlschema-lint.js",
     "start": "python -m http.server 8000"
   }
 }

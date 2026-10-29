@@ -7,6 +7,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ### Eklendi · Added
 
+- **Komut satırı denetimi:** `tools/sqlschema-lint.js` denetimi, borç kaydını ve değişiklik incelemesini Node'da çalıştırır (`--since V15`, `--baseline <yol>`); metin, Markdown, JSON ve SARIF çıktı; `--fail-on` ile çıkış kodu; `--fix` ile düzeltme SQL'i. README'de GitHub Actions örneği.
+  Command-line audit: `tools/sqlschema-lint.js` runs the audit, debt register and change review in Node (`--since V15`, `--baseline <path>`); text, Markdown, JSON and SARIF output; exit code via `--fail-on`; fix SQL via `--fix`. A GitHub Actions example in the README.
 - **Değişiklik incelemesi (PR):** karşılaştırma ya da zaman çizelgesi açıkken bu değişikliğin getirdiği ve giderdiği bulgular; adı değişen tablolar eşlenir, borç sayılmaz. PR yorumu için Markdown rapor, isteğe bağlı düzeltme SQL'iyle; denetim penceresinde özet; `?review=1`.
   Change review (PR): with a comparison or the timeline active, the findings this change brings and resolves; renamed tables are matched and debt is not counted. A Markdown report for a PR comment, optionally with fix SQL; a summary in the audit window; `?review=1`.
 
