@@ -277,5 +277,24 @@
       "sector": "Telecom CRM",
       "scenario": "Every status and type code lives in a single SOZLUK table; more than 30 columns point to it through @ref ... (TIP_ID = n) tags in their comments. On the map they appear as badges instead of lines."
     }
+  },
+  {
+    "id": "hatali",
+    "title": "Hatalı tasarım (DBA incelemesi)",
+    "sector": "Bayi satış",
+    "dialect": "Oracle",
+    "scenario": "Düzgün bir başlangıç şemasına üç geliştiricinin özensiz eklediği tablolar: PK'siz tablo, metin tarih, FLOAT tutar, indekssiz FK, döngü, anahtar-değer tablosu. Tasarım denetimini denemek için.",
+    "files": [
+      "db/migration/V1__temel_sema.sql",
+      "db/migration/V2__kampanya.sql",
+      "db/migration/V3__musteri_iletisim.sql",
+      "db/migration/V4__bolge_sorumlusu.sql",
+      "db/migration/V5__raporlama.sql"
+    ],
+    "en": {
+      "title": "Flawed design (DBA review)",
+      "sector": "Dealer sales",
+      "scenario": "Tables three developers carelessly added to a clean baseline: a table without a PK, text dates, FLOAT amounts, unindexed FKs, a cycle, a key-value table. For trying the design audit."
+    }
   }
 ];

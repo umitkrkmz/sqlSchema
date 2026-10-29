@@ -5,6 +5,15 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Eklendi · Added
+
+- **Tasarım denetimi:** 29 kural (anahtarlar ve bütünlük, veri tipleri, normalizasyon, adlandırma); her bulgu ne, neden ve öneriyle. Hata / uyarı / bilgi, addan tahmin edilen bulgular işaretli. Haritada gösterme, panelde tablonun bulguları, en çok bulgu olan tablolar, Markdown inceleme belgesi; `?audit=1`, `?pop=audit`.
+  Design audit: 29 rules (keys and integrity, data types, normalisation, naming); each finding with what, why and a suggestion. Error / warning / info, findings guessed from names marked as such. Show on map, the table's findings in the panel, the tables with the most findings, a Markdown review document; `?audit=1`, `?pop=audit`.
+- **"Hatalı tasarım (DBA incelemesi)" örneği:** düzgün bir şemaya özensiz eklenmiş migration'lar; her denetim kuralı tetiklenir.
+  "Flawed design (DBA review)" sample: careless migrations added to a clean schema; every audit rule fires.
+- Benzersiz olmayan indeksler (`CREATE INDEX`) modelde tutulur (FK indeksi ve gereksiz indeks denetimi için).
+  Non-unique indexes (`CREATE INDEX`) are kept in the model (for the FK-index and redundant-index checks).
+
 ## [0.7.0] - 2026-10-29
 
 ### Eklendi · Added

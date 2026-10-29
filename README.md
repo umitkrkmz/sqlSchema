@@ -39,12 +39,13 @@ draw.io kadar elle uğraştırmaz, veri modelleme aracı kadar ağır değildir.
 5. [Desteklenen veritabanları](#tr-veritabanlari)
 6. [MongoDB](#tr-mongodb)
 7. [Adlandırma profili](#tr-adlandirma)
-8. [Örnekler](#tr-ornekler)
-9. [Şemayı dışa aktarmak](#tr-disa-aktarma)
-10. [Dil](#tr-dil)
-11. [Proje yapısı ve geliştirme](#tr-gelistirme)
-12. [Sınırlar](#tr-sinirlar)
-13. [Katkı, güvenlik, lisans](#tr-katki)
+8. [Tasarım denetimi](#tr-denetim)
+9. [Örnekler](#tr-ornekler)
+10. [Şemayı dışa aktarmak](#tr-disa-aktarma)
+11. [Dil](#tr-dil)
+12. [Proje yapısı ve geliştirme](#tr-gelistirme)
+13. [Sınırlar](#tr-sinirlar)
+14. [Katkı, güvenlik, lisans](#tr-katki)
 
 <a id="tr-one-cikanlar"></a>
 
@@ -57,6 +58,8 @@ draw.io kadar elle uğraştırmaz, veri modelleme aracı kadar ağır değildir.
 - **Karga ayağı notasyonu:** kardinalite `NOT NULL`, `UNIQUE` ve PK bilgisinden çıkarılır.
 - **Tahmini ilişkiler:** FK tanımlı olmayan eski sistemlerde, Cassandra'da ve MongoDB'de bağlantılar kolon adlarından bulunur.
 - **Adlandırma profili:** şemada hangi adlandırma kalıplarının ne oranda kullanıldığını ve baskın kalıba uymayan tabloları gösterir.
+- **Tasarım denetimi:** PK'siz tablo, metin tarih, indekssiz FK gibi hataları neden ve öneriyle listeler.
+- **Şema farkı ve zaman çizelgesi:** iki sürümü karşılaştırır, migration'ları sırayla oynatır.
 - **Ölçek:** 2 862 tabloluk 4,7 MB'lık bir döküm yaklaşık 0,6 saniyede açılır, bir karenin çizimi 10 ms'nin altında kalır.
 - **Türkçe ve İngilizce arayüz.**
 
@@ -391,6 +394,40 @@ Araç bir kural dayatmaz: `ID` mi `<TABLO>_ID` mi doğru, buna ekip karar verir.
 
 **Karışık adlandırma** örneği bu özellik için hazırlanmıştır: iki ekibin farklı alışkanlıklarla tablo eklediği bir Oracle şeması.
 
+<a id="tr-denetim"></a>
+
+### Tasarım denetimi
+
+Sağ alttaki **denetim** bağlantısı şemayı yaygın tasarım hatalarına karşı tarar. Her bulgu üç şey söyler:
+- **Ne:** "`BASLANGIC_TAR` kolonu `VARCHAR2(20)`"
+- **Neden sorun:** tarih metin olunca aralık sorguları indeks kullanamaz, sıralama yanlış olur
+- **Öneri:** `DATE` ya da `TIMESTAMP` kullanın
+
+Kurallar dört grupta toplanır:
+
+| Grup | Örnek kurallar |
+|---|---|
+| Anahtarlar ve bütünlük | PK'siz tablo, FK ile hedef kolonun tipi uyuşmuyor, tanımlanmamış ilişki, indeksi olmayan FK, döngüsel FK zinciri, gereksiz indeks, devre dışı FK, bulunamayan `@ref` hedefi |
+| Veri tipleri | metin tarih, metin sayı, `FLOAT` tutar, gereğinden geniş metin, değişken veri için `CHAR`, kısa metin için `CLOB`, aynı adlı kolonların farklı tipi, farklı biçimlerde mantıksal kolonlar (E/H, Y/N, 0/1) |
+| Normalizasyon | `TEL1, TEL2, TEL3` gibi tekrarlayan kolonlar, virgülle ayrılmış liste, anahtar-değer (EAV) tablosu, çok kolonlu tablo |
+| Adlandırma | ad sınırını aşan ad (Oracle 12.1 ve öncesinde 30), ayrılmış kelime, Türkçe karakter, `SYS_C0012345` gibi sistem adları; PK, FK ve harf düzeninde baskın kalıba uymayanlar |
+
+- **Önem:** hata, uyarı ve bilgi. Addan tahmin yürüten kurallar (metin tarih, tutar, EAV ...) **addan tahmin** olarak işaretlenir.
+- **Yanlış alarmı azaltmak için:**
+  - Kayıt, geçmiş ve olgu tablolarında (`_LOG`, `_HIST`, `_CDR`, `FACT_`) PK ve FK yokluğu bilinçli sayılır.
+  - SQLite'ta metin tarih olağandır.
+  - Rol adlı FK'ler (`FATURA_ADRES_ID`) ve metin tipli doğal anahtarlar (`PARA_BIRIMI_KOD`) kalıp dışı sayılmaz.
+  - Dosyalarda hiç indeks tanımı yoksa FK indeksi denetlenmez.
+- **Haritada göster:** hatalı tablolar kırmızı, uyarılılar sarı; öbürleri geri planda kalır. Kartta bulgusu olan kolon satırları renklenir.
+- **Panelde:** seçili tablonun bulguları ve önerileri **Denetim** bölümündedir.
+- **Pencerede:** en çok bulgu olan on tablo listelenir. **Markdown indir** bütün bulguları neden ve öneriyle bir inceleme belgesine yazar.
+- **Zaman çizelgesiyle:** her sürümde denetim yeniden hesaplanır; bir bulgunun hangi migration'la geldiği görünür.
+- **Bağlantı:** `?audit=1` denetimi haritada açar, `?pop=audit` pencereyi açar.
+
+<img src="docs/images/tr/tasarim-denetimi.png" alt="Tasarım denetimi: hatalı tablolar haritada kırmızı, panelde KAMPANYA tablosunun bulguları" width="900">
+
+**Hatalı tasarım (DBA incelemesi)** örneği bu özellik için hazırlanmıştır: düzgün bir başlangıç şemasına üç geliştiricinin özensiz eklediği migration'lar. Her kural en az bir kez tetiklenir.
+
 <a id="tr-ornekler"></a>
 
 ### Örnekler
@@ -413,6 +450,7 @@ Araç bir kural dayatmaz: `ID` mi `<TABLO>_ID` mi doğru, buna ekip karar verir.
 | Çok veritabanlı e-ticaret | MySQL + MongoDB + PostgreSQL | Mikroservisler, her klasör ayrı galaksi |
 | Karışık adlandırma | Oracle | İki ekip, iki alışkanlık: PK `ID` ve `<TABLO>_ID`, kuralsız FK'ler, ORM tabloları |
 | Sözlük ağırlıklı | Oracle | Bütün kodlar tek bir `SOZLUK` tablosunda; 30'dan fazla kolon ona `@ref` ile bağlı |
+| Hatalı tasarım (DBA incelemesi) | Oracle | Düzgün bir şemaya özensiz eklenmiş migration'lar; her denetim kuralı tetiklenir |
 
 <a id="tr-disa-aktarma"></a>
 
@@ -476,6 +514,7 @@ js/                 tarayıcıda bu sırayla yüklenir; hepsi globalThis.sqlSche
   diff.js           iki modelin farkı: tablo, kolon, PK, FK; ad değişikliği tahmini; zaman çizelgesi
   layout.js         veritabanı → şema → takımyıldız → yıldız, hiyerarşik kuvvet yerleşimi
   conventions.js    adlandırma profili: kalıplar, oranlar, baskın kalıba uymayanlar
+  audit.js          tasarım denetimi: kurallar, bulgular (kod döner, metin arayüzde)
   sample-small.js   gömülü küçük örnek
   render.js         canvas çizimi, kamera, karga ayağı
   ui.js             yükleme, dosya listesi, arama, panel, rapor, URL parametreleri
@@ -550,12 +589,13 @@ It is less manual than draw.io and lighter than a data-modelling tool. The goal 
 5. [Supported databases](#en-databases)
 6. [MongoDB](#en-mongodb)
 7. [Naming profile](#en-naming)
-8. [Samples](#en-samples)
-9. [Exporting a schema](#en-export)
-10. [Language](#en-language)
-11. [Project layout and development](#en-development)
-12. [Limitations](#en-limitations)
-13. [Contributing, security, license](#en-contributing)
+8. [Design audit](#en-audit)
+9. [Samples](#en-samples)
+10. [Exporting a schema](#en-export)
+11. [Language](#en-language)
+12. [Project layout and development](#en-development)
+13. [Limitations](#en-limitations)
+14. [Contributing, security, license](#en-contributing)
 
 <a id="en-highlights"></a>
 
@@ -568,6 +608,8 @@ It is less manual than draw.io and lighter than a data-modelling tool. The goal 
 - **Crow's foot notation:** cardinality is derived from `NOT NULL`, `UNIQUE` and primary keys.
 - **Inferred relationships:** links are found from column names in legacy systems without FKs, in Cassandra and in MongoDB.
 - **Naming profile:** shows which naming patterns the schema uses, in what proportion, and which tables depart from the dominant pattern.
+- **Design audit:** lists mistakes such as tables without a PK, text dates and unindexed FKs, with reasons and suggestions.
+- **Schema diff and timeline:** compares two versions and plays migrations in order.
 - **Scale:** a 4.7 MB dump with 2,862 tables opens in about 0.6 s, and a frame draws in under 10 ms.
 - **Turkish and English interface.**
 
@@ -904,6 +946,40 @@ The tool imposes no rule: whether `ID` or `<TABLE>_ID` is right is the team's de
 
 The **Mixed naming** sample was made for this feature: an Oracle schema to which two teams added tables with different habits.
 
+<a id="en-audit"></a>
+
+### Design audit
+
+**audit** in the bottom bar scans the schema for common design mistakes. Each finding says three things:
+- **What:** "column `BASLANGIC_TAR` is `VARCHAR2(20)`"
+- **Why it matters:** with dates as text, range queries cannot use indexes and sorting is wrong
+- **Suggestion:** use `DATE` or `TIMESTAMP`
+
+The rules fall into four groups:
+
+| Group | Example rules |
+|---|---|
+| Keys and integrity | table without a PK, FK and target column types differ, undeclared relationship, FK without an index, circular FK chain, redundant index, disabled FK, unresolved `@ref` target |
+| Data types | dates and numbers as text, `FLOAT` amounts, oversized text, `CHAR` for variable data, `CLOB` for short text, same-named columns with different types, booleans in different formats (E/H, Y/N, 0/1) |
+| Normalisation | repeating columns like `PHONE1, PHONE2, PHONE3`, comma-separated lists, key-value (EAV) tables, very wide tables |
+| Naming | names over the limit (30 on Oracle 12.1 and earlier), reserved words, Turkish characters, system names like `SYS_C0012345`; PK, FK and case outliers from the dominant pattern |
+
+- **Severity:** error, warning and info. Rules that reason from names (text dates, amounts, EAV ...) are marked **guessed from names**.
+- **To keep false alarms down:**
+  - Missing PKs and FKs on log, history and fact tables (`_LOG`, `_HIST`, `_CDR`, `FACT_`) are treated as deliberate.
+  - Text dates are normal on SQLite.
+  - Role-named FKs (`BILLING_ADDRESS_ID`) and text natural keys (`CURRENCY_CODE`) are not counted as outliers.
+  - If the files contain no index definitions at all, FK indexes are not checked.
+- **Show on map:** tables with errors are red, with warnings yellow; the rest stay in the background. Column rows with findings are tinted on the card.
+- **In the panel:** the selected table's findings and suggestions are in the **Audit** section.
+- **In the window:** the ten tables with the most findings are listed. **Download Markdown** writes every finding with its reason and suggestion into a review document.
+- **With the timeline:** the audit is recomputed at each version, so you can see which migration brought a finding.
+- **Link:** `?audit=1` shows the audit on the map, `?pop=audit` opens the window.
+
+<img src="docs/images/en/tasarim-denetimi.png" alt="Design audit: tables with errors in red on the map, findings of the KAMPANYA table in the panel" width="900">
+
+The **Flawed design (DBA review)** sample was made for this feature: migrations three developers carelessly added to a clean baseline. Every rule fires at least once.
+
 <a id="en-samples"></a>
 
 ### Samples
@@ -926,6 +1002,7 @@ The samples under `samples/` are **synthetic**: they do not belong to any real o
 | Polyglot e-commerce | MySQL + MongoDB + PostgreSQL | Microservices, one galaxy per folder |
 | Mixed naming | Oracle | Two teams, two habits: PK `ID` and `<TABLE>_ID`, irregular FKs, ORM tables |
 | Lookup-heavy | Oracle | Every code lives in a single `SOZLUK` table; more than 30 columns point to it with `@ref` |
+| Flawed design (DBA review) | Oracle | Careless migrations added to a clean schema; every audit rule fires |
 
 <a id="en-export"></a>
 
@@ -989,6 +1066,7 @@ js/                 loaded in this order; each file adds to the globalThis.sqlSc
   diff.js           difference of two models: tables, columns, PK, FK; rename guesses; timeline
   layout.js         database → schema → constellation → star, hierarchical force layout
   conventions.js    naming profile: patterns, shares, names that depart from the dominant pattern
+  audit.js          design audit: rules and findings (returns codes; text lives in the UI)
   sample-small.js   embedded small sample
   render.js         canvas drawing, camera, crow's feet
   ui.js             loading, file list, search, panel, report, URL parameters

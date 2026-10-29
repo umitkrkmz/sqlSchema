@@ -6,7 +6,8 @@
  *
  * İşlemler (hepsinde file ve line bulunur):
  *   create    { t, def: { columns, comment, noColumns } }
- *   pk / uq   { t, cols, name, partition? }
+ *   pk / uq   { t, cols, name, partition? }   uq: UNIQUE kısıtı ya da benzersiz indeks (index: true)
+ *   index     { t, cols, name }       benzersiz olmayan indeks (denetim: FK indeksi, yinelenen indeks)
  *   fk        { t, cols, ref, refCols, name, disabled, onDelete }
  *   addcol    { t, col }              dropcol   { t, col }
  *   null      { t, col, nullable }    type      { t, col, type }
@@ -477,7 +478,7 @@ function parseCreateIndex(c, P) {
   if (!c.acceptW('INDEX')) return P.skip('CREATE INDEX');
   c.acceptW('CONCURRENTLY');
   c.acceptSeq('IF', 'NOT', 'EXISTS');
-  if (!c.isW('ON')) readName(c);
+  const name = c.isW('ON') ? null : readName(c);
   if (!c.acceptW('ON')) return P.skip('CREATE INDEX');
   c.acceptW('ONLY');
   const t = readName(c);
@@ -485,7 +486,9 @@ function parseCreateIndex(c, P) {
   if (c.acceptW('USING')) c.next();
   const cols = readColList(c);
   P.stats.indexes++;
-  if (unique && cols) P.op({ op: 'uq', t: P.qn(t), cols, index: true });
+  if (!cols) return;
+  const iname = name ? name[name.length - 1] : null;
+  P.op(unique ? { op: 'uq', t: P.qn(t), cols, name: iname, index: true } : { op: 'index', t: P.qn(t), cols, name: iname });
 }
 
 function parseComment(c, P) {

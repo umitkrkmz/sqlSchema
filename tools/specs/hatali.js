@@ -1,0 +1,196 @@
+/*
+ * Hatalı tasarım (DBA incelemesi) — Oracle, Flyway migration klasörü.
+ * V1 düzgün bir bayi satış şemasıdır: PK ID, FK <TABLO>_ID, her FK'nin indeksi, tarihler DATE, tutarlar NUMBER(p,s).
+ * Sonraki sürümleri üç geliştirici özensizce eklemiştir; her denetim kuralı en az bir kez tetiklenir.
+ * tests/run.js buradaki bulgu listesini birebir bekler.
+ */
+'use strict';
+
+const DIR = 'db/migration/';
+
+// Düz rapor tablosu: 100'den fazla kolon (wide-table)
+const METRIKLER = Array.from({ length: 104 }, (_, i) => `  METRIK_${String(i + 1).padStart(3, '0')} NUMBER(12),`).join('\n');
+
+const MIGRATIONS = {
+  'V1__temel_sema.sql': `-- Bayi satış: başlangıç şeması (DBA ekibi)
+CREATE TABLE BOLGE (
+  ID          NUMBER(10)         NOT NULL,
+  BOLGE_ADI   VARCHAR2(100 CHAR) NOT NULL,
+  CONSTRAINT PK_BOLGE PRIMARY KEY (ID)
+);
+
+CREATE TABLE BAYI (
+  ID          NUMBER(10)         NOT NULL,
+  BAYI_ADI    VARCHAR2(200 CHAR) NOT NULL,
+  BOLGE_ID    NUMBER(10)         NOT NULL,
+  AKTIF_MI    CHAR(1 CHAR)       DEFAULT 'E' NOT NULL,
+  CONSTRAINT PK_BAYI PRIMARY KEY (ID),
+  CONSTRAINT FK_BAYI_BOLGE FOREIGN KEY (BOLGE_ID) REFERENCES BOLGE (ID),
+  CONSTRAINT CK_BAYI_AKTIF CHECK (AKTIF_MI IN ('E', 'H'))
+);
+CREATE INDEX IX_BAYI_BOLGE ON BAYI (BOLGE_ID);
+
+CREATE TABLE MUSTERI (
+  ID            NUMBER(18)         NOT NULL,
+  AD_SOYAD      VARCHAR2(200 CHAR) NOT NULL,
+  DOGUM_TARIHI  DATE,
+  KAYIT_TARIHI  DATE               DEFAULT SYSDATE NOT NULL,
+  CONSTRAINT PK_MUSTERI PRIMARY KEY (ID)
+);
+
+CREATE TABLE URUN (
+  ID            NUMBER(10)         NOT NULL,
+  URUN_ADI      VARCHAR2(200 CHAR) NOT NULL,
+  LISTE_FIYATI  NUMBER(12,2)       NOT NULL,
+  CONSTRAINT PK_URUN PRIMARY KEY (ID)
+);
+
+CREATE TABLE SIPARIS (
+  ID              NUMBER(18)   NOT NULL,
+  MUSTERI_ID      NUMBER(18)   NOT NULL,
+  BAYI_ID         NUMBER(10)   NOT NULL,
+  SIPARIS_TARIHI  DATE         NOT NULL,
+  DURUM           NUMBER(2)    NOT NULL,
+  TOPLAM_TUTAR    NUMBER(14,2) NOT NULL,
+  CONSTRAINT PK_SIPARIS PRIMARY KEY (ID),
+  CONSTRAINT FK_SIPARIS_MUSTERI FOREIGN KEY (MUSTERI_ID) REFERENCES MUSTERI (ID),
+  CONSTRAINT FK_SIPARIS_BAYI FOREIGN KEY (BAYI_ID) REFERENCES BAYI (ID)
+);
+CREATE INDEX IX_SIPARIS_MUSTERI ON SIPARIS (MUSTERI_ID);
+CREATE INDEX IX_SIPARIS_BAYI ON SIPARIS (BAYI_ID);
+
+-- PK'nin ilk kolonu SIPARIS_ID'nin indeksi sayılır
+CREATE TABLE SIPARIS_KALEM (
+  SIPARIS_ID   NUMBER(18)   NOT NULL,
+  KALEM_NO     NUMBER(4)    NOT NULL,
+  URUN_ID      NUMBER(10)   NOT NULL,
+  ADET         NUMBER(6)    NOT NULL,
+  BIRIM_FIYAT  NUMBER(12,2) NOT NULL,
+  CONSTRAINT PK_SIPARIS_KALEM PRIMARY KEY (SIPARIS_ID, KALEM_NO),
+  CONSTRAINT FK_KALEM_SIPARIS FOREIGN KEY (SIPARIS_ID) REFERENCES SIPARIS (ID),
+  CONSTRAINT FK_KALEM_URUN FOREIGN KEY (URUN_ID) REFERENCES URUN (ID)
+);
+CREATE INDEX IX_KALEM_URUN ON SIPARIS_KALEM (URUN_ID);
+`,
+
+  'V2__kampanya.sql': `-- Kampanya modülü (geliştirici A, acele bir sprint)
+CREATE TABLE KAMPANYA (
+  ID                  NUMBER(10)     NOT NULL,
+  KAMPANYA_ADI        VARCHAR2(4000),
+  BASLANGIC_TAR       VARCHAR2(20),
+  BITIS_TAR           VARCHAR2(20),
+  INDIRIM_TUTARI      FLOAT,
+  KATILIMCI_ADEDI     VARCHAR2(10),
+  HEDEF_SEGMENT_IDS   VARCHAR2(500),
+  DURUM               VARCHAR2(20),
+  AKTIF_FLAG          CHAR(1),
+  İNDİRİM_ORANI       NUMBER(5,2),
+  CONSTRAINT PK_KAMPANYA PRIMARY KEY (ID),
+  CONSTRAINT CK_KAMPANYA_AKTIF CHECK (AKTIF_FLAG IN ('Y', 'N'))
+);
+
+-- PK yok; MUSTERI_ID, MUSTERI.ID'den dar; FK'lerin indeksi yok
+CREATE TABLE KAMPANYA_KATILIM (
+  KAMPANYA_ID     NUMBER(10) NOT NULL,
+  MUSTERI_ID      NUMBER(10) NOT NULL,
+  KATILIM_TARIHI  DATE,
+  CONSTRAINT FK_KATILIM_KAMPANYA FOREIGN KEY (KAMPANYA_ID) REFERENCES KAMPANYA (ID),
+  CONSTRAINT FK_KATILIM_MUSTERI FOREIGN KEY (MUSTERI_ID) REFERENCES MUSTERI (ID)
+);
+`,
+
+  'V3__musteri_iletisim.sql': `-- Müşteri iletişim bilgileri (geliştirici B)
+ALTER TABLE MUSTERI ADD (
+  TEL1         VARCHAR2(20),
+  TEL2         VARCHAR2(20),
+  TEL3         VARCHAR2(20),
+  ADRES        CHAR(200),
+  SEGMENT_KOD  VARCHAR2(10)
+);
+COMMENT ON COLUMN MUSTERI.SEGMENT_KOD IS 'Müşteri segmenti. @ref SEGMENT_TANIM.KOD';
+
+CREATE TABLE MUSTERI_NOTU (
+  ID           NUMBER(18) NOT NULL,
+  MUSTERI_REF  NUMBER(18) NOT NULL,
+  BASLIK       CLOB,
+  "COMMENT"    VARCHAR2(1000),
+  ONAYLI       NUMBER(1),
+  CONSTRAINT PK_MUSTERI_NOTU PRIMARY KEY (ID),
+  CONSTRAINT FK_NOT_MUSTERI FOREIGN KEY (MUSTERI_REF) REFERENCES MUSTERI (ID)
+);
+CREATE INDEX IX_MUSTERI_NOTU_MUSTERI ON MUSTERI_NOTU (MUSTERI_REF);
+CREATE INDEX IX_MUSTERI_NOTU_MUSTERI_ID ON MUSTERI_NOTU (MUSTERI_REF, ID);
+
+-- Anahtar-değer tablosu: her yeni bilgi bir satır
+CREATE TABLE MUSTERI_OZELLIK (
+  ID              NUMBER(18)         NOT NULL,
+  MUSTERI_ID      NUMBER(18)         NOT NULL,
+  OZELLIK_ADI     VARCHAR2(100 CHAR) NOT NULL,
+  OZELLIK_DEGERI  VARCHAR2(400 CHAR),
+  CONSTRAINT PK_MUSTERI_OZELLIK PRIMARY KEY (ID),
+  CONSTRAINT FK_OZELLIK_MUSTERI FOREIGN KEY (MUSTERI_ID) REFERENCES MUSTERI (ID)
+);
+CREATE INDEX IX_OZELLIK_MUSTERI ON MUSTERI_OZELLIK (MUSTERI_ID);
+`,
+
+  'V4__bolge_sorumlusu.sql': `-- Her bölgenin sorumlu bayisi (geliştirici B): BAYI → BOLGE → BAYI döngüsü
+ALTER TABLE BOLGE ADD (SORUMLU_BAYI_ID NUMBER(10));
+ALTER TABLE BOLGE ADD CONSTRAINT FK_BOLGE_SORUMLU_BAYI FOREIGN KEY (SORUMLU_BAYI_ID) REFERENCES BAYI (ID);
+CREATE INDEX IX_BOLGE_SORUMLU_BAYI ON BOLGE (SORUMLU_BAYI_ID);
+
+-- Ürün grupları: eski alışkanlıkla <TABLO>_ID; URUN'e FK eklenmemiş
+CREATE TABLE URUN_GRUBU (
+  URUN_GRUBU_ID  NUMBER(6)          NOT NULL,
+  GRUP_ADI       VARCHAR2(100 CHAR) NOT NULL,
+  CONSTRAINT PK_URUN_GRUBU PRIMARY KEY (URUN_GRUBU_ID)
+);
+ALTER TABLE URUN ADD (URUN_GRUBU_ID NUMBER(6));
+
+-- Siparişe kampanya: FK devre dışı açılmış, indeksi yok
+ALTER TABLE SIPARIS ADD (KAMPANYA_ID NUMBER(10));
+ALTER TABLE SIPARIS ADD CONSTRAINT FK_SIPARIS_KAMPANYA FOREIGN KEY (KAMPANYA_ID) REFERENCES KAMPANYA (ID) DISABLE;
+`,
+
+  'V5__raporlama.sql': `-- Raporlama (geliştirici C, ORM ile üretilmiş ve elle kopyalanmış)
+CREATE TABLE "BayiPerformans" (
+  "Id"      NUMBER(10) NOT NULL,
+  "BayiId"  NUMBER(10) NOT NULL,
+  "Donem"   DATE       NOT NULL,
+  CONSTRAINT PK_BAYI_PERFORMANS PRIMARY KEY ("Id"),
+  CONSTRAINT FK_PERFORMANS_BAYI FOREIGN KEY ("BayiId") REFERENCES BAYI (ID)
+);
+CREATE INDEX IX_PERFORMANS_BAYI ON "BayiPerformans" ("BayiId");
+
+-- Eski sistemden aktarılmış fiyat listesi: ilişkisi yok, PK'si sistem adlı
+CREATE TABLE ESKI_FIYAT_LISTESI (
+  URUN_KODU  VARCHAR2(30) NOT NULL,
+  FIYAT      NUMBER,
+  SON_KAMPANYA_KATILIM_ONAY_TARIHI DATE
+);
+ALTER TABLE ESKI_FIYAT_LISTESI ADD CONSTRAINT SYS_C0012345 PRIMARY KEY (URUN_KODU);
+
+-- Excel'den birebir: her metrik bir kolon
+CREATE TABLE MUSTERI_RAPOR_DUZ (
+  ID          NUMBER(18) NOT NULL,
+  MUSTERI_ID  NUMBER(18) NOT NULL,
+${METRIKLER}
+  CONSTRAINT PK_MUSTERI_RAPOR_DUZ PRIMARY KEY (ID),
+  CONSTRAINT FK_RAPOR_MUSTERI FOREIGN KEY (MUSTERI_ID) REFERENCES MUSTERI (ID)
+);
+CREATE INDEX IX_RAPOR_MUSTERI ON MUSTERI_RAPOR_DUZ (MUSTERI_ID);
+`,
+};
+
+module.exports = {
+  id: 'hatali',
+  title: 'Hatalı tasarım (DBA incelemesi)',
+  sector: 'Bayi satış',
+  dialect: 'Oracle',
+  scenario: 'Düzgün bir başlangıç şemasına üç geliştiricinin özensiz eklediği tablolar: PK\'siz tablo, metin tarih, FLOAT tutar, indekssiz FK, döngü, anahtar-değer tablosu. Tasarım denetimini denemek için.',
+  en: { title: 'Flawed design (DBA review)', sector: 'Dealer sales', scenario: 'Tables three developers carelessly added to a clean baseline: a table without a PK, text dates, FLOAT amounts, unindexed FKs, a cycle, a key-value table. For trying the design audit.' },
+  build() {
+    const files = {};
+    for (const [name, sql] of Object.entries(MIGRATIONS)) files[DIR + name] = sql;
+    return files;
+  },
+};

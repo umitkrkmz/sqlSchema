@@ -5,9 +5,10 @@
  *
  * URL parametreleri (paylaşılabilir bağlantılar ve belge görüntüleri için):
  *   ?lang=tr|en   ?sample=<örnek kimliği>   ?select=<tablo adı>   ?center=<tablo adı>   ?zoom=<1.6>   ?legend=0|1
- *   ?pop=naming|report|files|diff   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
+ *   ?pop=naming|report|files|diff|audit   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
  *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)   ?impact=1 (select ile)
  *   ?diff=V3 (migration klasöründe bu sürümle karşılaştır)   ?time=V4 (zaman çizelgesi bu sürümde; ?time=1 baştan)
+ *   ?audit=1 (tasarım denetimi haritada)
  */
 (function (NS) {
 'use strict';
@@ -122,6 +123,7 @@ function rebuild() {
   if (S.subKeys && (S.diffRes || !enterSubset(S.subKeys, S.subNeighbors))) S.subKeys = null;
   renderDiff();
   renderTimeBar();
+  refreshAudit();
   S.pick = new Set([...S.pick].filter(k => S.byKey.has(k)));
   renderPickBar();
   return true;
@@ -447,6 +449,181 @@ function namingMarkdown() {
   return out.join('\n');
 }
 
+/* ─── Tasarım denetimi ─── */
+
+// Bulgular js/audit.js'te (kod döner); burada metin, pencere, panel ve harita.
+// Denetim tembel kurulur ve görüntülenen modele bağlı saklanır: alt diyagramda tam model, karşılaştırmada "sonra" denetlenir.
+S.audit = null;      // { src, res }
+S.auditMap = false;  // haritada: en ağır bulguya göre renk; hata ve uyarısı olmayanlar geri planda
+S.auditSev = null;   // tablo → en ağır önem (render.js)
+S.auditCols = null;  // tablo → Map(KOLON → önem) (kartta satır rengi)
+const AUDIT_RULE = new Map(NS.AUDIT_RULES.map(r => [r.id, r]));
+const SEV_RANK = { error: 0, warning: 1, info: 2 };
+const SEV_KEY = { error: 'sevError', warning: 'sevWarning', info: 'sevInfo' };
+const AUDIT_GROUPS = ['keys', 'types', 'norm', 'naming'];
+
+function getAudit() {
+  const src = S.full ? S.full.model : S.model;
+  if (!src) return null;
+  if (!S.audit || S.audit.src !== src) {
+    const m = S.diffRes ? { ...src, tables: src.tables.filter(tb => S.diffRes.byAfter.has(tb)) } : src;
+    S.audit = { src, res: NS.auditModel(m) };
+    applyAuditMap();
+  }
+  return S.audit.res;
+}
+
+function applyAuditMap() {
+  S.auditSev = S.auditCols = null;
+  const a = S.auditMap && S.audit && S.audit.res;
+  if (a) {
+    S.auditSev = new Map();
+    S.auditCols = new Map();
+    const worse = (m, k, sev) => { if (!m.has(k) || SEV_RANK[sev] < SEV_RANK[m.get(k)]) m.set(k, sev); };
+    for (const [tb, fs] of a.byTable) {
+      for (const f of fs) {
+        worse(S.auditSev, tb, f.severity);
+        const cols = f.col ? f.col.split(', ') : f.data.cols || [];
+        if (!cols.length) continue;
+        if (!S.auditCols.has(tb)) S.auditCols.set(tb, new Map());
+        for (const c of cols) worse(S.auditCols.get(tb), c.toUpperCase(), f.severity);
+      }
+    }
+  }
+  for (const tb of (S.model ? S.model.tables : [])) tb._rows = null;
+}
+
+// Görüntülenen model değişince (rebuild, alt diyagram, zaman adımı): harita ve açık pencere yeni modelle
+function refreshAudit() {
+  if (!S.auditMap && $('#auditPop').hidden) { S.auditSev = S.auditCols = null; return; }
+  getAudit();
+  renderAudit();
+}
+
+function setAuditMap(on) {
+  S.auditMap = on;
+  getAudit();
+  applyAuditMap();
+  renderAudit();
+  renderPanel();
+  invalidate();
+}
+
+// Kural metinlerinin değişkenleri: tablo nesneleri ada, listeler metne
+function auditVars(f) {
+  const d = f.data, nm = x => (x && x.name) || '';
+  const style = k => (k ? t('nk_' + d.dim + '_' + k, { n: 30 }) : '');
+  return {
+    ...d, col: f.col, parent: nm(d.parent), ref: nm(d.ref),
+    cols: (d.cols || []).join(', '), names: (d.names || []).join(', '), byCols: (d.byCols || []).join(', '),
+    tables: f.tables.map(nm).join(' \u{2194} '),
+    variants: (d.variants || []).map(x => `${x.type}: ${x.tables.map(nm).join(', ')}`).join(' · '),
+    encodings: (d.encodings || []).map(e => `${e.enc} (${e.cols.map(c => c.t.name + '.' + c.c).join(', ')})`).join(' · '),
+    style: style(d.style), dominant: style(d.dominant),
+  };
+}
+const ruleText = id => t('auditRules')[id];
+const auditWhat = f => ruleText(f.rule).what(auditVars(f));
+const auditLabel = f => (f.t ? f.t.name + (f.col ? '.' + f.col : '') : f.col || '');
+const sevCounts = c => ['error', 'warning', 'info'].filter(s => c[s]).map(s => `<i class="sev-${s}">${esc(t(SEV_KEY[s], { n: c[s] }))}</i>`).join('');
+
+function renderAudit() {
+  const el = $('#auditPop');
+  if (el.hidden && !S.auditMap) return;
+  const a = getAudit();
+  if (!a) { el.innerHTML = ''; return; }
+  // yeniden çizimde açık kurallar açık kalsın (haritada göster, dil değişimi)
+  const open = new Set([...el.querySelectorAll('details[open]')].map(d => d.dataset.rule));
+  const byRule = new Map();
+  for (const f of a.findings) { if (!byRule.has(f.rule)) byRule.set(f.rule, []); byRule.get(f.rule).push(f); }
+  const groups = AUDIT_GROUPS.map(g => {
+    const rules = NS.AUDIT_RULES.filter(r => r.group === g && byRule.has(r.id));
+    if (!rules.length) return '';
+    return `<h5>${esc(t('auditGroups')[g])}</h5>${rules.map(r => {
+      const fs = byRule.get(r.id), R = ruleText(r.id), max = 40;
+      const items = fs.slice(0, max).map(f => {
+        const tb = f.t || f.tables[0], what = auditWhat(f);
+        return `<li class="sev-${f.severity}" data-go="${esc(tb.key)}"${f.t && f.col && !f.col.includes(',') ? ` data-col="${esc(f.col)}"` : ''} tabindex="0"><b>${esc(auditLabel(f))}</b>${what ? ` <span>${esc(what)}</span>` : ''}</li>`;
+      }).join('');
+      return `<details class="au-rule sev-${r.severity}" data-rule="${r.id}"${open.has(r.id) ? ' open' : ''}><summary><i class="dot"></i><b>${esc(R.title)}</b>${r.guess ? `<em>${esc(t('auditGuess'))}</em>` : ''}<span class="n">${fs.length}</span></summary>
+        <p><b>${esc(t('auditWhy'))}:</b> ${esc(R.why)}</p><p><b>${esc(t('auditFix'))}:</b> ${esc(R.fix)}</p>
+        <ul class="au-items">${items}${fs.length > max ? `<li class="more">${esc(t('auditMore', { n: fs.length - max }))}</li>` : ''}</ul></details>`;
+    }).join('')}`;
+  }).join('');
+  // en çok bulgu: hata 10, uyarı 3, bilgi 1 ağırlıkla
+  const weight = fs => fs.reduce((s, f) => s + (f.severity === 'error' ? 10 : f.severity === 'warning' ? 3 : 1), 0);
+  const worst = [...a.byTable.entries()].filter(([, fs]) => fs.some(f => f.severity !== 'info'))
+    .sort((x, y) => weight(y[1]) - weight(x[1]) || String(x[0].name).localeCompare(String(y[0].name))).slice(0, 10);
+  const skipped = a.skipped.map(s => `<p class="nn">${esc(t(s.reason === 'noIndexes' ? 'auditSkipNoIndexes' : 'auditNone'))}</p>`).join('');
+  el.innerHTML = `<h4>${esc(t('auditTitle'))}</h4>
+    <p class="intro">${esc(t('auditIntro'))}</p>
+    <p class="au-sum">${esc(t('auditSummary', a))}</p>
+    <p class="au-chips">${sevCounts(a.counts) || `<span class="nn">${esc(t('auditNone'))}</span>`}</p>
+    ${skipped}${groups}
+    ${worst.length > 1 ? `<h5>${esc(t('auditWorst'))}</h5><ul class="au-items au-worst">${worst.map(([tb, fs]) => {
+      const c = { error: 0, warning: 0, info: 0 };
+      for (const f of fs) c[f.severity]++;
+      return `<li data-go="${esc(tb.key)}" tabindex="0"><b>${esc(tb.name)}</b><span class="au-chips">${sevCounts(c)}</span></li>`;
+    }).join('')}</ul>` : ''}
+    <div class="df-row">
+      ${a.findings.length ? `<button class="btn sm ${S.auditMap ? '' : 'ghost'}" data-act="audit-map">${esc(t(S.auditMap ? 'auditMapOff' : 'auditMap'))}</button>
+      <button class="btn sm ghost" data-act="audit-md">${esc(t('namingMd'))}</button>` : ''}
+    </div>`;
+}
+
+$('#auditPop').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (b) {
+    e.stopPropagation();
+    if (b.dataset.act === 'audit-map') setAuditMap(!S.auditMap);
+    else if (b.dataset.act === 'audit-md') downloadText(auditMarkdown(), fileStem() + '-' + t('auditFile') + '.md', 'text/markdown;charset=utf-8');
+    return;
+  }
+  const li = e.target.closest('li[data-go]');
+  if (!li) return;
+  const tb = S.byKey.get(li.dataset.go);
+  if (tb) select(tb, { fly: true, col: li.dataset.col || null });
+});
+$('#auditPop').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.matches('li[data-go]')) e.target.click();
+});
+
+// Panel: seçili tablonun bulguları (kapalı başlar; haritada gösterilirken açık)
+function auditPanelHtml(tb) {
+  const a = getAudit();
+  const fs = a && a.byTable.get(tb);
+  if (!fs || !fs.length) return '';
+  const c = { error: 0, warning: 0, info: 0 };
+  for (const f of fs) c[f.severity]++;
+  return `<section class="auditsec"><details${S.auditMap ? ' open' : ''}><summary><h3>${esc(t('auditHead'))} <span class="au-chips">${sevCounts(c)}</span></h3></summary>
+    <ul class="au-items">${fs.map(f => {
+      const R = ruleText(f.rule), what = auditWhat(f);
+      const where = f.t === tb ? f.col : f.col || '';
+      return `<li class="sev-${f.severity}"><b>${esc(R.title)}</b>${where ? ` <code>${esc(where)}</code>` : ''}${what ? ` <span>${esc(what)}</span>` : ''}<small>${esc(t('auditFix'))}: ${esc(R.fix)}</small></li>`;
+    }).join('')}</ul></details></section>`;
+}
+
+// İnceleme belgesi: kural kural, ne / neden / öneri ve bütün bulgular
+function auditMarkdown() {
+  const a = getAudit();
+  const code = s => '`' + String(s).replace(/`/g, "'") + '`';
+  const out = [`# ${t('auditTitle')} · ${S.title || ''}`, '', t('auditSummary', a), '',
+    ['error', 'warning', 'info'].filter(s => a.counts[s]).map(s => t(SEV_KEY[s], { n: a.counts[s] })).join(' · '), ''];
+  for (const s of a.skipped) out.push('> ' + t(s.reason === 'noIndexes' ? 'auditSkipNoIndexes' : 'auditNone'), '');
+  for (const g of AUDIT_GROUPS) {
+    const rules = NS.AUDIT_RULES.filter(r => r.group === g && a.findings.some(f => f.rule === r.id));
+    if (!rules.length) continue;
+    out.push(`## ${t('auditGroups')[g]}`, '');
+    for (const r of rules) {
+      const fs = a.findings.filter(f => f.rule === r.id), R = ruleText(r.id);
+      out.push(`### ${R.title} (${fs.length})${r.guess ? ' · ' + t('auditGuess') : ''}`, '', `**${t('auditWhy')}:** ${R.why}`, '', `**${t('auditFix')}:** ${R.fix}`, '');
+      for (const f of fs) { const what = auditWhat(f), label = auditLabel(f); out.push(`- ${label ? code(label) : ''}${label && what ? ' ' : ''}${what}`); }
+      out.push('');
+    }
+  }
+  return out.join('\n');
+}
+
 function downloadText(text, name, type) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type }));
@@ -596,6 +773,7 @@ function afterLayout() {
   renderList();
   renderNaming();
   renderPickBar();
+  refreshAudit();
   resetHud();
   fitView(true);
 }
@@ -1085,6 +1263,7 @@ function timeGo(i) {
   if (!$('#namingPop').hidden) renderNaming();
   if (!$('#report').hidden) renderReport();
   renderTimeBar();
+  refreshAudit();
   resetHud();
   invalidate();
 }
@@ -1395,6 +1574,7 @@ function renderPanel() {
     <div class="p-body">
       ${diffPanelHtml(tb)}
       ${timeHistoryHtml(tb)}
+      ${auditPanelHtml(tb)}
       ${S.impactRes && S.impactRes.root === tb ? impactHtml(S.impactRes) : ''}
       <section>
         <h3>${esc(t(mongo ? 'fields' : 'columns'))} <span>${tb.columns.length}</span></h3>
@@ -1646,7 +1826,7 @@ let appendNext = false;
 fileInput.addEventListener('change', () => { loadEntries(fromInput(fileInput), appendNext); appendNext = false; fileInput.value = ''; });
 folderInput.addEventListener('change', () => { loadEntries(fromInput(folderInput), false); folderInput.value = ''; });
 
-const popovers = ['#sampleMenu', '#viewMenu', '#report', '#filesPop', '#namingPop', '#diffPop'];
+const popovers = ['#sampleMenu', '#viewMenu', '#report', '#filesPop', '#namingPop', '#diffPop', '#auditPop'];
 function togglePop(sel) {
   for (const p of popovers) $(p).hidden = p === sel ? !$(p).hidden : true;
 }
@@ -1670,6 +1850,7 @@ document.addEventListener('click', e => {
     case 'report': togglePop('#report'); break;
     case 'files': togglePop('#filesPop'); break;
     case 'naming': togglePop('#namingPop'); break;
+    case 'audit': togglePop('#auditPop'); renderAudit(); break;
     case 'diff': togglePop('#diffPop'); break;
     case 'naming-md': if (S.model) downloadText(namingMarkdown(), fileStem() + '-' + t('namingFile') + '.md', 'text/markdown;charset=utf-8'); break;
     case 'list-close': setList(false); break;
@@ -1790,6 +1971,7 @@ NS.onLangChange(() => {
     renderDiff();
     $('#timeBar').innerHTML = '';
     renderTimeBar();
+    renderAudit();
     resetHud();
   }
   if (S.title && S.files.length > 1 && /^\d+ /.test(S.title)) $('#fileName').textContent = t('nFiles', { n: S.files.filter(f => f.text != null).length });
@@ -1878,8 +2060,10 @@ if (params.get('sample')) {
     } else if (zoom > 0) {
       S.cam.k = zoom;
     }
-    const pop = { naming: '#namingPop', report: '#report', files: '#filesPop', diff: '#diffPop' }[params.get('pop')];
-    if (pop) togglePop(pop);
+    // ?audit=1: denetim haritada
+    if (params.get('audit') === '1') setAuditMap(true);
+    const pop = { naming: '#namingPop', report: '#report', files: '#filesPop', diff: '#diffPop', audit: '#auditPop' }[params.get('pop')];
+    if (pop) { togglePop(pop); if (pop === '#auditPop') renderAudit(); }
     invalidate();
   });
 }

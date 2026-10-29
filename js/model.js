@@ -183,7 +183,7 @@ function buildModel(inputs, opts = {}) {
   function mk(db, schema, name, external) {
     const t = {
       id: nextId++, key: keyOf(db, schema, name), db, schema: schema || '', name,
-      columns: [], colIdx: new Map(), pk: [], pkName: null, uniques: [], comment: null,
+      columns: [], colIdx: new Map(), pk: [], pkName: null, uniques: [], indexes: [], comment: null,
       external: !!external, embedded: false, junction: false, dialect: null,
       out: [], inc: [], fkDefs: [], colRenames: new Map(), src: null, files: [],
     };
@@ -256,7 +256,7 @@ function buildModel(inputs, opts = {}) {
     let t = tables.get(key);
     if (t && !t.external && !t.dropped) {
       warnings.push({ kind: 'dup', name: t.name, a: where(t.src), b: where(op) });
-      t.columns = []; t.colIdx = new Map(); t.pk = []; t.pkName = null; t.uniques = []; t.fkDefs = [];
+      t.columns = []; t.colIdx = new Map(); t.pk = []; t.pkName = null; t.uniques = []; t.indexes = []; t.fkDefs = [];
     }
     if (!t || t.dropped) t = mk(input.db, schema, n);
     t.external = false;
@@ -302,7 +302,10 @@ function buildModel(inputs, opts = {}) {
         for (const c of op.cols) { const col = getCol(t, c); if (col) { col.pk = true; col.nullable = false; } }
         break;
       case 'uq':
-        t.uniques.push({ cols: op.cols.slice(), name: op.name || null });
+        t.uniques.push({ cols: op.cols.slice(), name: op.name || null, index: !!op.index });
+        break;
+      case 'index':
+        t.indexes.push({ cols: op.cols.slice(), name: op.name || null });
         break;
       case 'addcol':
         addCol(t, op.col);
@@ -315,6 +318,7 @@ function buildModel(inputs, opts = {}) {
         const gone = x => U(x) === U(op.col);
         t.pk = t.pk.filter(x => !gone(x));
         t.uniques = t.uniques.filter(u => !u.cols.some(gone));
+        t.indexes = t.indexes.filter(u => !u.cols.some(gone));
         t.fkDefs = t.fkDefs.filter(f => !f.cols.some(gone));
         break;
       }
@@ -327,7 +331,7 @@ function buildModel(inputs, opts = {}) {
         t.colRenames.set(U(op.col), op.to);
         const ren = x => (U(x) === U(op.col) ? op.to : x);
         t.pk = t.pk.map(ren);
-        for (const u of t.uniques) u.cols = u.cols.map(ren);
+        for (const u of t.uniques.concat(t.indexes)) u.cols = u.cols.map(ren);
         for (const f of t.fkDefs) f.cols = f.cols.map(ren);
         break;
       }
@@ -468,7 +472,7 @@ function buildModel(inputs, opts = {}) {
         else parent = find(t.db, parts, t.schema);
       } else parent = find(t.db, parts, t.schema);
       if (!parent || parent.dropped || (col && !getCol(parent, col)) || (!col && parent.pk.length !== 1)) {
-        warnings.push({ kind: 'ref', name: t.name + '.' + c.name, target: m[1] });
+        warnings.push({ kind: 'ref', name: t.name + '.' + c.name, target: m[1], t, col: c.name });
         continue;
       }
       const refCol = col ? getCol(parent, col).name : parent.pk[0];

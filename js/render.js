@@ -109,6 +109,8 @@ function cardRows(t) {
   // karşılaştırmada kolon durumu (eklenen / değişen / adı değişen satırlar renklenir)
   const de = S.diffRes && diffOf(t);
   t._diffCols = de && de.status === 'changed' ? new Map(de.cols.filter(c => c.after).map(c => [c.after.name.toUpperCase(), c.status])) : null;
+  // denetim haritadayken bulgusu olan kolon satırları
+  t._auditCols = !S.diffRes && S.auditCols ? S.auditCols.get(t) || null : null;
   t._rowIdx = new Map(t._rows.map((c, i) => [c.name.toUpperCase(), i]));
   t._h = CARD.head + Math.max(1, t._rows.length) * CARD.row + (t._more > 0 ? CARD.row : 0) + CARD.pad;
   return t._rows;
@@ -279,6 +281,8 @@ function nodeAlpha(t) {
   if (em.active && !em.near.has(t)) return 0.3;
   // karşılaştırmada değişmeyen tablolar geri planda
   if (S.diffRes) { const d = diffOf(t); if (!d || d.status === 'same') return 0.35; }
+  // denetim haritada: hata ve uyarısı olmayan tablolar geri planda
+  else if (S.auditSev) { const sev = S.auditSev.get(t); if (!sev || sev === 'info') return 0.35; }
   return 1;
 }
 
@@ -286,6 +290,10 @@ function nodeAlpha(t) {
 const DIFF_COLOR = { added: '#7fd49a', removed: '#ef7b86', changed: '#f2b45a', renamed: '#6cc6dc' };
 const diffOf = t => S.diffRes && (S.diffRes.byAfter.get(t) || S.diffRes.byBefore.get(t));
 const diffColor = t => { const d = diffOf(t); return d && d.status !== 'same' ? DIFF_COLOR[d.status] : null; };
+
+// Tasarım denetimi: hata kırmızı, uyarı sarı (bilgi renk almaz)
+const AUDIT_COLOR = { error: '#ef7b86', warning: '#f2b45a', info: '#6cc6dc' };
+const auditColor = t => { const s = !S.diffRes && S.auditSev && S.auditSev.get(t); return s && s !== 'info' ? AUDIT_COLOR[s] : null; };
 
 function relClass(r) {
   const em = S.em;
@@ -638,7 +646,7 @@ function drawStars(lv) {
     if (t.x < v.x0 || t.x > v.x1 || t.y < v.y0 || t.y > v.y1) continue;
     const a = nodeAlpha(t);
     const x = sx(t.x), y = sy(t.y), r = starR(t);
-    const col = diffColor(t) || schemaColor(t);
+    const col = diffColor(t) || auditColor(t) || schemaColor(t);
     ctx.globalAlpha = a * (t.deg === 0 ? 0.6 : 1);
     if (t === em.active || t === S.sel) {
       const g = ctx.createRadialGradient(x, y, 0, x, y, r * 5);
@@ -794,7 +802,7 @@ function drawCards() {
     const rows = cardRows(t);
     const W = CARD.w * k, H = t._h * k;
     const x0 = sx(t.x) - W / 2, y0 = sy(t.y) - H / 2;
-    const col = diffColor(t) || schemaColor(t);
+    const col = diffColor(t) || auditColor(t) || schemaColor(t);
     const a = nodeAlpha(t);
     const isSel = t === S.sel, isAct = t === em.active;
     ctx.globalAlpha = a;
@@ -843,6 +851,8 @@ function drawCards() {
       if (hl) { ctx.fillStyle = 'rgba(242,180,90,0.16)'; ctx.fillRect(x0 + 1, y - rowH / 2, W - 2, rowH); }
       const ds = t._diffCols && t._diffCols.get(c.name.toUpperCase());
       if (ds) { ctx.fillStyle = rgba(DIFF_COLOR[ds === 'added' ? 'added' : ds === 'renamed' ? 'renamed' : 'changed'], 0.16); ctx.fillRect(x0 + 1, y - rowH / 2, W - 2, rowH); }
+      const as = !ds && t._auditCols && t._auditCols.get(c.name.toUpperCase());
+      if (as) { ctx.fillStyle = rgba(AUDIT_COLOR[as], as === 'info' ? 0.1 : 0.16); ctx.fillRect(x0 + 1, y - rowH / 2, W - 2, rowH); }
       const tag = keyTag(t, c);
       ctx.textAlign = 'left';
       if (tag) {

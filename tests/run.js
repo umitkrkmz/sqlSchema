@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'files', 'model', 'diff', 'layout', 'conventions', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
+for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'files', 'model', 'diff', 'layout', 'conventions', 'audit', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
 require(path.join(ROOT, 'samples', 'catalog.js'));
 const NS = globalThis.sqlSchema;
 
@@ -269,6 +269,41 @@ const EXPECT = {
     check('sozluk: veri satırları sayıldı, INSERT raporda kalır', m.stats.dataRows === 42 && m.stats.skipped.some(([k, n]) => k === 'INSERT' && n === 42), [m.stats.dataRows, m.stats.skipped]);
     check('sozluk: TIP_ID kolonları SOZLUK_TIP\'e tahmin edilmez', !m.rels.some(r => r.kind === 'implicit'), m.rels.filter(r => r.kind === 'implicit').map(r => r.child.name + '.' + r.cols[0]));
   },
+  hatali({ model: m, migration }, all) {
+    check('hatali: Flyway tanındı, 14 tablo', migration === 'Flyway' && m.stats.tables === 14, [migration, m.stats.tables]);
+    const a = NS.auditModel(m);
+    const got = a.findings.map(f => `${f.rule} ${f.t ? f.t.name : f.tables.map(t => t.name).join('+')}${f.col ? '.' + f.col : ''}`);
+    const want = [
+      'no-pk KAMPANYA_KATILIM', 'fk-type-mismatch KAMPANYA_KATILIM.MUSTERI_ID', 'ref-broken MUSTERI.SEGMENT_KOD',
+      'fk-missing URUN.URUN_GRUBU_ID', 'fk-no-index KAMPANYA_KATILIM.KAMPANYA_ID', 'fk-no-index KAMPANYA_KATILIM.MUSTERI_ID',
+      'fk-no-index SIPARIS.KAMPANYA_ID', 'fk-cycle BAYI+BOLGE', 'duplicate-index MUSTERI_NOTU.MUSTERI_REF',
+      'disabled-fk SIPARIS.KAMPANYA_ID', 'orphan-table ESKI_FIYAT_LISTESI', 'date-as-text KAMPANYA.BASLANGIC_TAR',
+      'date-as-text KAMPANYA.BITIS_TAR', 'money-as-float KAMPANYA.INDIRIM_TUTARI', 'number-as-text KAMPANYA.KATILIMCI_ADEDI',
+      'oversized-text KAMPANYA', 'char-for-variable MUSTERI', 'same-name-diff-type SIPARIS+KAMPANYA.DURUM',
+      'number-no-precision ESKI_FIYAT_LISTESI', 'lob-for-short MUSTERI_NOTU', 'bool-inconsistent BAYI+KAMPANYA+MUSTERI_NOTU',
+      'repeating-group MUSTERI', 'delimited-list KAMPANYA.HEDEF_SEGMENT_IDS', 'eav-pattern MUSTERI_OZELLIK',
+      'wide-table MUSTERI_RAPOR_DUZ', 'name-too-long ESKI_FIYAT_LISTESI.SON_KAMPANYA_KATILIM_ONAY_TARIHI',
+      'reserved-word MUSTERI_NOTU.COMMENT', 'non-ascii-name KAMPANYA', 'pk-style URUN_GRUBU.URUN_GRUBU_ID',
+      'fk-style MUSTERI_NOTU.MUSTERI_REF', 'naming-case BayiPerformans', 'naming-case BayiPerformans.BayiId',
+      'naming-case BayiPerformans.Donem', 'naming-case BayiPerformans.Id', 'system-name ESKI_FIYAT_LISTESI',
+    ];
+    check('hatali denetim: bulgu listesi birebir', same(got, want), got.filter(x => !want.includes(x)).concat(want.filter(x => !got.includes(x)).map(x => '-' + x)));
+    check('hatali denetim: her kural en az bir kez', NS.AUDIT_RULES.every(r => a.findings.some(f => f.rule === r.id)), NS.AUDIT_RULES.filter(r => !a.findings.some(f => f.rule === r.id)).map(r => r.id));
+    check('hatali denetim: sayılar ve temiz tablolar', same(a.counts, { error: 7, warning: 20, info: 8 }) && a.clean === 3 && !a.skipped.length, [a.counts, a.clean]);
+    const bi = a.findings.find(f => f.rule === 'bool-inconsistent');
+    check('hatali denetim: mantıksal kodlamalar', same(bi.data.encodings.map(e => e.enc), ['E/H', 'Y/N', 'NUMBER(1)']), bi.data.encodings.map(e => e.enc));
+    check('hatali denetim: tabloya göre bulgular', a.byTable.get(find(m, 'KAMPANYA')).length === 9 && !a.byTable.has(find(m, 'SIPARIS_KALEM')), a.byTable.get(find(m, 'KAMPANYA')).map(f => f.rule));
+    // indeks işlemi: benzersiz olmayan indeks modelde, kolonu silinince indeks de gider
+    check('hatali: indeksler modelde', find(m, 'MUSTERI_NOTU').indexes.length === 2 && find(m, 'SIPARIS').indexes.length === 2);
+    // mevcut örneklerde yanlış alarm makul
+    const at = NS.auditModel(all.telekom.model), ab = NS.auditModel(all.banka.model);
+    check('telekom denetim: metin tarih yok', !at.findings.some(f => f.rule === 'date-as-text'));
+    check('banka denetim: PK stili bulgusu yok, hata yok', !ab.findings.some(f => f.rule === 'pk-style') && ab.counts.error === 0, ab.counts);
+    check('saha denetim: SQLite metin tarihi sayılmaz', !NS.auditModel(all.saha.model).findings.some(f => f.rule === 'date-as-text'));
+    check('denetim: MongoDB örneğinde bulgu yok', !NS.auditModel(all.sosyal.model).findings.length);
+    const ad = NS.auditModel(all.eticaret.model);
+    check('eticaret denetim: dökümde indeks yoksa FK indeksi denetlenmez', ad.skipped.some(x => x.rule === 'fk-no-index'));
+  },
   karisik({ model: m }) {
     const p = NS.namingProfile(m);
     check('karisik: 25 tablo, 29 FK', p.tables === 25 && p.fks === 29, [p.tables, p.fks]);
@@ -411,6 +446,10 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   }
   const missing = [...used].filter(k => !en.has(k) || !tr.has(k));
   check('i18n: kullanılan her anahtar iki dilde de var', !missing.length, missing);
+  // denetim kurallarının metni: her kural iki dilde başlık, neden, öneri ve ayrıntı işleviyle
+  const ruleText = l => NS.i18nRaw(l, 'auditRules');
+  const noText = ['tr', 'en'].flatMap(l => NS.AUDIT_RULES.filter(r => { const x = ruleText(l)[r.id]; return !x || !x.title || !x.why || !x.fix || typeof x.what !== 'function'; }).map(r => l + ':' + r.id));
+  check('i18n: her denetim kuralının metni iki dilde', !noText.length, noText);
   check('i18n: Node ortamında varsayılan dil seçildi', NS.LANGS.includes(NS.getLang()), NS.getLang());
 }
 
