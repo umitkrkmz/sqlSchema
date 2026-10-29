@@ -784,12 +784,14 @@ function drawCards() {
     ctx.font = `600 ${10 * k}px ${FONT_SANS}`;
     ctx.fillStyle = C.text;
     const badge = t.junction ? 'M:N' : t.external ? tr('badgeExt') : t.embedded ? tr('badgeSat') : '';
-    ctx.fillText(fitText(t.name, W - (badge ? 50 : 22) * k), x0 + 16 * k, y0 + CARD.head * k / 2 + 0.5);
-    if (badge) {
+    // kolonlar gizliyken başlıkta kolon sayısı: kartın ne kadar dolu olduğu yine görünsün
+    const right = [badge, !S.columns && t.columns.length ? String(t.columns.length) : ''].filter(Boolean).join(' · ');
+    ctx.fillText(fitText(t.name, W - (right ? 50 : 22) * k), x0 + 16 * k, y0 + CARD.head * k / 2 + 0.5);
+    if (right) {
       ctx.font = `500 ${7.5 * k}px ${FONT_MONO}`;
       ctx.textAlign = 'right';
-      ctx.fillStyle = rgba(col, 0.9);
-      ctx.fillText(badge, x0 + W - 6 * k, y0 + CARD.head * k / 2 + 0.5);
+      ctx.fillStyle = badge ? rgba(col, 0.9) : C.dim;
+      ctx.fillText(right, x0 + W - 6 * k, y0 + CARD.head * k / 2 + 0.5);
     }
     // satırlar
     const rowH = CARD.row * k;

@@ -592,7 +592,9 @@ function trailHtml() {
   for (let i = from; i < to; i++) {
     const tb = S.byKey.get(S.history[i]);
     if (!tb) continue;
-    items.push(`<li class="${i === S.histPos ? 'cur' : i > S.histPos ? 'fwd' : ''}"><button data-hist="${i}" ${i === S.histPos ? 'aria-current="true"' : ''}>${esc(tb.name)}</button></li>`);
+    // dar panelde ad kısalır; tam ad ve şema ipucunda
+    const full = (tb.schema ? tb.schema + '.' : '') + tb.name;
+    items.push(`<li class="${i === S.histPos ? 'cur' : i > S.histPos ? 'fwd' : ''}"><button data-hist="${i}" title="${esc(full)}" ${i === S.histPos ? 'aria-current="true"' : ''}>${esc(tb.name)}</button></li>`);
   }
   if (to < S.history.length) items.push('<li class="gap">…</li>');
   return `<nav class="trail" aria-label="${esc(t('trailLabel'))}">

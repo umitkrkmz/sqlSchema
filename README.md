@@ -278,6 +278,19 @@ Migration'lar baştan sona uygulanır ve harita şemanın **son hâlini** göste
 | `CREATE UNIQUE INDEX` (1:1 tespiti) | ✓ | ✓ | ✓ | ✓ | ✓ | |
 | Tablo / kolon açıklamaları | `COMMENT ON` | `sp_addextendedproperty` | `COMMENT '…'` | `COMMENT ON` | | |
 
+**Veritabanı türü nasıl anlaşılır.** Seçmeniz gerekmez; her dosyada yalnızca o veritabanına **özgü** ifadeler sayılır ve en çok puan alan seçilir:
+
+| Veritabanı | Bakılan ipuçları |
+|---|---|
+| Oracle | `VARCHAR2`, `NUMBER(…)`, `TABLESPACE`, `SYSDATE`, `PCTFREE`, `NOVALIDATE`, satırda tek başına `/` |
+| SQL Server | `[dbo]`, satırda tek başına `GO`, `NVARCHAR`, `IDENTITY(…)`, `CLUSTERED`, `DATETIME2`, `sp_addextendedproperty` |
+| MySQL / MariaDB | `` `ters tırnak` ``, `ENGINE=`, `AUTO_INCREMENT`, `DEFAULT CHARSET`, `UNSIGNED`; MariaDB döküm başlığından |
+| PostgreSQL | `SERIAL`, `::tip`, `$$`, `TIMESTAMPTZ`, `JSONB`, `OWNER TO`, `character varying`, `ALTER TABLE ONLY` |
+| SQLite | `AUTOINCREMENT`, `WITHOUT ROWID`, `PRAGMA` |
+| Cassandra | `.cql` uzantısı, `CREATE KEYSPACE`, `WITH CLUSTERING ORDER`, `frozen<`, `map<` |
+
+`DATE`, `INTEGER`, `VARCHAR` gibi her veritabanında bulunan tipler ayırt etmeye yaramadığı için sayılmaz. İpucu taşımayan sade bir `CREATE TABLE` dosyası, aynı klasördeki dosyaların baskın türünü alır. MongoDB dosyaları uzantıdan ve içerikten (`$jsonSchema`, `new Schema(…)`, JSON belgeleri) tanınır.
+
 **Çizime girmeyenler.** View, sequence, trigger, package, procedure, function, type, grant ve `INSERT` raporda sayılır ama çizilmez (`INSERT … VALUES` satırları yalnızca [sözlük değerleri](#tr-haritayi-okumak) için okunur). Ayrıştırıcı bunların içindeki `;` işaretlerine takılmaz:
 - PL/SQL blokları `/` satırına kadar bütün tutulur.
 - T-SQL blokları `GO` satırına kadar bütün tutulur.
@@ -737,6 +750,19 @@ Migrations are applied from first to last, and the map shows the **final state**
 | Renames and drops | `RENAME`, `DROP` | `sp_rename`, `DROP` | `RENAME TABLE`, `DROP` | `RENAME`, `DROP` | `RENAME`, `DROP` | |
 | `CREATE UNIQUE INDEX` (1:1 detection) | ✓ | ✓ | ✓ | ✓ | ✓ | |
 | Table / column comments | `COMMENT ON` | `sp_addextendedproperty` | `COMMENT '…'` | `COMMENT ON` | | |
+
+**How the database type is recognised.** You do not have to choose it; each file is scored only on expressions **specific** to one database, and the highest score wins:
+
+| Database | Hints looked for |
+|---|---|
+| Oracle | `VARCHAR2`, `NUMBER(…)`, `TABLESPACE`, `SYSDATE`, `PCTFREE`, `NOVALIDATE`, a `/` on its own line |
+| SQL Server | `[dbo]`, `GO` on its own line, `NVARCHAR`, `IDENTITY(…)`, `CLUSTERED`, `DATETIME2`, `sp_addextendedproperty` |
+| MySQL / MariaDB | `` `backticks` ``, `ENGINE=`, `AUTO_INCREMENT`, `DEFAULT CHARSET`, `UNSIGNED`; MariaDB from the dump header |
+| PostgreSQL | `SERIAL`, `::type`, `$$`, `TIMESTAMPTZ`, `JSONB`, `OWNER TO`, `character varying`, `ALTER TABLE ONLY` |
+| SQLite | `AUTOINCREMENT`, `WITHOUT ROWID`, `PRAGMA` |
+| Cassandra | the `.cql` extension, `CREATE KEYSPACE`, `WITH CLUSTERING ORDER`, `frozen<`, `map<` |
+
+Types found in every database, such as `DATE`, `INTEGER` or `VARCHAR`, cannot tell databases apart and are not counted. A plain `CREATE TABLE` file without hints takes the dominant type of the other files in its folder. MongoDB files are recognised by extension and content (`$jsonSchema`, `new Schema(…)`, JSON documents).
 
 **Not drawn.** Views, sequences, triggers, packages, procedures, functions, types, grants and `INSERT`s are counted in the report but not drawn (`INSERT … VALUES` rows are read only for [lookup values](#en-reading)). The parser does not trip over the `;` inside them:
 - PL/SQL blocks are kept whole up to the `/` line.
