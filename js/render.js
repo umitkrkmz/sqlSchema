@@ -106,6 +106,9 @@ function cardRows(t) {
   t._more = ordered.length - t._rows.length;
   // kolon → bağlandığı sözlük tablosu (kartta tip yerine rozet)
   t._dict = new Map(t.out.filter(r => r.dict && r.cols.length === 1).map(r => [r.cols[0].toUpperCase(), r.parent.name]));
+  // karşılaştırmada kolon durumu (eklenen / değişen / adı değişen satırlar renklenir)
+  const de = S.diffRes && diffOf(t);
+  t._diffCols = de && de.status === 'changed' ? new Map(de.cols.filter(c => c.after).map(c => [c.after.name.toUpperCase(), c.status])) : null;
   t._rowIdx = new Map(t._rows.map((c, i) => [c.name.toUpperCase(), i]));
   t._h = CARD.head + Math.max(1, t._rows.length) * CARD.row + (t._more > 0 ? CARD.row : 0) + CARD.pad;
   return t._rows;
@@ -274,8 +277,15 @@ function nodeAlpha(t) {
   const em = S.em;
   if (em.focus && !em.focus.has(t)) return 0.07;
   if (em.active && !em.near.has(t)) return 0.3;
+  // karşılaştırmada değişmeyen tablolar geri planda
+  if (S.diffRes) { const d = diffOf(t); if (!d || d.status === 'same') return 0.35; }
   return 1;
 }
+
+// Şema farkı: eklenen yeşil, silinen kırmızı, değişen sarı; adı değişen ayrıca mavi halka
+const DIFF_COLOR = { added: '#7fd49a', removed: '#ef7b86', changed: '#f2b45a', renamed: '#6cc6dc' };
+const diffOf = t => S.diffRes && (S.diffRes.byAfter.get(t) || S.diffRes.byBefore.get(t));
+const diffColor = t => { const d = diffOf(t); return d && d.status !== 'same' ? DIFF_COLOR[d.status] : null; };
 
 function relClass(r) {
   const em = S.em;
@@ -628,7 +638,7 @@ function drawStars(lv) {
     if (t.x < v.x0 || t.x > v.x1 || t.y < v.y0 || t.y > v.y1) continue;
     const a = nodeAlpha(t);
     const x = sx(t.x), y = sy(t.y), r = starR(t);
-    const col = schemaColor(t);
+    const col = diffColor(t) || schemaColor(t);
     ctx.globalAlpha = a * (t.deg === 0 ? 0.6 : 1);
     if (t === em.active || t === S.sel) {
       const g = ctx.createRadialGradient(x, y, 0, x, y, r * 5);
@@ -677,6 +687,8 @@ function drawStars(lv) {
     if (S.pick.has(t.key)) drawPickRing(x, y, r + 4);
     const d = S.impactDepth && S.impactDepth.get(t);
     if (d) drawPickRing(x, y, r + 4, impactColor(d));
+    const dd = S.diffRes && diffOf(t);
+    if (dd && dd.renamed) drawPickRing(x, y, r + 4, DIFF_COLOR.renamed);
   }
   ctx.globalAlpha = 1;
   if (S.sel) drawReticle(sx(S.sel.x), sy(S.sel.y), starR(S.sel) + 7);
@@ -782,7 +794,7 @@ function drawCards() {
     const rows = cardRows(t);
     const W = CARD.w * k, H = t._h * k;
     const x0 = sx(t.x) - W / 2, y0 = sy(t.y) - H / 2;
-    const col = schemaColor(t);
+    const col = diffColor(t) || schemaColor(t);
     const a = nodeAlpha(t);
     const isSel = t === S.sel, isAct = t === em.active;
     ctx.globalAlpha = a;
@@ -829,6 +841,8 @@ function drawCards() {
     for (const c of rows) {
       const hl = isSel && S.selCol && c.name.toUpperCase() === S.selCol;
       if (hl) { ctx.fillStyle = 'rgba(242,180,90,0.16)'; ctx.fillRect(x0 + 1, y - rowH / 2, W - 2, rowH); }
+      const ds = t._diffCols && t._diffCols.get(c.name.toUpperCase());
+      if (ds) { ctx.fillStyle = rgba(DIFF_COLOR[ds === 'added' ? 'added' : ds === 'renamed' ? 'renamed' : 'changed'], 0.16); ctx.fillRect(x0 + 1, y - rowH / 2, W - 2, rowH); }
       const tag = keyTag(t, c);
       ctx.textAlign = 'left';
       if (tag) {

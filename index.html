@@ -143,11 +143,13 @@
     <span id="hudView"></span>
     <span id="hudStats"></span>
     <button class="link" id="hudFiles" data-act="files" hidden></button>
+    <button class="link" data-act="diff" data-i18n="diffLink"></button>
     <button class="link" data-act="naming" data-i18n="naming"></button>
     <button class="link" data-act="report" data-i18n="report"></button>
   </div>
   <div id="report" class="report pop" hidden></div>
   <div id="namingPop" class="report naming-pop pop" hidden></div>
+  <div id="diffPop" class="report diff-pop pop" hidden></div>
   <div id="filesPop" class="report files-pop pop" hidden></div>
 
   <div id="toast" class="toast" role="status" hidden></div>
@@ -168,6 +170,8 @@
 <input type="file" id="file" multiple accept=".sql,.ddl,.txt,.pls,.pks,.pkb,.tab,.cql,.js,.mjs,.cjs,.ts,.json,.jsonl,.ndjson" hidden>
 <input type="file" id="folder" webkitdirectory multiple hidden>
 <input type="file" id="viewFile" accept=".json,application/json" hidden>
+<input type="file" id="diffFile" multiple accept=".sql,.ddl,.txt,.pls,.pks,.pkb,.tab,.cql,.js,.mjs,.cjs,.ts,.json,.jsonl,.ndjson" hidden>
+<input type="file" id="diffFolder" webkitdirectory multiple hidden>
 
 <!-- Sıra önemli: her dosya globalThis.sqlSchema ad alanına ekler, sonrakiler öncekileri kullanır -->
 <script src="js/i18n.js"></script>
@@ -176,6 +180,7 @@
 <script src="js/mongo.js"></script>
 <script src="js/files.js"></script>
 <script src="js/model.js"></script>
+<script src="js/diff.js"></script>
 <script src="js/layout.js"></script>
 <script src="js/conventions.js"></script>
 <script src="js/sample-small.js"></script>

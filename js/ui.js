@@ -5,8 +5,9 @@
  *
  * URL parametreleri (paylaşılabilir bağlantılar ve belge görüntüleri için):
  *   ?lang=tr|en   ?sample=<örnek kimliği>   ?select=<tablo adı>   ?center=<tablo adı>   ?zoom=<1.6>   ?legend=0|1
- *   ?pop=naming|report|files   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
+ *   ?pop=naming|report|files|diff   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
  *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)   ?impact=1 (select ile)
+ *   ?diff=V3 (migration klasöründe bu sürümle karşılaştır)
  */
 (function (NS) {
 'use strict';
@@ -72,8 +73,21 @@ function rebuild() {
     S.model = S.lay = null;
     return false;
   }
-  S.lay = layoutModel(model, { grouping: resolveGrouping(S.grouping, migration) });
-  S.model = model;
+  // karşılaştırma açıksa: "önce" modeli kurulur, fark hesaplanır; silinen tablolar da haritada yerini alır
+  let shown = model;
+  S.diffRes = null;
+  if (S.diff) {
+    const before = buildBefore(ordered, f => (S.separate ? dbNames.get(f.path) : 'main'));
+    if (before) {
+      S.diffRes = NS.diffModels(before, model);
+      const gone = S.diffRes.tables.filter(e => e.status === 'removed').map(e => e.before);
+      shown = { ...model, tables: model.tables.concat(gone) };
+    }
+  }
+  S.lay = layoutModel(shown, { grouping: resolveGrouping(S.grouping, migration) });
+  S.model = shown;
+  // silinen tabloların "önce" ilişkileri çizilmez; yalnızca sonraki modelin ilişkileri
+  if (S.diffRes) S.relSet = new Set(model.rels);
   S.parseMs = Math.round(performance.now() - t0);
   S.order = model.tables.slice().sort((a, b) => b.deg - a.deg || String(a.name).localeCompare(String(b.name)));
   S.hover = S.sel = null;
@@ -93,8 +107,9 @@ function rebuild() {
   document.body.classList.add('loaded');
   $('#empty').hidden = true;
   fitView(false);
-  // görünüm ayarı ya da dosya seçimi değişince açık alt diyagram korunur
-  if (S.subKeys && !enterSubset(S.subKeys, S.subNeighbors)) S.subKeys = null;
+  // görünüm ayarı ya da dosya seçimi değişince açık alt diyagram korunur (karşılaştırmada alt diyagram yok)
+  if (S.subKeys && (S.diffRes || !enterSubset(S.subKeys, S.subNeighbors))) S.subKeys = null;
+  renderDiff();
   S.pick = new Set([...S.pick].filter(k => S.byKey.has(k)));
   renderPickBar();
   return true;
@@ -110,9 +125,10 @@ function guessSeparate(files) {
 // Yükleme bitince çözülen bir Promise döndürür (URL'deki ?select= için)
 function setFiles(files, title, opts = {}) {
   S.files = files;
-  // yeni dosya kümesi: önceki seçim ve alt diyagram geçersiz
+  // yeni dosya kümesi: önceki seçim, alt diyagram ve karşılaştırma geçersiz
   S.subKeys = null;
   S.pick = new Set();
+  S.diff = null;
   S.title = title;
   $('#fileName').textContent = title;
   $('#fileName').title = title;
@@ -811,6 +827,168 @@ $('#tableList').addEventListener('keydown', e => {
   listGo(from < 0 ? 0 : from + (e.key === 'ArrowDown' ? 1 : -1));
 });
 
+/* ─── Şema farkı (karşılaştırma) ─── */
+
+// "Önce" iki yoldan gelir: migration klasöründe bir sürüme kadarki dosyalar ya da ayrıca seçilen dosyalar.
+// "Sonra" her zaman açık dosyalardır. Fark js/diff.js'te; burada harita, panel ve rapor.
+S.diff = null;
+S.diffRes = null;
+
+function buildBefore(ordered, dbOf) {
+  let inputs;
+  if (S.diff.mode === 'version') {
+    const i = ordered.findIndex(f => f.path === S.diff.version);
+    if (i < 0) return null;
+    inputs = ordered.slice(0, i + 1).filter(f => f.include && f.result).map(f => ({ ...f.result, db: dbOf(f) }));
+  } else {
+    const recs = S.diff.files.filter(f => f.text != null && !f.skipReason);
+    for (const f of recs) {
+      if (f.result === undefined) { try { f.result = parseFile(f.path, f.text); } catch (err) { f.result = null; } }
+    }
+    const { files: ord } = orderFiles(recs);
+    const usable = ord.filter(f => f.result);
+    harmonizeDialects(usable.map(f => f.result));
+    const names = databaseNames(usable.map(f => f.path));
+    inputs = usable.map(f => ({ ...f.result, db: S.separate ? names.get(f.path) : 'main' }));
+  }
+  if (!inputs.length) return null;
+  return buildModel(inputs, { dictionaries: S.dictOverride });
+}
+
+function startDiff(diff) {
+  S.diff = diff;
+  S.subKeys = null;
+  S.pick = new Set();
+  if (!rebuild()) { S.diff = null; rebuild(); return; }
+  if (!S.diffRes) { toast(t('diffNoBefore'), 5000); S.diff = null; rebuild(); return; }
+  const s = S.diffRes.summary;
+  toast(t('diffSummary', s), 4000);
+}
+function stopDiff() {
+  S.diff = null;
+  rebuild();
+}
+
+// Migration klasöründeki sürüm dosyaları (karşılaştırma ve zaman çizelgesi için): son dosya hariç
+function versionFiles() {
+  return (S.ordered || []).filter(f => f.include && f.result);
+}
+const fileLabel = p => baseName(p).replace(/\.[^.]+$/, '');
+
+const DIFF_STATUS = { added: 'diffAdded', removed: 'diffRemoved', changed: 'diffChanged', renamed: 'diffRenamed' };
+
+function renderDiff() {
+  const el = $('#diffPop');
+  if (!S.model) { el.innerHTML = ''; return; }
+  if (!S.diffRes) {
+    const vers = S.migration ? versionFiles() : [];
+    const verSel = vers.length > 1 ? `<label class="df-row">${esc(t('diffVersion'))}
+      <select id="dfVersion">${vers.slice(0, -1).map((f, i) => `<option value="${esc(f.path)}" ${i === vers.length - 2 ? 'selected' : ''}>${esc(fileLabel(f.path))}</option>`).join('')}</select>
+      <button class="btn sm" data-act="diff-version">${esc(t('diffRun'))}</button></label>` : '';
+    el.innerHTML = `<h4>${esc(t('diffTitle'))}</h4>
+      <p class="intro">${esc(t('diffIntro'))}</p>
+      ${verSel}
+      <p class="df-or">${esc(t(verSel ? 'diffOrFiles' : 'diffFiles'))}</p>
+      <div class="df-row"><button class="btn sm ghost" data-act="diff-files">${esc(t('chooseFiles'))}</button><button class="btn sm ghost" data-act="diff-folder">${esc(t('chooseFolder'))}</button></div>`;
+    return;
+  }
+  const res = S.diffRes, s = res.summary;
+  const before = S.diff.mode === 'version' ? fileLabel(S.diff.version) : S.diff.title;
+  const group = (status, list) => list.length ? `<h5>${esc(t(DIFF_STATUS[status]))} <span>${list.length}</span></h5><ul class="df-list">${list.map(e => {
+    const tb = e.after || e.before;
+    const note = e.renamed ? ` <i>← ${esc(e.before.name)}</i>` : '';
+    return `<li data-go="${esc(tb.key)}" class="d-${status}"><b>${esc(tb.name)}</b>${note}<span>${esc(tb.schema || '')}</span></li>`;
+  }).join('')}</ul>` : '';
+  const by = st => res.tables.filter(e => e.status === st);
+  el.innerHTML = `<h4>${esc(t('diffTitle'))}</h4>
+    <p class="df-sides"><span>${esc(t('diffBefore'))}: <b>${esc(before)}</b></span><span>${esc(t('diffAfter'))}: <b>${esc(S.title || '')}</b></span></p>
+    <p class="df-chips"><i class="d-added">${esc(t('diffAdded'))} ${s.added}</i><i class="d-removed">${esc(t('diffRemoved'))} ${s.removed}</i><i class="d-changed">${esc(t('diffChanged'))} ${s.changed}</i><i class="d-renamed">${esc(t('diffRenamed'))} ${s.renamed}</i></p>
+    ${s.added + s.removed + s.changed ? '' : `<p class="nn">${esc(t('diffNone'))}</p>`}
+    ${group('added', by('added'))}${group('removed', by('removed'))}${group('changed', by('changed'))}
+    <div class="df-row">
+      ${s.added + s.removed + s.changed ? `<button class="btn sm ghost" data-act="diff-md">${esc(t('namingMd'))}</button>` : ''}
+      <button class="btn sm" data-act="diff-close">${esc(t('diffClose'))}</button>
+    </div>`;
+}
+
+// Panel: seçili tablonun farkı
+function diffPanelHtml(tb) {
+  const e = S.diffRes && (S.diffRes.byAfter.get(tb) || S.diffRes.byBefore.get(tb));
+  if (!e || e.status === 'same') return '';
+  const items = [];
+  if (e.renamed) items.push(`<li class="d-renamed">${esc(t('diffRenamedFrom', { name: e.before.name }))}</li>`);
+  for (const c of e.cols) items.push(`<li class="d-${c.status}">${esc(diffColText(c))}</li>`);
+  if (e.pk) items.push(`<li class="d-changed">PK: (${esc(e.pk.before.join(', '))}) → (${esc(e.pk.after.join(', '))})</li>`);
+  for (const f of e.fks) items.push(`<li class="d-${f.status === 'added' ? 'added' : 'removed'}">${f.status === 'added' ? '+' : '\u{2212}'} FK ${esc(f.rel.cols.join(', '))} → ${esc(f.rel.parent.name)}</li>`);
+  return `<section class="diffsec"><h3>${esc(t('diffHead'))} <span class="tag d-${e.status}">${esc(t(DIFF_STATUS[e.status]))}</span></h3>
+    ${items.length ? `<ul class="df-changes">${items.join('')}</ul>` : ''}</section>`;
+}
+
+function diffColText(c) {
+  const what = { type: () => t('diffType', { a: c.before.type, b: c.after.type }), null: () => t(c.after.nullable ? 'diffNowNull' : 'diffNowNotNull'), pk: () => t(c.after.pk ? 'diffNowPk' : 'diffNoLongerPk') };
+  const ch = c.changes.map(k => what[k]()).join('; ');
+  if (c.status === 'added') return `+ ${c.name} ${c.after.type || ''}`.trim();
+  if (c.status === 'removed') return `\u{2212} ${c.name}`;
+  if (c.status === 'renamed') return `${c.from} → ${c.name} (${t('diffGuess')})${ch ? ': ' + ch : ''}`;
+  return `~ ${c.name}: ${ch}`;
+}
+
+// Değişiklik raporu: sürüm notu ya da inceleme için
+function diffMarkdown() {
+  const res = S.diffRes, s = res.summary;
+  const before = S.diff.mode === 'version' ? fileLabel(S.diff.version) : S.diff.title;
+  const q = tb => '`' + (tb.schema ? tb.schema + '.' : '') + tb.name + '`';
+  const out = [`# ${t('diffTitle')} · ${before} → ${S.title || ''}`, '', t('diffSummary', s), ''];
+  const by = st => res.tables.filter(e => e.status === st);
+  if (by('added').length) out.push(`## ${t('diffAdded')}`, '', ...by('added').map(e => '- ' + q(e.after)), '');
+  if (by('removed').length) out.push(`## ${t('diffRemoved')}`, '', ...by('removed').map(e => '- ' + q(e.before)), '');
+  if (by('changed').length) {
+    out.push(`## ${t('diffChanged')}`, '');
+    for (const e of by('changed')) {
+      out.push(`### ${q(e.after)}${e.renamed ? ' ← ' + q(e.before) + ' (' + t('diffGuess') + ')' : ''}`, '');
+      const items = e.cols.map(c => '- ' + diffColText(c));
+      if (e.pk) items.push(`- PK: (${e.pk.before.join(', ')}) → (${e.pk.after.join(', ')})`);
+      for (const f of e.fks) items.push(`- ${f.status === 'added' ? '+' : '\u{2212}'} FK ${f.rel.cols.join(', ')} → ${f.rel.parent.name}`);
+      if (items.length) out.push(...items, '');
+    }
+  }
+  return out.join('\n');
+}
+
+$('#diffPop').addEventListener('click', e => {
+  const go = e.target.closest('li[data-go]');
+  if (go) { const tb = S.byKey.get(go.dataset.go); if (tb) select(tb, { fly: true }); return; }
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  e.stopPropagation();
+  const a = b.dataset.act;
+  if (a === 'diff-version') startDiff({ mode: 'version', version: $('#dfVersion').value });
+  else if (a === 'diff-files') $('#diffFile').click();
+  else if (a === 'diff-folder') $('#diffFolder').click();
+  else if (a === 'diff-close') stopDiff();
+  else if (a === 'diff-md') downloadText(diffMarkdown(), fileStem() + '-' + t('diffFile') + '.md', 'text/markdown;charset=utf-8');
+});
+
+// "Önce" dosyaları: açık dosyalarla aynı okuma kuralları; açık dosyalara eklenmez
+async function readBefore(list) {
+  if (!list.length) return;
+  const recs = [];
+  for (const { path, file } of list) {
+    const rec = { path, include: true };
+    const c = classify(path);
+    if (c.skip) rec.skipReason = c.skip;
+    else if (file.size > MAX_FILE) rec.skipReason = 'tooBig';
+    else rec.text = await readFileText(file);
+    recs.push(rec);
+  }
+  const readable = recs.filter(f => f.text != null);
+  const dirs = new Set(readable.map(f => f.path.split('/')[0]));
+  const title = readable.length === 1 ? readable[0].path : dirs.size === 1 && readable[0].path.includes('/') ? [...dirs][0] + '/' : t('nFiles', { n: readable.length });
+  startDiff({ mode: 'files', files: recs, title });
+}
+$('#diffFile').addEventListener('change', () => { readBefore(fromInput($('#diffFile'))); $('#diffFile').value = ''; });
+$('#diffFolder').addEventListener('change', () => { readBefore(fromInput($('#diffFolder'))); $('#diffFolder').value = ''; });
+
 /* ─── Etki analizi ─── */
 
 // Kip açıkken seçili tabloyu izler; panelde bir kolona tıklanınca yalnızca o kolona bağlananlar (S.selCol)
@@ -1030,6 +1208,7 @@ function renderPanel() {
       </div>
     </div>
     <div class="p-body">
+      ${diffPanelHtml(tb)}
       ${S.impactRes && S.impactRes.root === tb ? impactHtml(S.impactRes) : ''}
       <section>
         <h3>${esc(t(mongo ? 'fields' : 'columns'))} <span>${tb.columns.length}</span></h3>
@@ -1278,7 +1457,7 @@ let appendNext = false;
 fileInput.addEventListener('change', () => { loadEntries(fromInput(fileInput), appendNext); appendNext = false; fileInput.value = ''; });
 folderInput.addEventListener('change', () => { loadEntries(fromInput(folderInput), false); folderInput.value = ''; });
 
-const popovers = ['#sampleMenu', '#viewMenu', '#report', '#filesPop', '#namingPop'];
+const popovers = ['#sampleMenu', '#viewMenu', '#report', '#filesPop', '#namingPop', '#diffPop'];
 function togglePop(sel) {
   for (const p of popovers) $(p).hidden = p === sel ? !$(p).hidden : true;
 }
@@ -1302,6 +1481,7 @@ document.addEventListener('click', e => {
     case 'report': togglePop('#report'); break;
     case 'files': togglePop('#filesPop'); break;
     case 'naming': togglePop('#namingPop'); break;
+    case 'diff': togglePop('#diffPop'); break;
     case 'naming-md': if (S.model) downloadText(namingMarkdown(), fileStem() + '-' + t('namingFile') + '.md', 'text/markdown;charset=utf-8'); break;
     case 'list-close': setList(false); break;
     case 'legend':
@@ -1418,6 +1598,7 @@ NS.onLangChange(() => {
     renderList();
     renderViews();
     renderPickBar();
+    renderDiff();
     resetHud();
   }
   if (S.title && S.files.length > 1 && /^\d+ /.test(S.title)) $('#fileName').textContent = t('nFiles', { n: S.files.filter(f => f.text != null).length });
@@ -1473,6 +1654,12 @@ if (document.fonts && document.fonts.ready) {
 if (params.get('sample')) {
   loadSample(params.get('sample')).then(ok => {
     if (!ok || !S.model) return;
+    // ?diff=V3: migration klasöründe bu sürüme kadarki hâliyle karşılaştır
+    const dv = params.get('diff');
+    if (dv) {
+      const f = versionFiles().find(x => fileLabel(x.path) === dv || fileLabel(x.path).startsWith(dv + '__'));
+      if (f) startDiff({ mode: 'version', version: f.path });
+    }
     // ?sub=A,B,C&near=1: bu tablolarla (ve komşularıyla) alt diyagram
     const subNames = (params.get('sub') || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
     if (subNames.length) {
@@ -1493,7 +1680,7 @@ if (params.get('sample')) {
     } else if (zoom > 0) {
       S.cam.k = zoom;
     }
-    const pop = { naming: '#namingPop', report: '#report', files: '#filesPop' }[params.get('pop')];
+    const pop = { naming: '#namingPop', report: '#report', files: '#filesPop', diff: '#diffPop' }[params.get('pop')];
     if (pop) togglePop(pop);
     invalidate();
   });

@@ -280,6 +280,16 @@ Migration'lar baştan sona uygulanır ve harita şemanın **son hâlini** göste
 - `ALTER COLUMN … TYPE`, `MODIFY`, `CHANGE`
 - T-SQL `sp_rename`, MySQL `RENAME TABLE`
 
+**Şema farkı.** Alt bilgi çubuğundaki **karşılaştır**, açık dosyaları (sonra) önceki bir sürümle (önce) karşılaştırır:
+- **Önceki sürüm:** migration klasöründe bir sürüm seçilir ("V7'ye kadarki hâliyle") ya da önceki sürümün dosyaları / klasörü ayrıca seçilir (ör. prod dökümü ile test dökümü).
+- **Haritada:** eklenen tablolar yeşil, silinenler kırmızı, değişenler sarı; adı değişenlerin çevresinde mavi halka var. Değişmeyenler geri planda kalır. Silinen tablolar da haritada yerinde görünür.
+- **Panelde:** seçili tablonun farkı: eklenen, silinen ve değişen kolonlar (tip, NULL, PK), adı değişen kolonlar, PK ve FK farkları. Kartta eklenen ve değişen kolon satırları renklenir.
+- **Ad değişikliği tahmini:** tablolar kolon kümesinin benzerliğiyle (`customer` → `customers`), kolonlar tip ve ad benzerliğiyle (`weight` → `weight_grams`) eşleştirilir; tahmin olduğu yazılır. Adı değişen kolonun FK'si değişmiş sayılmaz.
+- **Rapor:** **Markdown indir** değişiklik listesini sürüm notu ya da inceleme için dosyaya yazar.
+- **Bağlantı:** `?diff=V3` migration klasöründe o sürümle karşılaştırmayı açar.
+
+<img src="docs/images/tr/sema-farki.png" alt="Şema farkı: V3'ten bugüne eklenen, değişen ve adı değişen tablolar" width="900">
+
 **Ayrı veritabanları.** Farklı lehçelerden dosyalar birlikte açılırsa (örneğin MySQL siparişler, MongoDB katalog, PostgreSQL raporlama) her klasör kendi galaksisi olarak çizilir.
 
 <img src="docs/images/tr/coklu-veritabani.png" alt="Üç veritabanı üç ayrı galaksi olarak" width="900">
@@ -453,6 +463,7 @@ js/                 tarayıcıda bu sırayla yüklenir; hepsi globalThis.sqlSche
   mongo.js          $jsonSchema, Mongoose ve JSON belgelerinden aynı işlem listesi
   files.js          dosya sıralama (Flyway, golang-migrate), ayrıştırıcı seçimi
   model.js          işlemleri uygular: tablolar, ilişkiler, kardinalite, ara tablo, tahmini ilişki
+  diff.js           iki modelin farkı: tablo, kolon, PK, FK; ad değişikliği tahmini
   layout.js         veritabanı → şema → takımyıldız → yıldız, hiyerarşik kuvvet yerleşimi
   conventions.js    adlandırma profili: kalıplar, oranlar, baskın kalıba uymayanlar
   sample-small.js   gömülü küçük örnek
@@ -772,6 +783,16 @@ Migrations are applied from first to last, and the map shows the **final state**
 - `ALTER COLUMN … TYPE`, `MODIFY`, `CHANGE`
 - T-SQL `sp_rename`, MySQL `RENAME TABLE`
 
+**Schema diff.** **compare** in the bottom bar compares the open files (after) with an earlier version (before):
+- **Earlier version:** in a migration folder, pick a version ("as of V7"), or choose the files / folder of the earlier version separately (for example a production dump and a test dump).
+- **On the map:** added tables are green, removed ones red, changed ones yellow; renamed tables have a blue ring. Unchanged tables stay in the background. Removed tables also appear in place on the map.
+- **In the panel:** the difference for the selected table: added, removed and changed columns (type, NULL, PK), renamed columns, PK and FK differences. Added and changed column rows are tinted on the card.
+- **Rename guesses:** tables are matched by the similarity of their column sets (`customer` → `customers`), columns by type and name similarity (`weight` → `weight_grams`); guesses are labelled as such. The FK of a renamed column is not counted as changed.
+- **Report:** **Download Markdown** writes the change list to a file for release notes or reviews.
+- **Link:** `?diff=V3` opens the comparison with that version of a migration folder.
+
+<img src="docs/images/en/sema-farki.png" alt="Schema diff: tables added, changed and renamed since V3" width="900">
+
 **Separate databases.** When files of different dialects are opened together (for example orders in MySQL, a catalogue in MongoDB and reporting in PostgreSQL), each folder is drawn as its own galaxy.
 
 <img src="docs/images/en/coklu-veritabani.png" alt="Three databases drawn as three galaxies" width="900">
@@ -945,6 +966,7 @@ js/                 loaded in this order; each file adds to the globalThis.sqlSc
   mongo.js          the same operation list from $jsonSchema, Mongoose and JSON documents
   files.js          file ordering (Flyway, golang-migrate), parser selection
   model.js          applies operations: tables, relationships, cardinality, junctions, inference
+  diff.js           difference of two models: tables, columns, PK, FK; rename guesses
   layout.js         database → schema → constellation → star, hierarchical force layout
   conventions.js    naming profile: patterns, shares, names that depart from the dominant pattern
   sample-small.js   embedded small sample

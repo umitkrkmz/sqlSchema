@@ -26,6 +26,7 @@ const SCENES = {
   'etki-analizi': 'sample=kucuk&select=CUSTOMER&impact=1&zoom=0.75&legend=0',
   'mongodb-uydular': 'sample=sosyal&select=posts&zoom=0.75&legend=0',
   'adlandirma-profili': 'sample=karisik&pop=naming&legend=0',
+  'sema-farki': 'sample=lojistik&diff=V3&select=shipments&zoom=1.3&legend=0',
 };
 
 const CANDIDATES = [

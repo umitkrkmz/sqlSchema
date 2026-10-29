@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'files', 'model', 'layout', 'conventions', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
+for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'files', 'model', 'diff', 'layout', 'conventions', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
 require(path.join(ROOT, 'samples', 'catalog.js'));
 const NS = globalThis.sqlSchema;
 
@@ -171,7 +171,7 @@ const EXPECT = {
     check('saglik: PK\'ler ayrı dosyadan geldi', find(m, 'patient').pk[0] === 'patient_id');
     check('saglik: açıklamalar ayrı dosyadan geldi', !!find(m, 'patient').comment);
   },
-  lojistik({ model: m, migration, skipped, order }) {
+  lojistik({ model: m, migration, skipped, order }, all, s) {
     check('lojistik: Flyway tanındı', migration === 'Flyway', migration);
     check('lojistik: U betiği ve flyway.conf atlandı', skipped.length === 2, skipped.map(x => x.file.path));
     check('lojistik: R__ en sonda', /R__/.test(order[order.length - 1]), order.slice(-2));
@@ -184,6 +184,19 @@ const EXPECT = {
     check('lojistik: yeniden adlandırılan tabloya FK', rel(m, 'parcels', 'shipment_id', 'shipments', 'fk'));
     check('lojistik: partition tablosu tahminle bağlı', rel(m, 'tracking_events', 'shipment_id', 'shipments', 'implicit'));
     check('lojistik: partition parçaları tablo olmadı', !find(m, 'tracking_events_2026_09'));
+    // şema farkı: V3'e kadarki hâl → son hâl
+    const lfiles = s.files.map(p => ({ path: 'lojistik/' + p, text: fs.readFileSync(path.join(ROOT, 'samples', 'lojistik', p), 'utf8') }));
+    const upTo = n => lfiles.filter(f => { const v = /\/V(\d+)__/.exec(f.path); return v ? +v[1] <= n : false; });
+    const d = NS.diffModels(build(upTo(3)).model, m);
+    const de = n => d.tables.find(e => (e.after || e.before).name === n);
+    check('lojistik fark: 12 eklenen, 1 silinen, 8 değişen (8 adı değişen)', d.summary.added === 12 && d.summary.removed === 1 && d.summary.changed === 8 && d.summary.renamed === 8, d.summary);
+    check('lojistik fark: tablo adı değişikliği tahmini', de('customers').renamed && de('customers').before.name === 'customer' && de('drivers').before.name === 'courier');
+    const sc = Object.fromEntries(de('shipments').cols.map(c => [c.name, c]));
+    check('lojistik fark: kolon adı değişikliği ve tip değişikliği', sc.weight_grams.status === 'renamed' && sc.weight_grams.from === 'weight' && sc.weight_grams.changes.includes('type') && sc.sender_customer_id.from === 'sender_id', Object.values(sc).map(c => [c.status, c.from, c.name, c.changes]));
+    check('lojistik fark: adı değişen kolonun FK\'si değişmiş sayılmaz', !de('shipments').fks.length, de('shipments').fks.map(f => [f.status, f.rel.cols]));
+    check('lojistik fark: silinen kolon ve FK', de('addresses').cols.some(c => c.status === 'removed' && c.name === 'customer_id') && de('addresses').fks.some(f => f.status === 'removed'));
+    check('lojistik fark: silinen ve eklenen tablo', de('legacy_route').status === 'removed' && de('tracking_events').status === 'added');
+    check('lojistik fark: aynı dosyalarda fark yok', NS.diffModels(build(lfiles.filter(f => /\/V/.test(f.path))).model, build(lfiles.filter(f => /\/V/.test(f.path))).model).summary.same === 23);
     check('lojistik: migration\'da dosyaya göre gruplanmaz', NS.resolveGrouping('auto', migration) === 'name' && !m.tables.some(t => t.group.file));
   },
   iot({ model: m }) {

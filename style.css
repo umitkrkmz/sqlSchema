@@ -331,6 +331,30 @@ code, kbd { font-family: var(--mono); }
 .cvals .cv b { font: 500 10px var(--mono); color: var(--accent); }
 .cvals .cv.more { border-style: dashed; color: var(--dim); }
 .cvals .vsrc { font: italic 10px var(--sans); color: var(--faint); margin-left: 2px; }
+/* Şema farkı */
+.diff-pop { width: 360px; max-height: calc(100vh - var(--bar-h) - 76px); }
+.diff-pop .intro { margin: 0 0 10px; color: var(--dim); font-size: 11.5px; }
+.diff-pop .df-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; color: var(--dim); font-size: 11.5px; }
+.diff-pop select { flex: 1; min-width: 0; padding: 3px 6px; background: var(--bg-2); color: var(--text); border: 1px solid var(--line-2); border-radius: 6px; font: 11.5px var(--mono); }
+.diff-pop .df-or { margin: 8px 0 2px; color: var(--dim); font-size: 11.5px; }
+.diff-pop .df-sides { display: flex; flex-direction: column; gap: 2px; margin: 0 0 8px; font-size: 11.5px; color: var(--dim); }
+.diff-pop .df-sides b { color: var(--text); font: 500 11.5px var(--mono); }
+.df-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px; }
+.df-chips i { font: normal 11px var(--mono); padding: 1px 6px; border-radius: 4px; border: 1px solid currentColor; }
+.d-added { color: #7fd49a; }
+.d-removed { color: var(--rose); }
+.d-changed { color: var(--accent); }
+.d-renamed { color: var(--cyan); }
+.report ul.df-list li { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; cursor: pointer; font-family: var(--sans); }
+.report ul.df-list li b { font: 500 12px var(--mono); }
+.report ul.df-list li i { font-style: normal; color: var(--cyan); font-size: 11px; }
+.report ul.df-list li span { margin-left: auto; font: 10.5px var(--mono); color: var(--faint); }
+.report ul.df-list li:hover b { text-decoration: underline; }
+.diffsec { border-bottom: 1px solid var(--line); }
+.diffsec h3 .tag { margin-left: 6px; }
+.df-changes { list-style: none; margin: 0 0 12px; padding: 0; font: 11.5px/1.5 var(--mono); }
+.df-changes li { padding: 1px 0; }
+
 /* Etki analizi */
 .impact { border-bottom: 1px solid var(--line); }
 .impact h4 { margin: 10px 0 4px; font: 600 10.5px var(--cond); letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
