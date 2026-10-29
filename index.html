@@ -57,6 +57,7 @@
           <label><input type="radio" name="grouping" value="name"><span data-i18n="groupName"></span></label>
           <small data-i18n="optGroupingHint"></small>
         </fieldset>
+        <div id="savedViews" class="saved-views"></div>
       </div>
     </div>
     <button class="btn ghost" data-act="fit" data-i18n="fit" data-i18n-attr="title:fitTitle"></button>
@@ -166,6 +167,7 @@
 
 <input type="file" id="file" multiple accept=".sql,.ddl,.txt,.pls,.pks,.pkb,.tab,.cql,.js,.mjs,.cjs,.ts,.json,.jsonl,.ndjson" hidden>
 <input type="file" id="folder" webkitdirectory multiple hidden>
+<input type="file" id="viewFile" accept=".json,application/json" hidden>
 
 <!-- Sıra önemli: her dosya globalThis.sqlSchema ad alanına ekler, sonrakiler öncekileri kullanır -->
 <script src="js/i18n.js"></script>

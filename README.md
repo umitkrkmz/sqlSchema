@@ -128,6 +128,7 @@ Ayrıntı panelinde kolonlar, açıklamalar, tanımın geçtiği dosya ve satır
 - **Alt diyagramda:** yalnızca bu tablolar ve aralarındaki ilişkiler kendi yerleşimiyle çizilir; panel, arama, tablo listesi ve adlandırma profili de yalnızca bu tablolara bakar.
 - **Dönüş:** **Tümüne dön** ya da `Esc`. Tam harita aynı konumlarla geri gelir.
 - **Bağlantı:** `?sub=BILLING_ACCOUNT,INVOICE&near=1` bu alt diyagramı doğrudan açar.
+- **Kayıtlı görünümler:** alt diyagramdayken **Kaydet** ile ad verilir. Görünümler tarayıcıda, açılan dosya kümesine göre saklanır; aynı dosyalar yeniden açılınca **Görünüm → Kayıtlı görünümler** altında durur. **Dışa aktar** bunları `.sqlschema.json` dosyasına yazar, **İçe aktar** geri okur. Dosya yalnızca görünümü (tablo adlarını) taşır, şemayı içermez; ekip içinde paylaşmak için uygundur.
 
 <img src="docs/images/tr/alt-diyagram.png" alt="Alt diyagram: iki tablo ve komşuları kendi yerleşimiyle" width="900">
 
@@ -610,6 +611,7 @@ The detail panel lists:
 - **In the sub-diagram:** only these tables and the relationships between them are drawn, with a layout of their own; the panel, search, table list and naming profile also look only at these tables.
 - **Going back:** **Back to all** or `Esc`. The full map returns with the same positions.
 - **Link:** `?sub=BILLING_ACCOUNT,INVOICE&near=1` opens this sub-diagram directly.
+- **Saved views:** while in a sub-diagram, **Save** gives it a name. Views are kept in the browser per set of opened files; when the same files are opened again they are listed under **View → Saved views**. **Export** writes them to a `.sqlschema.json` file and **Import** reads it back. The file carries only the view (table names), not the schema, so it is safe to share within a team.
 
 <img src="docs/images/en/alt-diyagram.png" alt="Sub-diagram: two tables and their neighbours with a layout of their own" width="900">
 

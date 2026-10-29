@@ -87,6 +87,7 @@ function rebuild() {
   renderNaming();
   renderFiles();
   renderList();
+  renderViews();
   resetHud();
   document.body.classList.add('loaded');
   $('#empty').hidden = true;
@@ -566,10 +567,19 @@ function afterLayout() {
   fitView(true);
 }
 
-function renderPickBar() {
+function renderPickBar(naming) {
   const el = $('#pickBar');
-  if (S.full) {
+  if (S.full && naming) {
+    el.innerHTML = `<span class="pb-title">${esc(t('pbSub'))}</span>
+      <input id="pbName" type="text" maxlength="80" spellcheck="false" value="${esc(defaultViewName())}" placeholder="${esc(t('pbNamePh'))}">
+      <button class="btn sm" data-act="view-save">${esc(t('pbSave'))}</button>
+      <button class="btn sm ghost" data-act="view-cancel">${esc(t('cancel'))}</button>`;
+    const inp = $('#pbName');
+    inp.focus();
+    inp.select();
+  } else if (S.full) {
     el.innerHTML = `<span class="pb-title">${esc(t('pbSub'))}</span><b>${esc(t('pbCount', { n: S.model.tables.length }))}</b>
+      <button class="btn sm ghost" data-act="view-name" title="${esc(t('pbSaveTitle'))}">${esc(t('pbSave'))}</button>
       <button class="btn sm" data-act="sub-exit">${esc(t('pbExit'))}</button>`;
   } else if (S.pick.size) {
     el.innerHTML = `<b>${esc(t('pbSelected', { n: S.pick.size }))}</b>
@@ -588,6 +598,104 @@ $('#pickBar').addEventListener('click', e => {
   if (b.dataset.act === 'sub-open') enterSubset([...S.pick], S.subNeighbors);
   else if (b.dataset.act === 'sub-exit') exitSubset();
   else if (b.dataset.act === 'pick-clear') { S.pick = new Set(); afterPick(); }
+  else if (b.dataset.act === 'view-name') renderPickBar(true);
+  else if (b.dataset.act === 'view-cancel') renderPickBar();
+  else if (b.dataset.act === 'view-save') saveView($('#pbName').value);
+});
+$('#pickBar').addEventListener('keydown', e => {
+  if (e.target.id !== 'pbName') return;
+  e.stopPropagation();   // yazarken C, L gibi kısayollar çalışmasın
+  if (e.key === 'Enter') saveView(e.target.value);
+  else if (e.key === 'Escape') renderPickBar();
+});
+
+/* ─── Kayıtlı görünümler ─── */
+
+// Görünüm = adlandırılmış bir alt diyagram (tablo anahtarları + komşular). Tarayıcıda dosya kümesinin parmak izine
+// göre saklanır; aynı dosyalar açılınca geri gelir. .sqlschema.json olarak dışa/içe aktarılır, şemayı taşımaz.
+function viewsFingerprint() {
+  const paths = (S.ordered || []).filter(f => f.include && f.result).map(f => f.path).sort().join('\n');
+  let h = 5381;
+  for (let i = 0; i < paths.length; i++) h = ((h << 5) + h + paths.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+function loadViews() {
+  try {
+    const v = JSON.parse(localStorage.getItem('sqlschema.views.' + viewsFingerprint()) || '[]');
+    return Array.isArray(v) ? v.filter(x => x && typeof x.name === 'string' && Array.isArray(x.tables)) : [];
+  } catch (err) { return []; }
+}
+function storeViews(views) {
+  try { localStorage.setItem('sqlschema.views.' + viewsFingerprint(), JSON.stringify(views)); } catch (err) { toast(t('viewsNoStorage')); }
+}
+function defaultViewName() {
+  const full = S.full ? S.full.model : S.model;
+  const names = (S.subKeys || []).map(k => { const tb = full && full.tables.find(x => x.key === k); return tb ? tb.name : k.split('.').pop(); });
+  return names.slice(0, 2).join(', ') + (names.length > 2 ? ' +' + (names.length - 2) : '');
+}
+function saveView(name) {
+  name = String(name || '').trim();
+  if (!name || !S.subKeys) return;
+  const views = loadViews().filter(v => v.name !== name);
+  views.push({ name, tables: S.subKeys.slice(), near: S.subNeighbors });
+  storeViews(views);
+  renderPickBar();
+  renderViews();
+  toast(t('viewSaved', { name }), 2500);
+}
+function openView(v) {
+  const keys = v.tables.filter(k => (S.full ? S.full.model : S.model).tables.some(tb => tb.key === k));
+  if (!keys.length || !enterSubset(keys, !!v.near)) { toast(t('viewMissing'), 4000); return; }
+  $('#viewMenu').hidden = true;
+}
+
+function renderViews() {
+  const el = $('#savedViews');
+  const views = S.model || S.full ? loadViews() : [];
+  el.innerHTML = `<div class="sv-head">${esc(t('viewsTitle'))}</div>
+    ${views.length ? `<ul>${views.map((v, i) => `<li><button class="sv-open" data-view-open="${i}"><b>${esc(v.name)}</b><span>${esc(t('pbCount', { n: v.tables.length }))}${v.near ? ' · ' + esc(t('pbNeighbors')) : ''}</span></button><button class="sv-del" data-view-del="${i}" title="${esc(t('viewDelete'))}" aria-label="${esc(t('viewDelete'))}">×</button></li>`).join('')}</ul>` : `<p>${esc(t('viewsEmpty'))}</p>`}
+    <div class="sv-actions">
+      <button class="btn sm ghost" data-view-act="export" ${views.length ? '' : 'disabled'} title="${esc(t('viewsExportTitle'))}">${esc(t('viewsExport'))}</button>
+      <button class="btn sm ghost" data-view-act="import">${esc(t('viewsImport'))}</button>
+    </div>`;
+}
+
+$('#savedViews').addEventListener('click', e => {
+  const views = loadViews();
+  const open = e.target.closest('[data-view-open]');
+  if (open) { const v = views[Number(open.dataset.viewOpen)]; if (v) openView(v); return; }
+  const del = e.target.closest('[data-view-del]');
+  if (del) {
+    const v = views[Number(del.dataset.viewDel)];
+    if (!v) return;
+    storeViews(views.filter(x => x !== v));
+    renderViews();
+    toast(t('viewDeleted', { name: v.name }), 2500);
+    return;
+  }
+  const act = e.target.closest('[data-view-act]');
+  if (!act) return;
+  if (act.dataset.viewAct === 'export') {
+    const data = { app: 'sqlSchema', kind: 'views', version: 1, views };
+    downloadText(JSON.stringify(data, null, 2) + '\n', fileStem() + '.sqlschema.json', 'application/json');
+  } else $('#viewFile').click();
+});
+
+$('#viewFile').addEventListener('change', async () => {
+  const file = $('#viewFile').files[0];
+  $('#viewFile').value = '';
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (!data || data.app !== 'sqlSchema' || data.kind !== 'views' || !Array.isArray(data.views)) throw new Error('kind');
+    const incoming = data.views.filter(v => v && typeof v.name === 'string' && Array.isArray(v.tables)).map(v => ({ name: v.name.slice(0, 80), tables: v.tables.map(String), near: !!v.near }));
+    const names = new Set(incoming.map(v => v.name));
+    storeViews(loadViews().filter(v => !names.has(v.name)).concat(incoming));
+    renderViews();
+    toast(t('viewsImported', { n: incoming.length }), 3000);
+  } catch (err) {
+    toast(t('viewsBadFile'), 5000);
+  }
 });
 
 /* ─── Tablo listesi ─── */
@@ -1230,6 +1338,8 @@ NS.onLangChange(() => {
     renderNaming();
     renderFiles();
     renderList();
+    renderViews();
+    renderPickBar();
     resetHud();
   }
   if (S.title && S.files.length > 1 && /^\d+ /.test(S.title)) $('#fileName').textContent = t('nFiles', { n: S.files.filter(f => f.text != null).length });
@@ -1269,6 +1379,7 @@ Object.assign(NS, { loadText, setFiles, rebuild, loadSample });
 NS.applyI18n();
 markLang();
 renderSamples();
+renderViews();
 new ResizeObserver(resize).observe(canvas.parentElement);
 resize();
 drawLegend();

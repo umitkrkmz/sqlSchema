@@ -11,6 +11,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
   Table list (`L`): every table under schema and constellation headings; file order or A → Z, `↑` / `↓` moves the selection and the map together, a filter box, no-PK / M:N / lookup / external tags. Opened from the View menu, `?list=1`.
 - **Alt diyagram:** `Ctrl`/`Cmd` + tık, panel ya da tablo listesiyle seçilen tablolar (isteğe bağlı komşularıyla) kendi yerleşimiyle ayrı bir haritada; panel, arama, liste ve adlandırma profili de yalnızca onlara bakar. **Tümüne dön** ya da `Esc`; `?sub=A,B&near=1`.
   Sub-diagram: tables picked with `Ctrl`/`Cmd` + click, the panel or the table list (optionally with their neighbours) on a separate map with a layout of their own; the panel, search, list and naming profile look only at them. **Back to all** or `Esc`; `?sub=A,B&near=1`.
+- **Kayıtlı görünümler:** alt diyagram bir adla kaydedilir; dosya kümesine göre tarayıcıda saklanır, Görünüm menüsünden açılır, silinir; `.sqlschema.json` olarak dışa/içe aktarılır (şemayı içermez).
+  Saved views: a sub-diagram is saved under a name; kept in the browser per set of files, opened and deleted from the View menu; exported and imported as `.sqlschema.json` (without the schema).
 
 ### Değişti · Changed
 

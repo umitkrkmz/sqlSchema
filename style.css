@@ -112,7 +112,7 @@ code, kbd { font-family: var(--mono); }
 .menu-list button:hover { background: rgba(140, 160, 215, 0.1); }
 .menu-list b { font-weight: 600; font-size: 13px; }
 .menu-list span { font: 11px var(--mono); color: var(--dim); }
-.view-menu { left: auto; right: 0; width: 300px; }
+.view-menu { left: auto; right: 0; width: 300px; max-height: calc(100vh - var(--bar-h) - 24px); overflow: auto; scrollbar-width: thin; }
 .view-menu .opt { display: flex; align-items: flex-start; gap: 9px; padding: 8px 10px; border-radius: 7px; cursor: pointer; }
 .view-menu .opt:hover { background: rgba(140, 160, 215, 0.1); }
 .view-menu .opt input { accent-color: var(--accent); width: 14px; height: 14px; margin: 2px 0 0; flex: none; }
@@ -125,6 +125,17 @@ code, kbd { font-family: var(--mono); }
 .view-menu .opt-group input { accent-color: var(--accent); margin: 0; }
 .view-menu .opt-group label span { font: 12.5px var(--sans); color: inherit; }
 .view-menu .opt-group small { margin-top: 2px; font-size: 11.5px; color: var(--dim); line-height: 1.35; }
+.saved-views { margin-top: 4px; padding: 8px 10px 4px; border-top: 1px solid var(--line); }
+.saved-views .sv-head { margin-bottom: 4px; font: 600 13px var(--sans); color: var(--text); }
+.saved-views p { margin: 2px 0 6px; font-size: 11.5px; color: var(--dim); line-height: 1.35; }
+.saved-views ul { list-style: none; margin: 0 0 6px; padding: 0; max-height: 180px; overflow: auto; }
+.saved-views li { display: flex; align-items: center; gap: 4px; }
+.saved-views .sv-open { flex: 1; min-width: 0; padding: 5px 6px; }
+.saved-views .sv-open b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.saved-views .sv-del { flex: none; width: 22px; padding: 2px 0; text-align: center; color: var(--faint); }
+.saved-views .sv-del:hover { color: var(--rose); }
+.saved-views .sv-actions { display: flex; gap: 6px; }
+.pickbar input { width: 200px; padding: 3px 7px; background: var(--bg-2); color: var(--text); border: 1px solid var(--line-2); border-radius: 6px; font: 12.5px var(--sans); }
 .view-menu kbd { flex: none; padding: 1px 5px; border: 1px solid var(--line-2); border-radius: 4px; font-size: 10.5px; color: var(--dim); }
 .samples-menu { width: 380px; max-height: min(72vh, 640px); overflow: auto; scrollbar-width: thin; }
 .samples-menu button { gap: 3px; padding: 9px 10px; border-top: 1px solid var(--line); border-radius: 0; }
