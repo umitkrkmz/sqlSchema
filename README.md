@@ -184,6 +184,19 @@ Sigorta örneğinde durum kolonları genel kod tablosuna (`KOD_TABLO`) bu yolla 
 
 **Sözlük ağırlıklı** örneğinde 30'dan fazla kolon tek bir `SOZLUK` tablosuna bağlıdır.
 
+**Kod değerleri.** Kodların anlamı her zaman ayrı bir tabloda durmaz; çoğu zaman doğrudan kolon açıklamasına yazılır:
+
+```sql
+COMMENT ON COLUMN MUSTERI.MUSTERI_TIP IS 'G = Gerçek kişi, T = Tüzel kişi';
+COMMENT ON COLUMN HASAR_IHBAR.IHBAR_KANAL IS 'İhbarın geldiği kanal: ACN = Acente, CAG = Çağrı merkezi, WEB = İnternet şubesi';
+```
+
+- **Tanınan yazımlar:** `1 = Aktif, 2 = Pasif` · `A: Aktif; P: Pasif` · `E-Evet / H-Hayır` · `Durum (1=Aktif, 2=Pasif)` · `0 => kapalı, 1 => açık`.
+- **Yanlış yakalamaya karşı:** en az iki çift, aynı ayraç ve kod gibi görünen kısa kodlar aranır. "Not: eski alan, Kaynak: SAP" ya da "Sürüm 2 = yeni biçim" liste sayılmaz.
+- **Panelde:** değerler kolonun altında kutucuk olarak görünür; açıklamanın listede olmayan kısmı ("İhbarın geldiği kanal") ayrı yazılır.
+- **Kartta:** kolon adının yanında küçük bir `≡` işareti.
+- **Aramada:** değerlerin anlamı da aranır. "iptal" yazınca `4 = İptal` değerini tutan kolon bulunur; büyük/küçük harf ve Türkçe karakter farkı yok sayılır.
+
 <a id="tr-coklu-dosya"></a>
 
 ### Birden fazla dosya ve migration
@@ -603,6 +616,19 @@ In the insurance sample, status columns point to the generic code table (`KOD_TA
 <img src="docs/images/en/sozluk-rozetleri.png" alt="Lookup-heavy sample: links to the SOZLUK table shown as badges on the cards instead of lines" width="900">
 
 In the **Lookup-heavy** sample, more than 30 columns point to a single `SOZLUK` table.
+
+**Code values.** The meaning of codes is not always kept in a separate table; often it is written straight into the column comment:
+
+```sql
+COMMENT ON COLUMN MUSTERI.MUSTERI_TIP IS 'G = Gerçek kişi, T = Tüzel kişi';
+COMMENT ON COLUMN HASAR_IHBAR.IHBAR_KANAL IS 'Channel of the claim: ACN = Agency, CAG = Call centre, WEB = Online branch';
+```
+
+- **Recognised forms:** `1 = Active, 2 = Passive` · `A: Active; P: Passive` · `Y-Yes / N-No` · `Status (1=Active, 2=Passive)` · `0 => off, 1 => on`.
+- **Against false matches:** at least two pairs, the same separator and short, code-like codes are required. "Note: old field, Source: SAP" or "Version 2 = new format" is not a list.
+- **In the panel:** the values appear as chips under the column; the part of the comment outside the list ("Channel of the claim") is shown separately.
+- **On the card:** a small `≡` next to the column name.
+- **In search:** the meanings of values are searched too. Typing "iptal" finds the column holding `4 = İptal`; case and Turkish characters are ignored.
 
 <a id="en-multi-file"></a>
 

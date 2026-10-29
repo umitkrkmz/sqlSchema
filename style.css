@@ -314,6 +314,12 @@ code, kbd { font-family: var(--mono); }
 .tag.t-off { color: var(--rose); border-color: rgba(239, 123, 134, 0.45); }
 .tag.t-ref { color: var(--accent); border-color: rgba(242, 180, 90, 0.5); }
 .rels .filter { color: var(--accent); }
+/* Kolonun kod değerleri (1 = Aktif ...) */
+.cvals { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin: 4px 0 1px; }
+.cvals .cv { padding: 0 5px; border: 1px solid var(--line-2); border-radius: 4px; font: 10.5px/1.6 var(--sans); color: #c3cbe2; white-space: nowrap; }
+.cvals .cv b { font: 500 10px var(--mono); color: var(--accent); }
+.cvals .cv.more { border-style: dashed; color: var(--dim); }
+.cvals .vsrc { font: italic 10px var(--sans); color: var(--faint); margin-left: 2px; }
 table.dict { width: 100%; border-collapse: collapse; font-size: 12px; }
 table.dict td { padding: 5px 0; border-top: 1px solid var(--line); vertical-align: top; }
 table.dict tr:first-child td { border-top: 0; }

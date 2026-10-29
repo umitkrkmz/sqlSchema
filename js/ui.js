@@ -295,6 +295,7 @@ function renderReport() {
       ${row('rFk', st.fk + (st.fkDisabled ? ` <span class="dim">${esc(t('rDisabled', { n: st.fkDisabled }))}</span>` : ''))}
       ${st.refs ? row('rRefs', st.refs) : ''}
       ${st.dictionaries ? row('rDicts', st.dictionaries) : ''}
+      ${st.valueLists ? row('rValueLists', st.valueLists) : ''}
       ${row('rImplicit', st.implicit)}
       ${row('rJunctions', st.junctions)}
       ${row('rIndexes', `${st.indexes} / ${st.comments}`)}
@@ -534,6 +535,15 @@ function relItem(r, dir) {
   </li>`;
 }
 
+// Kolonun kod değerleri: kutucuklar ve nereden okunduğu
+const VALUE_SRC = { comment: 'vsrcComment' };
+function valuesHtml(c) {
+  const MAX = 40;
+  const chips = c.values.slice(0, MAX).map(v => `<span class="cv"><b>${esc(v.code)}</b>${v.label ? ' ' + esc(v.label) : ''}</span>`).join('');
+  const more = c.values.length > MAX ? `<span class="cv more">${esc(t('namingMore', { n: c.values.length - MAX }))}</span>` : '';
+  return `<div class="cvals">${chips}${more}<i class="vsrc">${esc(t(VALUE_SRC[c.valuesSrc] || 'vsrcComment', c))}</i></div>`;
+}
+
 // "Sözlük olarak göster" düğmesi yalnızca sözlüğe benzeyen tablolarda çıkar: az kolon, çok gelen ilişki,
 // kendisi pek bir yere bağlanmıyor (durum, tip, kod tabloları). Zaten sözlükse ya da elle seçildiyse her zaman.
 function dictCandidate(tb) {
@@ -583,7 +593,9 @@ function renderPanel() {
   const rows = tb.columns.map(c => {
     const k = keyTag(tb, c);
     const hl = S.selCol && c.name.toUpperCase() === S.selCol ? ' class="hl"' : '';
-    return `<tr${hl}><td class="ck ${k ? 'k-' + k : ''}">${k}</td><td class="cn${c.nullable ? ' nul' : ''}">${esc(c.name)}${c.comment ? `<div class="cc">${esc(c.comment)}</div>` : ''}</td><td class="ct">${esc(String(c.type).toLowerCase())}${c.nullable ? '' : `<b title="${esc(mongo ? t('reqTitle') : 'NOT NULL')}">${mongo ? 'req' : 'nn'}</b>`}</td></tr>`;
+    // açıklama bir değer listesiyse liste kutucuk olur, metnin geri kalanı açıklama olarak kalır
+    const note = c.valuesSrc === 'comment' ? c.valuesNote : c.comment;
+    return `<tr${hl}><td class="ck ${k ? 'k-' + k : ''}">${k}</td><td class="cn${c.nullable ? ' nul' : ''}">${esc(c.name)}${note ? `<div class="cc">${esc(note)}</div>` : ''}${c.values ? valuesHtml(c) : ''}</td><td class="ct">${esc(String(c.type).toLowerCase())}${c.nullable ? '' : `<b title="${esc(mongo ? t('reqTitle') : 'NOT NULL')}">${mongo ? 'req' : 'nn'}</b>`}</td></tr>`;
   }).join('');
   const where = [tb.db !== 'main' ? tb.db : '', schemaLabel(tb.schemaRef)].filter(Boolean).join(' / ');
   const group = tb.external ? t('externalRef') : tb.embedded ? t('satelliteOf', { o: tb.owner ? tb.owner.name : '' }) : tb.group.loose ? t('looseStar') : tb.desig + ' ' + groupLabel(tb.group);
@@ -674,6 +686,17 @@ function runSearch() {
       }
       if (n >= 8) break;
     }
+    // kod değerlerinin anlamı da aranır: "iptal" → "İptal" değerini tutan kolon. Aksan ve İ/ı farkı yok sayılır.
+    const fold = s => String(s || '').normalize('NFD').replace(/[\u{300}-\u{36F}]/gu, '').toUpperCase();
+    const fv = fold(q.value.trim());
+    n = 0;
+    for (const tb of S.model.tables) {
+      for (const c of tb.columns) {
+        const hit = c.values && c.values.find(x => fold(x.label).includes(fv));
+        if (hit) { hits.push({ tb, col: c.name, val: hit.code + ' = ' + hit.label }); if (++n >= 6) break; }
+      }
+      if (n >= 6) break;
+    }
   }
   active = hits.length ? 0 : -1;
   const meta = tb => [tb.db !== 'main' ? tb.db : '', tb.schema].filter(Boolean).join(' / ');
@@ -681,7 +704,7 @@ function runSearch() {
     ? hits.map((h, i) => `<li data-i="${i}" class="${i === active ? 'on' : ''}" role="option">
         <span class="dot" style="--c:${schemaColor(h.tb)}"></span>
         ${h.col ? `<span class="r-col">${esc(h.col)}</span><span class="r-in">${esc(h.tb.name)}</span>` : `<span class="r-name">${esc(h.tb.name)}</span>`}
-        <span class="r-meta">${esc(meta(h.tb))}${h.col ? ' · ' + esc(t('column')) : ''}</span></li>`).join('')
+        <span class="r-meta">${esc(meta(h.tb))}${h.val ? ' · ' + esc(h.val) : h.col ? ' · ' + esc(t('column')) : ''}</span></li>`).join('')
     : `<li class="none">${esc(t('noMatch'))}</li>`;
   results.hidden = false;
 }

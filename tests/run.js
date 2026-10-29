@@ -114,6 +114,11 @@ const EXPECT = {
     check('sigorta: @ref ile sözlük tablosuna koşullu ilişki', pd && pd.refCols[0] === 'KOD' && pd.filter === "KOD_TIP = 'POLICE_DURUM'", pd && [pd.refCols, pd.filter]);
     check('sigorta: 4 @ref ilişkisi, uyarı yok', m.stats.refs === 4 && !m.stats.warnings.length, [m.stats.refs, m.stats.warnings]);
     check('sigorta: @ref PK\'ye (MUSTERI)', rel(m, 'HASAR_IHBAR', 'IHBAR_EDEN_MUSTERI_NO', 'MUSTERI', 'ref'));
+    const vals = (t, c) => (find(m, t).colIdx.get(c).values || []).map(v => v.code + '=' + v.label).join(', ');
+    check('sigorta: açıklamadaki değer listeleri', vals('MUSTERI', 'MUSTERI_TIP') === 'G=Gerçek kişi, T=Tüzel kişi' && vals('MUSTERI', 'CINSIYET') === 'E=Erkek, K=Kadın, B=Belirtilmemiş' && vals('MUSTERI', 'KARA_LISTE') === 'E=Evet, H=Hayır', [vals('MUSTERI', 'MUSTERI_TIP'), vals('MUSTERI', 'CINSIYET'), vals('MUSTERI', 'KARA_LISTE')]);
+    const kanal = find(m, 'HASAR_IHBAR').colIdx.get('IHBAR_KANAL');
+    check('sigorta: listenin önündeki metin ayrı tutulur', kanal.values.length === 4 && kanal.valuesNote === 'İhbarın geldiği kanal', [kanal.values.length, kanal.valuesNote]);
+    check('sigorta: @ref açıklaması değer listesi sayılmaz', !find(m, 'POLICE').colIdx.get('POLICE_DURUM').values || find(m, 'POLICE').colIdx.get('POLICE_DURUM').valuesSrc !== 'comment');
     check('sigorta: KOD_TABLO sözlük, MUSTERI değil', find(m, 'KOD_TABLO').dictionary && !find(m, 'MUSTERI').dictionary && m.stats.dictionaries === 1);
     check('sigorta: sözlüğe giden ilişkiler işaretli', m.rels.filter(r => r.dict).length === 3 && !rel(m, 'HASAR_IHBAR', 'IHBAR_EDEN_MUSTERI_NO', 'MUSTERI', 'ref').dict);
     const labels = lay.schemas[0].groups.map(g => g.label).sort();
@@ -267,6 +272,27 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   const off = dm(dsql, new Map([['main|.SOZLUK', false]]));
   const on = dm(dsql, new Map([['main|.B', true]]));
   check('sözlük elle kapatılır ve açılır', !find(off, 'sozluk').dictionary && !off.rels.some(r => r.dict) && find(on, 'b').dictionary && rel(on, 'a', 'b_id', 'b').dict, [find(off, 'sozluk').key]);}
+
+// Açıklamadaki değer listeleri
+{
+  const v = s => { const r = NS.valuesFromComment(s); return r ? r.map(x => x.code + '=' + x.label).join(',') : null; };
+  const yes = {
+    '1 = Aktif, 2 = Pasif, 3 = İptal': '1=Aktif,2=Pasif,3=İptal',
+    'Abone durumu: 1 = Aktif, 2 = Pasif': '1=Aktif,2=Pasif',
+    'A: Aktif; P: Pasif': 'A=Aktif,P=Pasif',
+    'E-Evet / H-Hayır': 'E=Evet,H=Hayır',
+    'Durum (1=Aktif, 2=Pasif)': '1=Aktif,2=Pasif',
+    '1=Bireysel|2=Kurumsal': '1=Bireysel,2=Kurumsal',
+    '0 => kapalı, 1 => açık': '0=kapalı,1=açık',
+    'active: kullanılıyor, passive: kapalı': 'active=kullanılıyor,passive=kapalı',
+  };
+  const wrongYes = Object.entries(yes).filter(([s, e]) => v(s) !== e).map(([s]) => [s, v(s)]);
+  check('değer listesi biçimleri', !wrongYes.length, wrongYes);
+  const no = ['Not: bu alan eski, Kaynak: SAP', 'Sürüm 2 = yeni biçim', 'Tarih: 2024-01-01', 'E-posta adresi, SMS izni', 'Durum. @ref SOZLUK.ID (TIP_ID = 7)', 'a = b'];
+  const wrongNo = no.filter(s => v(s));
+  check('değer listesi sanılmayan açıklamalar', !wrongNo.length, wrongNo.map(s => [s, v(s)]));
+  check('listenin dışındaki metin', NS.valuesFromComment('G = Gerçek, T = Tüzel. Varsayılan G').rest === 'Varsayılan G');
+}
 
 // Adlandırma sınıflandırıcıları
 {

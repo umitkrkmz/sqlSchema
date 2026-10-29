@@ -34,6 +34,48 @@ const REF_PART = '(?:"[^"]+"|[\\p{L}\\p{N}_$#]+)';
 const REF_TAG = new RegExp(`@ref\\s+(${REF_PART}(?:\\.${REF_PART}){0,2})(?:\\s*\\(([^)]*)\\))?`, 'iu');
 const refParts = s => s.match(new RegExp(REF_PART, 'gu')).map(p => p.replace(/^"|"$/g, ''));
 
+/*
+ * Açıklamadaki değer listesi: "1 = Aktif, 2 = Pasif" · "A: Aktif; P: Pasif" · "E-Evet / H-Hayır".
+ * Kodun anlamı ayrı bir sözlük tablosunda değil açıklamada yazılıdır. Yanlış yakalamaya karşı:
+ * en az iki ardışık çift, aynı ayraç, kod gibi görünen kısa kodlar (1, A, AKTIF, active; "Kaynak" değil).
+ */
+const VALUE_PAIR = /(?<![\p{L}\p{N}_])([\p{L}\p{N}_]{1,12})\s*(=>|->|→|=|:|–|-)\s*([^=:]+?)\s*$/u;
+const CODE_LIKE = /^(?:\p{N}+|[\p{Lu}\p{N}_]+|[\p{Ll}\p{N}_]+)$/u;
+
+// Dönen dizinin .rest alanı, açıklamanın listeden geriye kalan kısmıdır ("Abone durumu"); panel onu ayrıca yazar
+function valuesFromComment(text) {
+  if (!text) return null;
+  const s = String(text).replace(new RegExp(REF_TAG.source, 'giu'), ' ');
+  const segs = s.split(/\s*[,;|\n]\s*|\s+\/\s+/);
+  let best = [], run = [], sep = null;
+  const flush = () => { if (run.length > best.length) best = run; run = []; sep = null; };
+  segs.forEach((seg, i) => {
+    const m = VALUE_PAIR.exec(seg);
+    const dash = m && (m[2] === '-' || m[2] === '–');
+    const parts = m ? m[3].split(/\.\s/) : [];
+    const label = m && parts[0].replace(/[\s.)\]]+$/, '').trim();
+    if (!m || !CODE_LIKE.test(m[1]) || (dash && !/^[\p{Lu}\p{N}]{1,4}$/u.test(m[1])) || !label || label.length > 60) { flush(); return; }
+    if ((sep && sep !== m[2]) || run.some(v => v.code === m[1])) flush();
+    run.push({ code: m[1], label, i, before: seg.slice(0, m.index), after: parts.slice(1).join('. ') });
+    sep = m[2];
+  });
+  flush();
+  if (best.length < 2) return null;
+  const used = new Set(best.map(v => v.i));
+  const rest = [];
+  segs.forEach((seg, i) => {
+    if (!used.has(i)) rest.push(seg);
+    else {
+      const v = best.find(x => x.i === i);
+      if (v.before.trim()) rest.push(v.before);
+      if (v.after.trim()) rest.push(v.after);
+    }
+  });
+  const list = best.map(v => ({ code: v.code, label: v.label }));
+  list.rest = rest.map(x => x.replace(/[\s:(.\-–]+$/, '').trim()).filter(Boolean).join(' · ') || null;
+  return list;
+}
+
 function typeFamily(type) {
   const t = String(type || '').toUpperCase();
   if (!t) return '';
@@ -285,7 +327,14 @@ function buildModel(inputs, opts = {}) {
 
   const alive = () => [...tables.values()].filter(t => !t.dropped);
   for (const t of alive()) {
-    for (const c of t.columns) if (t.pk.some(p => U(p) === U(c.name))) { c.pk = true; c.nullable = false; }
+    for (const c of t.columns) {
+      if (t.pk.some(p => U(p) === U(c.name))) { c.pk = true; c.nullable = false; }
+      // kod değerleri: c.values = [{ code, label }], c.valuesSrc kaynağı söyler
+      const v = valuesFromComment(c.comment);
+      c.values = v ? v.slice() : null;
+      c.valuesSrc = v ? 'comment' : null;
+      c.valuesNote = v ? v.rest : null;
+    }
   }
 
   // Tanımlı FK'ler
@@ -450,6 +499,7 @@ function buildModel(inputs, opts = {}) {
       implicit: rels.filter(r => r.kind === 'implicit').length,
       refs: rels.filter(r => r.kind === 'ref').length,
       dictionaries: all.filter(t => t.dictionary).length,
+      valueLists: all.reduce((s, t) => s + t.columns.filter(c => c.values).length, 0),
       embeds: rels.filter(r => r.kind === 'embed').length,
       junctions: all.filter(t => t.junction).length,
       indexes: inputs.reduce((s, i) => s + i.stats.indexes, 0),
@@ -530,5 +580,5 @@ function inferImplicit(all, rels, getCol, U) {
   }
 }
 
-Object.assign(NS, { buildModel, typeFamily });
+Object.assign(NS, { buildModel, typeFamily, valuesFromComment });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});

@@ -806,7 +806,15 @@ function drawCards() {
       }
       ctx.font = `${c.nullable ? 400 : 500} ${8.5 * k}px ${FONT_SANS}`;
       ctx.fillStyle = c.nullable ? 'rgba(200,210,235,0.62)' : C.text;
-      ctx.fillText(fitText(c.name, W * 0.54), x0 + 22 * k, y + 0.5);
+      const cname = fitText(c.name, W * 0.54 - (c.values ? 8 * k : 0));
+      ctx.fillText(cname, x0 + 22 * k, y + 0.5);
+      // değer listesi olan kolon: adın yanında ≡ (değerler panelde)
+      if (c.values) {
+        const nx = x0 + 22 * k + ctx.measureText(cname).width + 3 * k;
+        ctx.font = `${7.5 * k}px ${FONT_MONO}`;
+        ctx.fillStyle = 'rgba(242,180,90,0.85)';
+        ctx.fillText('\u{2261}', nx, y + 0.5);
+      }
       ctx.textAlign = 'right';
       ctx.font = `${7 * k}px ${FONT_MONO}`;
       const dict = !S.dictLines && t._dict.get(c.name.toUpperCase());

@@ -92,12 +92,23 @@ SGR.CESSION | Poliçe bazında devir | CESSION_NO pk; POLICE_NO nn; ANLASMA_NO n
 `,
 };
 
-// Durum kolonları genel kod tablosunun yalnızca bir tipine bağlıdır; FK ile tanımlanamaz, DBA açıklamaya @ref yazmıştır
-const REFS = {
+// Kolon açıklamaları:
+//   durum kolonları genel kod tablosunun yalnızca bir tipine bağlıdır; FK ile tanımlanamaz, DBA açıklamaya @ref yazmıştır
+//   bazı kodların anlamı ise ayrı bir tabloda değil doğrudan açıklamada yazılıdır ("G = Gerçek kişi, T = Tüzel kişi")
+const COMMENTS = {
   'SGR.POLICE': { POLICE_DURUM: "Poliçe durumu. @ref KOD_TABLO.KOD (KOD_TIP = 'POLICE_DURUM')" },
   'SGR.HASAR_DOSYA': { DOSYA_DURUM: "Dosya durumu. @ref KOD_TABLO.KOD (KOD_TIP = 'DOSYA_DURUM')" },
   'SGR.TEKLIF': { DURUM_KOD: "Teklif durumu. @ref KOD_TABLO.KOD (KOD_TIP = 'TEKLIF_DURUM')" },
-  'SGR.HASAR_IHBAR': { IHBAR_EDEN_MUSTERI_NO: 'İhbarı yapan kişi; sigortalı olmayabilir. @ref MUSTERI' },
+  'SGR.HASAR_IHBAR': {
+    IHBAR_EDEN_MUSTERI_NO: 'İhbarı yapan kişi; sigortalı olmayabilir. @ref MUSTERI',
+    IHBAR_KANAL: 'İhbarın geldiği kanal: ACN = Acente, CAG = Çağrı merkezi, WEB = İnternet şubesi, MOB = Mobil uygulama',
+  },
+  'SGR.MUSTERI': {
+    MUSTERI_TIP: 'G = Gerçek kişi, T = Tüzel kişi',
+    CINSIYET: 'E: Erkek; K: Kadın; B: Belirtilmemiş',
+    KARA_LISTE: 'Sahtecilik şüphesi. E-Evet / H-Hayır',
+  },
+  'SGR.POLICE_ZEYL': { ZEYL_TIP: 'Zeyilname tipi (1=Teminat ekleme, 2=Teminat çıkarma, 3=Bilgi değişikliği, 4=İptal)' },
 };
 
 const INDEXES = {
@@ -141,7 +152,7 @@ module.exports = {
     const files = {};
     for (const [mod, spec] of Object.entries(MODULES)) {
       const t = lib.parseSpec(spec, { infer: RULES });
-      for (const [key, cols] of Object.entries(REFS)) {
+      for (const [key, cols] of Object.entries(COMMENTS)) {
         if (!t.has(key)) continue;
         for (const [col, text] of Object.entries(cols)) t.get(key).cols.find(c => c.name === col).comment = text;
       }
