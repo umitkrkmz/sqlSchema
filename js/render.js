@@ -867,9 +867,9 @@ function resize() {
 function fitView(animate) {
   if (!S.lay) return;
   const b = S.lay.bounds;
-  // panel ve açık lejantın kapladığı şeritleri hesaba kat
+  // panel, tablo listesi ve açık lejantın kapladığı şeritleri hesaba kat
   const right = S.sel && !$('#panel').hidden && S.w > 820 ? 384 : 0;
-  const left = !document.body.classList.contains('legend-closed') && S.w > 980 ? 312 : 0;
+  const left = !$('#tableList').hidden && S.w > 980 ? 304 : !document.body.classList.contains('legend-closed') && S.w > 980 ? 312 : 0;
   const k = clamp(Math.min((S.w - left - right - 60) / (b.maxX - b.minX), (S.h - 80) / (b.maxY - b.minY)), 0.005, 1.6);
   const target = { x: (b.minX + b.maxX) / 2 + (right - left) / 2 / k, y: (b.minY + b.maxY) / 2, k };
   S.kMin = k * 0.4;
@@ -905,7 +905,8 @@ function zoomAt(px, py, f) {
 
 function flyToTable(t, k) {
   const kk = k || Math.max(S.cam.k, 0.85);
-  const offset = !$('#panel').hidden && S.w > 820 ? 190 : 0;
+  // sağdaki panel ve soldaki tablo listesi arasında kalan alanın ortasına
+  const offset = (!$('#panel').hidden && S.w > 820 ? 190 : 0) - (!$('#tableList').hidden && S.w > 980 ? 150 : 0);
   flyTo({ x: t.x + offset / kk, y: t.y, k: kk });
 }
 

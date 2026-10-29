@@ -6,13 +6,13 @@
  * URL parametreleri (paylaşılabilir bağlantılar ve belge görüntüleri için):
  *   ?lang=tr|en   ?sample=<örnek kimliği>   ?select=<tablo adı>   ?center=<tablo adı>   ?zoom=<1.6>   ?legend=0|1
  *   ?pop=naming|report|files   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
- *   ?grouping=auto|file|name
+ *   ?grouping=auto|file|name   ?list=0|1
  */
 (function (NS) {
 'use strict';
 
 const {
-  S, $, canvas, CARD, DIALECTS, t,
+  S, $, canvas, CARD, PALETTE, DIALECTS, t,
   levelOf, wx, wy, starR, cardRows, keyTag, schemaColor, schemaLabel, groupLabel, relStyle, relVisible,
   drawGlyph, refreshEmphasis, invalidate, draw, resetHud, resize, fitView, zoomAt, flyToTable,
   classify, orderFiles, parseFile, databaseNames, harmonizeDialects, buildModel, layoutModel, resolveGrouping, namingProfile,
@@ -84,6 +84,7 @@ function rebuild() {
   renderReport();
   renderNaming();
   renderFiles();
+  renderList();
   resetHud();
   document.body.classList.add('loaded');
   $('#empty').hidden = true;
@@ -457,9 +458,112 @@ function select(tb, opts = {}) {
   if (tb && !opts.fromHistory) pushHistory(tb);
   refreshEmphasis();
   renderPanel();
+  markListSel();
   invalidate();
   if (tb && opts.fly) flyToTable(tb, opts.k);
 }
+
+/* ─── Tablo listesi ─── */
+
+// Veritabanı › şema › takımyıldız › tablo. "Tabloları sırayla gezmek" için: ↑ ↓ seçimi ve haritayı birlikte taşır.
+// Varsayılan kapalı (Görünüm menüsü ya da L); açıkken lejant kapanır, ikisi aynı kenarı paylaşır.
+S.list = false;
+S.listOrder = 'file';
+let listKeys = [];
+
+// Dosyadaki sıra: tablonun tanımlandığı dosya ve satır; dosyası olmayanlar (dış başvurular) en sonda
+const fileOrder = (a, b) => {
+  const fa = a.src ? a.src.file : '\u{FFFF}', fb = b.src ? b.src.file : '\u{FFFF}';
+  return fa.localeCompare(fb, undefined, { numeric: true }) || (a.src ? a.src.line : 0) - (b.src ? b.src.line : 0) || String(a.name).localeCompare(String(b.name));
+};
+
+function renderList() {
+  if (!S.list || !S.model) return;
+  const fold = s => String(s || '').normalize('NFD').replace(/[\u{300}-\u{36F}]/gu, '').toUpperCase();
+  const f = fold($('#tlFilter').value.trim());
+  const multiDb = S.lay.dbs.length > 1, multiSchema = S.lay.schemas.length > 1;
+  const out = [];
+  listKeys = [];
+  let shown = 0, total = 0;
+  for (const s of S.lay.schemas) {
+    const groups = s.groups.map(g => {
+      const ts = g.tables.filter(tb => !tb.embedded);
+      total += ts.length;
+      const hit = f ? ts.filter(tb => fold(tb.name).includes(f)) : ts;
+      return { g, ts: hit.sort(S.listOrder === 'file' ? fileOrder : (a, b) => String(a.name).localeCompare(String(b.name))) };
+    }).filter(x => x.ts.length);
+    if (!groups.length) continue;
+    if (multiSchema) out.push(`<div class="tl-schema" style="--c:${PALETTE[s.index % PALETTE.length]}">${esc((multiDb ? s.db.label + ' / ' : '') + schemaLabel(s))}</div>`);
+    for (const { g, ts } of groups) {
+      if (s.groups.length > 1) out.push(`<div class="tl-group">${esc(groupLabel(g))} <span>${ts.length}</span></div>`);
+      for (const tb of ts) {
+        listKeys.push(tb.key);
+        shown++;
+        const tags = [
+          !tb.external && !tb.pk.length ? `<i class="bad">${esc(t('tagNoPk'))}</i>` : '',
+          tb.junction ? '<i>M:N</i>' : '',
+          tb.dictionary ? `<i class="acc">${esc(t('tagDict'))}</i>` : '',
+          tb.external ? `<i>${esc(t('tagExternal'))}</i>` : '',
+        ].join('');
+        out.push(`<button class="tl-row${tb === S.sel ? ' on' : ''}${tb.external ? ' ext' : ''}" data-key="${esc(tb.key)}" tabindex="-1"><span class="tl-name">${esc(tb.name)}</span>${tags}<span class="tl-n">${tb.columns.length}</span></button>`);
+      }
+    }
+  }
+  $('#tlBody').innerHTML = out.join('') || `<p class="tl-none">${esc(t('noMatch'))}</p>`;
+  $('#tlCount').textContent = f ? `${shown} / ${total}` : String(total);
+  for (const b of document.querySelectorAll('#tableList [data-order]')) b.setAttribute('aria-pressed', String(b.dataset.order === S.listOrder));
+  markListSel();
+}
+
+function markListSel() {
+  if (!S.list) return;
+  const prev = $('#tlBody .tl-row.on');
+  if (prev) prev.classList.remove('on');
+  if (!S.sel) return;
+  const row = $(`#tlBody .tl-row[data-key="${CSS.escape(S.sel.key)}"]`);
+  if (row) { row.classList.add('on'); row.scrollIntoView({ block: 'nearest' }); }
+}
+
+// persist: kullanıcının seçimi hatırlanır; ?list=1 gibi bağlantı parametreleri hatırlanmaz
+function setList(on, persist = true) {
+  S.list = on;
+  $('#tableList').hidden = !on;
+  $('#tList').checked = on;
+  document.body.classList.toggle('has-list', on);
+  if (on) document.body.classList.add('legend-closed');
+  if (persist) { try { localStorage.setItem('sqlschema.list', on ? '1' : '0'); } catch (err) { /* depolama kapalı */ } }
+  renderList();
+}
+
+// Listede bir satıra geç: seçim, panel ve harita birlikte ilerler
+function listGo(i) {
+  if (!listKeys.length) return;
+  const k = listKeys[Math.max(0, Math.min(listKeys.length - 1, i))];
+  const tb = S.byKey.get(k);
+  if (tb) select(tb, { fly: true });
+  const row = $(`#tlBody .tl-row[data-key="${CSS.escape(k)}"]`);
+  if (row) row.focus({ preventScroll: true });
+}
+
+$('#tList').addEventListener('change', e => setList(e.target.checked));
+$('#tlFilter').addEventListener('input', renderList);
+$('#tableList').addEventListener('click', e => {
+  const order = e.target.closest('[data-order]');
+  if (order) { S.listOrder = order.dataset.order; renderList(); return; }
+  const row = e.target.closest('.tl-row');
+  if (row) listGo(listKeys.indexOf(row.dataset.key));
+});
+$('#tableList').addEventListener('keydown', e => {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') {
+    if (e.key === 'Escape') { e.stopPropagation(); setList(false); }
+    return;
+  }
+  e.preventDefault();
+  e.stopPropagation();
+  const cur = document.activeElement && document.activeElement.dataset ? listKeys.indexOf(document.activeElement.dataset.key) : -1;
+  const from = cur >= 0 ? cur : S.sel ? listKeys.indexOf(S.sel.key) : -1;
+  listGo(from < 0 ? 0 : from + (e.key === 'ArrowDown' ? 1 : -1));
+});
 
 /* ─── Gezinme geçmişi ─── */
 
@@ -829,6 +933,10 @@ window.addEventListener('keydown', e => {
     else select(null);
   } else if (e.key === 'f' || e.key === 'F') fitView(true);
   else if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey) setColumns(!S.columns);
+  else if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.metaKey) {
+    setList(!S.list);
+    if (S.list) listGo(S.sel ? listKeys.indexOf(S.sel.key) : 0);
+  }
   else if (e.key === '+' || e.key === '=') zoomAt(S.w / 2, S.h / 2, 1.4);
   else if (e.key === '-' || e.key === '_') zoomAt(S.w / 2, S.h / 2, 1 / 1.4);
 });
@@ -866,8 +974,11 @@ document.addEventListener('click', e => {
     case 'files': togglePop('#filesPop'); break;
     case 'naming': togglePop('#namingPop'); break;
     case 'naming-md': if (S.model) downloadText(namingMarkdown(), fileStem() + '-' + t('namingFile') + '.md', 'text/markdown;charset=utf-8'); break;
+    case 'list-close': setList(false); break;
     case 'legend':
       document.body.classList.toggle('legend-closed');
+      // lejant ve tablo listesi aynı kenarı paylaşır
+      if (!document.body.classList.contains('legend-closed') && S.list) setList(false);
       try { localStorage.setItem('sqlschema.legend', document.body.classList.contains('legend-closed') ? '0' : '1'); } catch (err) { /* depolama kapalı */ }
       break;
   }
@@ -975,6 +1086,7 @@ NS.onLangChange(() => {
     renderReport();
     renderNaming();
     renderFiles();
+    renderList();
     resetHud();
   }
   if (S.title && S.files.length > 1 && /^\d+ /.test(S.title)) $('#fileName').textContent = t('nFiles', { n: S.files.filter(f => f.text != null).length });
@@ -1003,6 +1115,9 @@ try {
     S.dictLines = localStorage.getItem('sqlschema.dictLines') === '1';
   } catch (err) { /* depolama kapalı */ }
   $('#tDictLines').checked = S.dictLines;
+  let list = params.get('list');
+  if (list !== '0' && list !== '1') { try { list = localStorage.getItem('sqlschema.list'); } catch (err) { list = null; } }
+  if (list === '1') setList(true, false);
 }
 
 // Konsoldan inceleme için: sqlSchema.S.model.tables, sqlSchema.loadText(metin, 'ad.sql')

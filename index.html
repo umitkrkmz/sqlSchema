@@ -45,6 +45,7 @@
     <div class="menu">
       <button class="btn ghost" data-act="view" aria-haspopup="true"><span data-i18n="view"></span> <span aria-hidden="true">▾</span></button>
       <div class="menu-list view-menu pop" id="viewMenu" hidden>
+        <label class="opt"><input type="checkbox" id="tList"><span><b data-i18n="optList"></b><small data-i18n="optListHint"></small></span><kbd>L</kbd></label>
         <label class="opt"><input type="checkbox" id="tColumns" checked><span><b data-i18n="optColumns"></b><small data-i18n="optColumnsHint"></small></span><kbd>C</kbd></label>
         <label class="opt"><input type="checkbox" id="tImplicit" checked><span><b data-i18n="implicit"></b><small data-i18n="optImplicitHint"></small></span></label>
         <label class="opt"><input type="checkbox" id="tDictLines"><span><b data-i18n="optDictLines"></b><small data-i18n="optDictLinesHint"></small></span></label>
@@ -88,6 +89,19 @@
   <div id="dropOverlay" class="drop-overlay" hidden><span data-i18n="dropHere"></span></div>
 
   <aside id="panel" class="panel" hidden></aside>
+
+  <aside id="tableList" class="tlist" hidden data-i18n-attr="aria-label:listTitle">
+    <div class="tl-head">
+      <h4><span data-i18n="listTitle"></span> <small id="tlCount"></small></h4>
+      <button class="p-close" data-act="list-close" data-i18n-attr="aria-label:listClose;title:listClose">×</button>
+    </div>
+    <input id="tlFilter" type="search" autocomplete="off" spellcheck="false" data-i18n-attr="placeholder:listFilterPh;aria-label:listFilterPh">
+    <div class="tl-order" role="group">
+      <button data-order="file" data-i18n="listOrderFile" data-i18n-attr="title:listOrderFileTitle"></button>
+      <button data-order="name" data-i18n="listOrderName"></button>
+    </div>
+    <div id="tlBody" class="tl-body"></div>
+  </aside>
 
   <section id="legend" class="legend" data-i18n-attr="aria-label:legend">
     <button class="legend-toggle" data-act="legend" data-i18n="legend"></button>

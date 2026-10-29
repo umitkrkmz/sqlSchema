@@ -452,6 +452,45 @@ table.dict .dc:hover { border-color: var(--accent); color: var(--text); }
 .keys kbd { font-size: 10px; padding: 0 5px; border: 1px solid var(--line-2); border-radius: 4px; color: #c3cbe2; }
 body:not(.loaded) .legend, body:not(.loaded) .hud { display: none; }
 
+/* ─── Tablo listesi ─── */
+.tlist {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  bottom: 56px;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  z-index: 11;
+}
+.tl-head { position: relative; padding: 10px 14px 6px; }
+.tl-head h4 { margin: 0; font: 600 12px var(--cond); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+.tl-head small { margin-left: 6px; font: 11px var(--mono); letter-spacing: 0; color: var(--faint); }
+.tl-head .p-close { top: 6px; right: 8px; }
+.tlist input { margin: 0 12px 6px; padding: 5px 8px; background: var(--bg-2); color: var(--text); border: 1px solid var(--line-2); border-radius: 6px; font: 12px var(--sans); }
+.tl-order { display: flex; gap: 4px; margin: 0 12px 8px; }
+.tl-order button { flex: 1; padding: 3px 6px; border: 1px solid var(--line-2); border-radius: 5px; background: transparent; color: var(--dim); font: 11px var(--sans); cursor: pointer; }
+.tl-order button[aria-pressed="true"] { color: var(--text); border-color: var(--accent); background: rgba(242, 180, 90, 0.08); }
+.tl-body { flex: 1; overflow: auto; padding: 0 6px 8px; scrollbar-width: thin; }
+.tl-schema { position: sticky; top: 0; z-index: 1; margin: 6px 0 2px; padding: 4px 8px; background: var(--panel); font: 600 10.5px var(--cond); letter-spacing: 0.14em; text-transform: uppercase; color: var(--c); }
+.tl-group { margin: 6px 8px 2px; font: 600 10px var(--cond); letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+.tl-group span { font: 10px var(--mono); letter-spacing: 0; margin-left: 4px; }
+.tl-row { display: flex; align-items: center; gap: 5px; width: 100%; padding: 3px 8px; border: 0; border-radius: 5px; background: none; text-align: left; color: #c3cbe2; font: 12px var(--sans); cursor: pointer; }
+.tl-row:hover { background: rgba(140, 160, 215, 0.1); color: var(--text); }
+.tl-row:focus { outline: none; }
+.tl-row:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
+.tl-row.on { background: rgba(242, 180, 90, 0.14); color: var(--text); }
+.tl-row.ext { opacity: 0.55; }
+.tl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-row i { flex: none; padding: 0 4px; border: 1px solid var(--line-2); border-radius: 3px; font: normal 9.5px var(--mono); color: var(--dim); }
+.tl-row i.bad { color: var(--rose); border-color: rgba(239, 123, 134, 0.45); }
+.tl-row i.acc { color: var(--accent); border-color: rgba(242, 180, 90, 0.45); }
+.tl-n { flex: none; min-width: 18px; text-align: right; font: 10.5px var(--mono); color: var(--faint); }
+.tl-none { margin: 10px; color: var(--dim); font-size: 12px; }
+
 /* ─── HUD, rapor, bildirim ─── */
 .hud {
   position: absolute;
@@ -623,6 +662,8 @@ body:not(.loaded) .legend, body:not(.loaded) .hud { display: none; }
   .has-panel .hud, .has-panel .report { right: 12px; }
   .has-panel .hud, .has-panel .legend { display: none; }
   .legend { width: calc(100% - 24px); max-height: 50%; }
+  .tlist { width: calc(100% - 24px); bottom: 56px; }
+  .has-panel .tlist { display: none; }
   .hud { bottom: auto; top: 10px; right: 12px; }
   .hud #hudStats { display: none; }
   .report { bottom: auto; top: 46px; }

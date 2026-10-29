@@ -5,6 +5,11 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Eklendi · Added
+
+- **Tablo listesi (`L`):** şema ve takımyıldız başlıkları altında bütün tablolar; dosya sırası ya da A → Z, `↑` / `↓` ile seçim ve harita birlikte ilerler, süzme kutusu, PK yok / M:N / sözlük / dış işaretleri. Görünüm menüsünden açılır, `?list=1`.
+  Table list (`L`): every table under schema and constellation headings; file order or A → Z, `↑` / `↓` moves the selection and the map together, a filter box, no-PK / M:N / lookup / external tags. Opened from the View menu, `?list=1`.
+
 ## [0.5.0] - 2026-10-29
 
 ### Eklendi · Added

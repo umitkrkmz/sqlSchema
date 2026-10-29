@@ -85,6 +85,7 @@ python -m http.server 8000
 | `/` | Tablo ya da kolon ara |
 | `F` | Tümünü sığdır |
 | `C` | Kolon ayrıntılarını gizle / göster |
+| `L` | Tablo listesini aç / kapat |
 | `↑` / `↓`, `Enter` | Paneldeki ilişkiler arasında dolaş, seçilen tabloya git |
 | `Alt` + `←` / `→` | Gezinme geçmişinde geri / ileri |
 | `Esc` | Odak modunu kapat / seçimi bırak |
@@ -101,7 +102,7 @@ Yakınlaştırma düzeyine göre üç görünüm vardır:
 | Takımyıldız | Tablolar yıldız olur: boyut = bağlantı sayısı, renk = şema. Seçili tablonun çizgilerinde karga ayağı ve kolon adı yazar. |
 | Yakın plan | Tablolar kart olur; çizgiler doğrudan FK ve PK kolon satırlarına bağlanır. |
 
-**Görünüm** menüsünde kolon ayrıntıları, tahmini ilişkiler, sözlük bağlantıları, ızgara ve takımyıldız gruplaması seçenekleri var. **Kolon ayrıntıları** kapatılınca (kısayolu `C`) yakın planda kartlar yalnızca tablo adını gösterir ve çizgiler kartın başlığına bağlanır. Böylece yalnızca tablolar ve ilişkileri kalır. Ayrıntı paneli kolonları göstermeye devam eder. Seçim tarayıcıda hatırlanır.
+**Görünüm** menüsünde tablo listesi, kolon ayrıntıları, tahmini ilişkiler, sözlük bağlantıları, ızgara ve takımyıldız gruplaması seçenekleri var. **Kolon ayrıntıları** kapatılınca (kısayolu `C`) yakın planda kartlar yalnızca tablo adını gösterir ve çizgiler kartın başlığına bağlanır. Böylece yalnızca tablolar ve ilişkileri kalır. Ayrıntı paneli kolonları göstermeye devam eder. Seçim tarayıcıda hatırlanır.
 
 <img src="docs/images/tr/secim-ve-panel.png" alt="Seçili tablo, vurgulu ilişkileri ve ayrıntı paneli" width="900">
 
@@ -111,6 +112,15 @@ Ayrıntı panelinde kolonlar, açıklamalar, tanımın geçtiği dosya ve satır
 **Odak modu**, seçili tablonun yalnızca 1 ya da 2 adım uzaklıktaki komşularını bırakır, gerisini söndürür.
 
 **İlişki izlemek.** Paneldeki bir ilişkiye tıklamak (ya da `↓` ile seçip `Enter`) o tabloya gider. Panelin üstündeki **iz** gezilen tabloları sırasıyla gösterir (`ABONE › IS_EMRI › CIHAZ`); izdeki bir ada, `‹ ›` düğmelerine ya da `Alt` + `←` / `→` tuşlarına basarak geri ve ileri gidilir. Böylece fareye dokunmadan şema baştan sona gezilebilir.
+
+**Tablo listesi.** Bütün tabloları şema ve takımyıldız başlıkları altında listeler (**Görünüm → Tablo listesi** ya da `L`; varsayılan kapalı):
+- **Sıra:** tablolar ya SQL dosyasında tanımlandıkları sırayla (**Dosya sırası**) ya da ada göre (**A → Z**) dizilir.
+- **Gezinme:** `↑` / `↓` ile tablodan tabloya geçilir; seçim, panel ve harita birlikte ilerler. Arama kutusundan `↓` ile listeye inilir.
+- **Süzme:** listenin üstündeki kutu yalnızca listeyi süzer, haritayı değiştirmez.
+- **İşaretler:** her satırda kolon sayısı; PK'si olmayan, ara (M:N), sözlük ve dış tablolar küçük etiketlerle işaretlenir.
+- Liste ve lejant aynı kenarı paylaşır; biri açılınca öteki kapanır. Seçim tarayıcıda hatırlanır.
+
+<img src="docs/images/tr/tablo-listesi.png" alt="Tablo listesi: modül takımyıldızlarına göre sıralı tablolar ve seçili tablo" width="900">
 
 <img src="docs/images/tr/yakin-plan.png" alt="Yakın plan: kolon satırlarına bağlanan çizgiler ve karga ayağı uçları" width="900">
 
@@ -533,6 +543,7 @@ python -m http.server 8000
 | `/` | Search tables or columns |
 | `F` | Fit everything |
 | `C` | Hide / show column details |
+| `L` | Open / close the table list |
 | `↑` / `↓`, `Enter` | Move through the panel's relationships, go to the chosen table |
 | `Alt` + `←` / `→` | Back / forward in the navigation history |
 | `Esc` | Leave focus mode / clear the selection |
@@ -549,7 +560,7 @@ The view changes with the zoom level:
 | Constellation | Tables become stars: size = number of links, colour = schema. The lines of the selected table show crow's feet and column names. |
 | Close-up | Tables become cards; lines attach directly to the FK and PK column rows. |
 
-The **View** menu holds the column details, inferred relations, lookup links, grid and constellation grouping options. With **column details** off (shortcut `C`), close-up cards show only the table name and lines attach to the card header, leaving just tables and their relationships. The detail panel still lists the columns. The choice is remembered in the browser.
+The **View** menu holds the table list, column details, inferred relations, lookup links, grid and constellation grouping options. With **column details** off (shortcut `C`), close-up cards show only the table name and lines attach to the card header, leaving just tables and their relationships. The detail panel still lists the columns. The choice is remembered in the browser.
 
 <img src="docs/images/en/secim-ve-panel.png" alt="A selected table, its highlighted relationships and the detail panel" width="900">
 
@@ -561,6 +572,15 @@ The detail panel lists:
 **Focus mode** keeps only the neighbours one or two steps away from the selected table and dims everything else.
 
 **Following relationships.** Clicking a relationship in the panel (or picking it with `↓` and pressing `Enter`) goes to that table. The **trail** at the top of the panel lists the tables visited in order (`ABONE › IS_EMRI › CIHAZ`); click a name in it, the `‹ ›` buttons, or press `Alt` + `←` / `→` to go back and forward. The whole schema can be walked without touching the mouse.
+
+**Table list.** Lists every table under schema and constellation headings (**View → Table list** or `L`; off by default):
+- **Order:** tables are listed in the order they are defined in the SQL files (**File order**) or by name (**A → Z**).
+- **Navigation:** `↑` / `↓` moves from table to table; the selection, the panel and the map move together. Press `↓` in the filter box to step into the list.
+- **Filter:** the box at the top filters only the list, not the map.
+- **Marks:** each row shows the column count; tables without a PK, junction (M:N), lookup and external tables carry small tags.
+- The list and the legend share the same edge; opening one closes the other. The choice is remembered in the browser.
+
+<img src="docs/images/en/tablo-listesi.png" alt="Table list: tables ordered by module constellation, with the selected table" width="900">
 
 <img src="docs/images/en/yakin-plan.png" alt="Close-up: lines attached to column rows, with crow's foot ends" width="900">
 
