@@ -12,6 +12,8 @@
  *       fks:   [{ status: added | removed, rel }]
  *     byAfter, byBefore: tablo → kayıt · summary: { added, removed, changed, renamed, same }
  *   }
+ *   timeline(models) → { steps, idOf, union, unionRels }   (migration sürümleri, aşağıda)
+ *   tableHistory(tl, id) → [{ step, status, entry }]
  */
 (function (NS) {
 'use strict';
@@ -143,5 +145,57 @@ function diffModels(before, after) {
   };
 }
 
-Object.assign(NS, { diffModels });
+// Zaman çizelgesi: sürüm sürüm kurulmuş modeller. Her adımın bir öncekine farkı (ilk adım boş modele göre)
+// ve tablonun sürümler boyunca kimliği (soy): adı değişen tablo aynı soyda kalır.
+//   steps: [{ model, diff, byId }] · idOf: tablo → soy · union: her soyun son görülen tablosu (sabit yerleşim için)
+//   unionRels: bütün sürümlerdeki ilişkiler, birleşik tablolara bağlanmış
+const EMPTY = { tables: [], rels: [] };
+function timeline(models) {
+  const idOf = new Map(), last = new Map(), steps = [];
+  let next = 0;
+  models.forEach((m, i) => {
+    const diff = diffModels(i ? models[i - 1] : EMPTY, m);
+    const byId = new Map();
+    for (const tb of m.tables) {
+      const e = diff.byAfter.get(tb);
+      const id = e && e.before ? idOf.get(e.before) : next++;
+      idOf.set(tb, id);
+      byId.set(id, tb);
+      last.set(id, tb);
+    }
+    steps.push({ model: m, diff, byId });
+  });
+  const union = [...last.values()];
+  const unionOf = tb => last.get(idOf.get(tb));
+  // son sürümden geriye: aynı ilişki bir kez, en güncel hâliyle
+  const seen = new Set(), unionRels = [];
+  for (let i = models.length - 1; i >= 0; i--) {
+    for (const r of models[i].rels) {
+      if (!idOf.has(r.child) || !idOf.has(r.parent)) continue;
+      const k = idOf.get(r.child) + '>' + idOf.get(r.parent) + ':' + r.kind + ':' + r.cols.map(U).join(',');
+      if (seen.has(k)) continue;
+      seen.add(k);
+      unionRels.push({ ...r, id: unionRels.length, child: unionOf(r.child), parent: unionOf(r.parent) });
+    }
+  }
+  return { steps, idOf, union, unionRels };
+}
+
+// Bir soyun geçmişi: oluştuğu, değiştiği ve silindiği adımlar
+//   [{ step, status: added | changed | removed, entry }]
+function tableHistory(tl, id) {
+  const out = [];
+  tl.steps.forEach((s, i) => {
+    const now = s.byId.get(id);
+    if (now) {
+      const e = s.diff.byAfter.get(now);
+      if (e.status !== 'same') out.push({ step: i, status: e.status, entry: e });
+    } else if (i && tl.steps[i - 1].byId.has(id)) {
+      out.push({ step: i, status: 'removed', entry: s.diff.byBefore.get(tl.steps[i - 1].byId.get(id)) });
+    }
+  });
+  return out;
+}
+
+Object.assign(NS, { diffModels, timeline, tableHistory });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});

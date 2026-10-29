@@ -27,6 +27,7 @@ const SCENES = {
   'mongodb-uydular': 'sample=sosyal&select=posts&zoom=0.75&legend=0',
   'adlandirma-profili': 'sample=karisik&pop=naming&legend=0',
   'sema-farki': 'sample=lojistik&diff=V3&select=shipments&zoom=1.3&legend=0',
+  'zaman-cizelgesi': 'sample=lojistik&time=V4&select=shipments&zoom=0.85&legend=0',
 };
 
 const CANDIDATES = [

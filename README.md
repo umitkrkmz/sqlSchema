@@ -88,6 +88,7 @@ python -m http.server 8000
 | `L` | Tablo listesini aç / kapat |
 | `↑` / `↓`, `Enter` | Paneldeki ilişkiler arasında dolaş, seçilen tabloya git |
 | `Alt` + `←` / `→` | Gezinme geçmişinde geri / ileri |
+| `,` / `.` | Zaman çizelgesinde önceki / sonraki sürüm |
 | `Esc` | Odak modunu kapat / seçimi bırak |
 
 <a id="tr-haritayi-okumak"></a>
@@ -290,6 +291,15 @@ Migration'lar baştan sona uygulanır ve harita şemanın **son hâlini** göste
 
 <img src="docs/images/tr/sema-farki.png" alt="Şema farkı: V3'ten bugüne eklenen, değişen ve adı değişen tablolar" width="900">
 
+**Zaman çizelgesi.** Migration klasöründe **karşılaştır** penceresindeki **Zaman çizelgesi**, sürümleri sırayla oynatır:
+- **Sabit harita:** yerleşim bütün sürümlerdeki tablolardan bir kez kurulur. Adım değişince tablolar yerinde kalır, kamera oynamaz; yalnızca o sürümde var olan tablolar çizilir.
+- **Her adım bir fark:** o sürümün bir öncekine göre eklediği, değiştirdiği ve sildiği tablolar şema farkındaki renklerle görünür. **karşılaştır** penceresi o adımın listesini ve Markdown raporunu verir.
+- **Gezinme:** kaydırıcı, ‹ › düğmeleri ya da `,` / `.` tuşları; ▶ sürümleri sırayla oynatır.
+- **Tablo geçmişi:** seçili tablonun panelinde, oluştuğu, değiştiği ve silindiği sürümler listelenir (`V4__plural_table_names ad: shipment → shipments`). Bir satıra tıklayınca o sürüme gidilir. Adı değişen tablo seçili kalır.
+- **Bağlantı:** `?time=V4` çizelgeyi o sürümde açar.
+
+<img src="docs/images/tr/zaman-cizelgesi.png" alt="Zaman çizelgesi: V4'te adı değişen tablolar ve shipments tablosunun geçmişi" width="900">
+
 **Ayrı veritabanları.** Farklı lehçelerden dosyalar birlikte açılırsa (örneğin MySQL siparişler, MongoDB katalog, PostgreSQL raporlama) her klasör kendi galaksisi olarak çizilir.
 
 <img src="docs/images/tr/coklu-veritabani.png" alt="Üç veritabanı üç ayrı galaksi olarak" width="900">
@@ -463,7 +473,7 @@ js/                 tarayıcıda bu sırayla yüklenir; hepsi globalThis.sqlSche
   mongo.js          $jsonSchema, Mongoose ve JSON belgelerinden aynı işlem listesi
   files.js          dosya sıralama (Flyway, golang-migrate), ayrıştırıcı seçimi
   model.js          işlemleri uygular: tablolar, ilişkiler, kardinalite, ara tablo, tahmini ilişki
-  diff.js           iki modelin farkı: tablo, kolon, PK, FK; ad değişikliği tahmini
+  diff.js           iki modelin farkı: tablo, kolon, PK, FK; ad değişikliği tahmini; zaman çizelgesi
   layout.js         veritabanı → şema → takımyıldız → yıldız, hiyerarşik kuvvet yerleşimi
   conventions.js    adlandırma profili: kalıplar, oranlar, baskın kalıba uymayanlar
   sample-small.js   gömülü küçük örnek
@@ -589,6 +599,7 @@ python -m http.server 8000
 | `L` | Open / close the table list |
 | `↑` / `↓`, `Enter` | Move through the panel's relationships, go to the chosen table |
 | `Alt` + `←` / `→` | Back / forward in the navigation history |
+| `,` / `.` | Previous / next version on the timeline |
 | `Esc` | Leave focus mode / clear the selection |
 
 <a id="en-reading"></a>
@@ -793,6 +804,15 @@ Migrations are applied from first to last, and the map shows the **final state**
 
 <img src="docs/images/en/sema-farki.png" alt="Schema diff: tables added, changed and renamed since V3" width="900">
 
+**Timeline.** In a migration folder, **Timeline** in the **compare** window plays the versions in order:
+- **A stable map:** the layout is built once from the tables of every version. When the step changes, tables stay in place and the camera does not move; only the tables that exist in that version are drawn.
+- **Each step is a diff:** the tables that version added, changed and removed compared with the previous one appear in the schema-diff colours. The **compare** window gives that step's list and Markdown report.
+- **Navigation:** the slider, the ‹ › buttons or the `,` / `.` keys; ▶ plays the versions one after another.
+- **Table history:** the selected table's panel lists the versions in which it was created, changed and dropped (`V4__plural_table_names name: shipment → shipments`). Clicking a row goes to that version. A renamed table stays selected.
+- **Link:** `?time=V4` opens the timeline at that version.
+
+<img src="docs/images/en/zaman-cizelgesi.png" alt="Timeline: tables renamed in V4 and the history of the shipments table" width="900">
+
 **Separate databases.** When files of different dialects are opened together (for example orders in MySQL, a catalogue in MongoDB and reporting in PostgreSQL), each folder is drawn as its own galaxy.
 
 <img src="docs/images/en/coklu-veritabani.png" alt="Three databases drawn as three galaxies" width="900">
@@ -966,7 +986,7 @@ js/                 loaded in this order; each file adds to the globalThis.sqlSc
   mongo.js          the same operation list from $jsonSchema, Mongoose and JSON documents
   files.js          file ordering (Flyway, golang-migrate), parser selection
   model.js          applies operations: tables, relationships, cardinality, junctions, inference
-  diff.js           difference of two models: tables, columns, PK, FK; rename guesses
+  diff.js           difference of two models: tables, columns, PK, FK; rename guesses; timeline
   layout.js         database → schema → constellation → star, hierarchical force layout
   conventions.js    naming profile: patterns, shares, names that depart from the dominant pattern
   sample-small.js   embedded small sample

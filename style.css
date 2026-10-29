@@ -354,6 +354,44 @@ code, kbd { font-family: var(--mono); }
 .diffsec h3 .tag { margin-left: 6px; }
 .df-changes { list-style: none; margin: 0 0 12px; padding: 0; font: 11.5px/1.5 var(--mono); }
 .df-changes li { padding: 1px 0; }
+.diff-pop .df-hint { margin: -4px 0 8px; color: var(--dim); font-size: 11px; line-height: 1.4; }
+
+/* Migration zaman çizelgesi: haritanın altında, HUD'un üstünde */
+.timebar {
+  position: absolute;
+  left: 50%;
+  bottom: 52px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  padding: 6px 8px 6px 14px;
+  background: var(--panel);
+  border: 1px solid rgba(242, 180, 90, 0.5);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  font-size: 12px;
+  z-index: 11;
+}
+.timebar .pb-title { font: 600 11px var(--cond); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+.timebar .tb-btn { width: 28px; height: 26px; padding: 0; border: 1px solid var(--line-2); border-radius: 6px; background: var(--bg-2); color: var(--text); font: 14px/1 var(--sans); cursor: pointer; }
+.timebar .tb-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.timebar .tb-btn:disabled { opacity: 0.35; cursor: default; }
+.timebar input[type="range"] { width: 200px; min-width: 80px; accent-color: var(--accent); }
+.timebar .tb-ver { display: flex; gap: 6px; align-items: baseline; min-width: 0; white-space: nowrap; }
+.timebar .tb-ver b { overflow: hidden; text-overflow: ellipsis; max-width: 220px; font: 500 12px var(--mono); }
+.timebar .tb-ver i { font: normal 10.5px var(--mono); color: var(--faint); }
+.timebar .tb-chips { display: flex; gap: 4px; }
+.timebar .tb-chips i { font: normal 11px var(--mono); padding: 1px 6px; border-radius: 4px; border: 1px solid currentColor; }
+.timebar .tb-chips i.none { border: 0; color: var(--faint); }
+.timebar .p-close { position: static; flex: none; }
+.has-panel .timebar { left: calc(50% - 192px); }
+.tlhist { border-bottom: 1px solid var(--line); }
+.tlhist li { cursor: pointer; padding: 1px 4px; margin: 0 -4px; border-radius: 4px; }
+.tlhist li b { color: var(--text); font-weight: 500; }
+.tlhist li:hover b { text-decoration: underline; }
+.tlhist li.on { background: rgba(140, 160, 215, 0.12); }
 
 /* Etki analizi */
 .impact { border-bottom: 1px solid var(--line); }
@@ -738,6 +776,9 @@ body:not(.loaded) .legend, body:not(.loaded) .hud { display: none; }
   .has-panel .hud, .has-panel .legend { display: none; }
   .legend { width: calc(100% - 24px); max-height: 50%; }
   .tlist { width: calc(100% - 24px); bottom: 56px; }
+  .timebar, .has-panel .timebar { left: 12px; right: 12px; transform: none; flex-wrap: wrap; }
+  .timebar .pb-title, .timebar .tb-chips { display: none; }
+  .timebar input[type="range"] { flex: 1; width: auto; }
   .has-panel .tlist { display: none; }
   .hud { bottom: auto; top: 10px; right: 12px; }
   .hud #hudStats { display: none; }

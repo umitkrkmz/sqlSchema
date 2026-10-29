@@ -197,6 +197,21 @@ const EXPECT = {
     check('lojistik fark: silinen kolon ve FK', de('addresses').cols.some(c => c.status === 'removed' && c.name === 'customer_id') && de('addresses').fks.some(f => f.status === 'removed'));
     check('lojistik fark: silinen ve eklenen tablo', de('legacy_route').status === 'removed' && de('tracking_events').status === 'added');
     check('lojistik fark: aynı dosyalarda fark yok', NS.diffModels(build(lfiles.filter(f => /\/V/.test(f.path))).model, build(lfiles.filter(f => /\/V/.test(f.path))).model).summary.same === 23);
+    // zaman çizelgesi: dosya sırasıyla her sürüme kadarki model; soy, geçmiş, birleşik yerleşim
+    const ordF = order.map(p => lfiles.find(f => f.path.endsWith(p) || p.endsWith(f.path))).filter(Boolean);
+    const tl = NS.timeline(ordF.map((_, i) => build(ordF.slice(0, i + 1)).model));
+    const lastStep = tl.steps[tl.steps.length - 1].model;
+    const hist = n => NS.tableHistory(tl, tl.idOf.get(lastStep.tables.find(t => t.name === n)));
+    const unionNames = tl.union.map(t => t.name);
+    check('lojistik zaman: her dosya bir adım, son adım son model', tl.steps.length === order.length && lastStep.tables.length === m.tables.length, [tl.steps.length, order.length]);
+    check('lojistik zaman: ilk adımda her şey eklendi', tl.steps[0].diff.summary.added === tl.steps[0].model.tables.length);
+    const sh = hist('shipments');
+    check('lojistik zaman: shipments geçmişi (oluştu, adı değişti, kolonu değişti)', sh[0].status === 'added' && sh[0].step === 0 && sh.some(h => h.entry.renamed) && sh.some(h => h.entry.cols.some(c => c.name === 'weight_grams')), sh.map(h => [h.step, h.status, h.entry.renamed]));
+    check('lojistik zaman: adı değişen tablo birleşikte bir kez', unionNames.includes('shipments') && !unionNames.includes('shipment') && unionNames.includes('legacy_route'), unionNames);
+    const lr = tl.steps.findIndex((s, i) => i && s.diff.tables.some(e => e.status === 'removed' && e.before.name === 'legacy_route'));
+    check('lojistik zaman: silinen tablonun geçmişi silinmeyle biter', lr > 0 && NS.tableHistory(tl, tl.idOf.get(tl.steps[lr - 1].model.tables.find(t => t.name === 'legacy_route'))).pop().status === 'removed');
+    const us = new Set(tl.union);
+    check('lojistik zaman: birleşik ilişkiler birleşik tablolara bağlı', tl.unionRels.every(r => us.has(r.child) && us.has(r.parent)) && tl.unionRels.length >= lastStep.rels.length);
     check('lojistik: migration\'da dosyaya göre gruplanmaz', NS.resolveGrouping('auto', migration) === 'name' && !m.tables.some(t => t.group.file));
   },
   iot({ model: m }) {

@@ -7,7 +7,7 @@
  *   ?lang=tr|en   ?sample=<örnek kimliği>   ?select=<tablo adı>   ?center=<tablo adı>   ?zoom=<1.6>   ?legend=0|1
  *   ?pop=naming|report|files|diff   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
  *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)   ?impact=1 (select ile)
- *   ?diff=V3 (migration klasöründe bu sürümle karşılaştır)
+ *   ?diff=V3 (migration klasöründe bu sürümle karşılaştır)   ?time=V4 (zaman çizelgesi bu sürümde; ?time=1 baştan)
  */
 (function (NS) {
 'use strict';
@@ -39,6 +39,9 @@ function toast(msg, ms = 4500) {
 }
 
 /* ─── Model kurma ─── */
+
+// etiketler bu sırayla çizilir: çok bağlantılı tablolar önce
+const byDegree = (a, b) => b.deg - a.deg || String(a.name).localeCompare(String(b.name));
 
 function buildIndex() {
   const cell = 300;
@@ -76,21 +79,29 @@ function rebuild() {
   // karşılaştırma açıksa: "önce" modeli kurulur, fark hesaplanır; silinen tablolar da haritada yerini alır
   let shown = model;
   S.diffRes = null;
-  if (S.diff) {
-    const before = buildBefore(ordered, f => (S.separate ? dbNames.get(f.path) : 'main'));
-    if (before) {
-      S.diffRes = NS.diffModels(before, model);
-      const gone = S.diffRes.tables.filter(e => e.status === 'removed').map(e => e.before);
-      shown = { ...model, tables: model.tables.concat(gone) };
-    }
-  }
-  S.lay = layoutModel(shown, { grouping: resolveGrouping(S.grouping, migration) });
-  S.model = shown;
-  // silinen tabloların "önce" ilişkileri çizilmez; yalnızca sonraki modelin ilişkileri
-  if (S.diffRes) S.relSet = new Set(model.rels);
-  S.parseMs = Math.round(performance.now() - t0);
-  S.order = model.tables.slice().sort((a, b) => b.deg - a.deg || String(a.name).localeCompare(String(b.name)));
+  stopPlay();
+  S.tl = null;
   S.hover = S.sel = null;
+  if (S.time && migration && active.length > 1) {
+    S.tl = timelineState(active, inputs, model, migration);
+    applyStep(S.time.pos);
+  } else {
+    S.time = null;
+    if (S.diff) {
+      const before = buildBefore(ordered, f => (S.separate ? dbNames.get(f.path) : 'main'));
+      if (before) {
+        S.diffRes = NS.diffModels(before, model);
+        const gone = S.diffRes.tables.filter(e => e.status === 'removed').map(e => e.before);
+        shown = { ...model, tables: model.tables.concat(gone) };
+      }
+    }
+    S.lay = layoutModel(shown, { grouping: resolveGrouping(S.grouping, migration) });
+    S.model = shown;
+    // silinen tabloların "önce" ilişkileri çizilmez; yalnızca sonraki modelin ilişkileri
+    if (S.diffRes) S.relSet = new Set(model.rels);
+    S.order = shown.tables.slice().sort(byDegree);
+  }
+  S.parseMs = Math.round(performance.now() - t0);
   S.focus = 0;
   S.impactRes = S.impactDepth = null;
   S.history = [];
@@ -110,6 +121,7 @@ function rebuild() {
   // görünüm ayarı ya da dosya seçimi değişince açık alt diyagram korunur (karşılaştırmada alt diyagram yok)
   if (S.subKeys && (S.diffRes || !enterSubset(S.subKeys, S.subNeighbors))) S.subKeys = null;
   renderDiff();
+  renderTimeBar();
   S.pick = new Set([...S.pick].filter(k => S.byKey.has(k)));
   renderPickBar();
   return true;
@@ -128,7 +140,7 @@ function setFiles(files, title, opts = {}) {
   // yeni dosya kümesi: önceki seçim, alt diyagram ve karşılaştırma geçersiz
   S.subKeys = null;
   S.pick = new Set();
-  S.diff = null;
+  S.diff = S.time = null;
   S.title = title;
   $('#fileName').textContent = title;
   $('#fileName').title = title;
@@ -545,6 +557,8 @@ function subsetModel(full, keys, neighbors) {
 }
 
 function enterSubset(keys, neighbors) {
+  // zaman çizelgesinde alt diyagram yok: çizelge kapanır, alt diyagram son hâlden kurulur
+  if (S.tl) { S.time = null; rebuild(); }
   const full = S.full ? S.full.model : S.model;
   const sub = subsetModel(full, keys, neighbors);
   if (!sub.tables.length) return false;
@@ -572,7 +586,7 @@ function exitSubset() {
 function afterLayout() {
   S.hover = null;
   // etiketler bu sırayla çizilir; alt diyagramda yalnızca diyagramdaki tablolar
-  S.order = S.model.tables.slice().sort((a, b) => b.deg - a.deg || String(a.name).localeCompare(String(b.name)));
+  S.order = S.model.tables.slice().sort(byDegree);
   for (const tb of S.model.tables) { tb._rows = null; tb._lw = 0; }
   buildIndex();
   if (S.sel && !S.byKey.has(S.sel.key)) S.sel = null;
@@ -875,6 +889,15 @@ function versionFiles() {
 }
 const fileLabel = p => baseName(p).replace(/\.[^.]+$/, '');
 
+// Karşılaştırmanın iki yanının adı; zaman çizelgesinde bir önceki ve şimdiki sürüm
+function diffSides() {
+  if (S.tl) {
+    const i = S.tl.pos, f = S.tl.files;
+    return [i ? fileLabel(f[i - 1].path) : '\u{2205}', fileLabel(f[i].path)];
+  }
+  return [S.diff.mode === 'version' ? fileLabel(S.diff.version) : S.diff.title, S.title || ''];
+}
+
 const DIFF_STATUS = { added: 'diffAdded', removed: 'diffRemoved', changed: 'diffChanged', renamed: 'diffRenamed' };
 
 function renderDiff() {
@@ -885,15 +908,16 @@ function renderDiff() {
     const verSel = vers.length > 1 ? `<label class="df-row">${esc(t('diffVersion'))}
       <select id="dfVersion">${vers.slice(0, -1).map((f, i) => `<option value="${esc(f.path)}" ${i === vers.length - 2 ? 'selected' : ''}>${esc(fileLabel(f.path))}</option>`).join('')}</select>
       <button class="btn sm" data-act="diff-version">${esc(t('diffRun'))}</button></label>` : '';
+    const tl = vers.length > 1 ? `<div class="df-row"><button class="btn sm" data-act="time-open">${esc(t('tlOpen'))}</button></div><p class="df-hint">${esc(t('tlHint'))}</p>` : '';
     el.innerHTML = `<h4>${esc(t('diffTitle'))}</h4>
       <p class="intro">${esc(t('diffIntro'))}</p>
-      ${verSel}
+      ${verSel}${tl}
       <p class="df-or">${esc(t(verSel ? 'diffOrFiles' : 'diffFiles'))}</p>
       <div class="df-row"><button class="btn sm ghost" data-act="diff-files">${esc(t('chooseFiles'))}</button><button class="btn sm ghost" data-act="diff-folder">${esc(t('chooseFolder'))}</button></div>`;
     return;
   }
   const res = S.diffRes, s = res.summary;
-  const before = S.diff.mode === 'version' ? fileLabel(S.diff.version) : S.diff.title;
+  const [before, after] = diffSides();
   const group = (status, list) => list.length ? `<h5>${esc(t(DIFF_STATUS[status]))} <span>${list.length}</span></h5><ul class="df-list">${list.map(e => {
     const tb = e.after || e.before;
     const note = e.renamed ? ` <i>← ${esc(e.before.name)}</i>` : '';
@@ -901,13 +925,13 @@ function renderDiff() {
   }).join('')}</ul>` : '';
   const by = st => res.tables.filter(e => e.status === st);
   el.innerHTML = `<h4>${esc(t('diffTitle'))}</h4>
-    <p class="df-sides"><span>${esc(t('diffBefore'))}: <b>${esc(before)}</b></span><span>${esc(t('diffAfter'))}: <b>${esc(S.title || '')}</b></span></p>
+    <p class="df-sides"><span>${esc(t('diffBefore'))}: <b>${esc(before)}</b></span><span>${esc(t('diffAfter'))}: <b>${esc(after)}</b></span></p>
     <p class="df-chips"><i class="d-added">${esc(t('diffAdded'))} ${s.added}</i><i class="d-removed">${esc(t('diffRemoved'))} ${s.removed}</i><i class="d-changed">${esc(t('diffChanged'))} ${s.changed}</i><i class="d-renamed">${esc(t('diffRenamed'))} ${s.renamed}</i></p>
     ${s.added + s.removed + s.changed ? '' : `<p class="nn">${esc(t('diffNone'))}</p>`}
     ${group('added', by('added'))}${group('removed', by('removed'))}${group('changed', by('changed'))}
     <div class="df-row">
       ${s.added + s.removed + s.changed ? `<button class="btn sm ghost" data-act="diff-md">${esc(t('namingMd'))}</button>` : ''}
-      <button class="btn sm" data-act="diff-close">${esc(t('diffClose'))}</button>
+      <button class="btn sm" data-act="diff-close">${esc(t(S.tl ? 'tlClose' : 'diffClose'))}</button>
     </div>`;
 }
 
@@ -936,9 +960,9 @@ function diffColText(c) {
 // Değişiklik raporu: sürüm notu ya da inceleme için
 function diffMarkdown() {
   const res = S.diffRes, s = res.summary;
-  const before = S.diff.mode === 'version' ? fileLabel(S.diff.version) : S.diff.title;
+  const [before, after] = diffSides();
   const q = tb => '`' + (tb.schema ? tb.schema + '.' : '') + tb.name + '`';
-  const out = [`# ${t('diffTitle')} · ${before} → ${S.title || ''}`, '', t('diffSummary', s), ''];
+  const out = [`# ${t('diffTitle')} · ${before} → ${after}`, '', t('diffSummary', s), ''];
   const by = st => res.tables.filter(e => e.status === st);
   if (by('added').length) out.push(`## ${t('diffAdded')}`, '', ...by('added').map(e => '- ' + q(e.after)), '');
   if (by('removed').length) out.push(`## ${t('diffRemoved')}`, '', ...by('removed').map(e => '- ' + q(e.before)), '');
@@ -965,7 +989,8 @@ $('#diffPop').addEventListener('click', e => {
   if (a === 'diff-version') startDiff({ mode: 'version', version: $('#dfVersion').value });
   else if (a === 'diff-files') $('#diffFile').click();
   else if (a === 'diff-folder') $('#diffFolder').click();
-  else if (a === 'diff-close') stopDiff();
+  else if (a === 'diff-close') { if (S.tl) stopTimeline(); else stopDiff(); }
+  else if (a === 'time-open') { $('#diffPop').hidden = true; startTimeline(0); }
   else if (a === 'diff-md') downloadText(diffMarkdown(), fileStem() + '-' + t('diffFile') + '.md', 'text/markdown;charset=utf-8');
 });
 
@@ -988,6 +1013,166 @@ async function readBefore(list) {
 }
 $('#diffFile').addEventListener('change', () => { readBefore(fromInput($('#diffFile'))); $('#diffFile').value = ''; });
 $('#diffFolder').addEventListener('change', () => { readBefore(fromInput($('#diffFolder'))); $('#diffFolder').value = ''; });
+
+/* ─── Migration zaman çizelgesi ─── */
+
+// Her sürüm dosyası bir adım: o dosyaya kadarki model ve bir öncekine farkı (js/diff.js timeline).
+// Yerleşim bütün sürümlerdeki tabloların birleşiminden bir kez kurulur; adım değişince tablolar yerinde kalır,
+// yalnızca o adımda var olanlar (ve o adımda silinenler) çizilir. Kamera adımlar arasında oynamaz.
+S.time = null;   // { pos }: istenen adım; rebuild bundan S.tl'yi kurar
+S.tl = null;     // { tl, lay, uni, files, pos, timer }
+const LAY_FIELDS = ['x', 'y', 'lx', 'ly', 'desig', 'group', 'schemaRef'];
+
+function timelineState(files, inputs, model, migration) {
+  const models = inputs.map((_, i) => (i === inputs.length - 1 ? model : buildModel(inputs.slice(0, i + 1), { dictionaries: S.dictOverride })));
+  const tl = NS.timeline(models);
+  const lay = layoutModel({ ...model, tables: tl.union, rels: tl.unionRels }, { grouping: resolveGrouping(S.grouping, migration) });
+  for (const s of lay.schemas) { s._all = s.tables; for (const g of s.groups) g._all = g.tables; }
+  const uni = new Map(tl.union.map(u => [tl.idOf.get(u), u]));
+  return { tl, lay, uni, files, pos: 0, timer: null };
+}
+
+function applyStep(i) {
+  const T = S.tl, { tl, lay, uni } = T;
+  const keep = S.sel ? tl.idOf.get(S.sel) : null;
+  T.pos = S.time.pos = Math.max(0, Math.min(tl.steps.length - 1, i));
+  const st = tl.steps[T.pos];
+  const gone = st.diff.tables.filter(e => e.status === 'removed').map(e => e.before);
+  const tables = st.model.tables.concat(gone);
+  const byId = new Map(tables.map(tb => [tl.idOf.get(tb), tb]));
+  for (const tb of tables) {
+    const u = uni.get(tl.idOf.get(tb));
+    for (const k of LAY_FIELDS) tb[k] = u[k];
+    tb._rows = null;
+    tb._lw = 0;
+  }
+  // bölgeler birleşik yerleşimde kalır; içlerindeki tablo listeleri bu adımın tabloları
+  const here = u => byId.get(tl.idOf.get(u));
+  for (const s of lay.schemas) {
+    s.tables = s._all.map(here).filter(Boolean);
+    for (const g of s.groups) g.tables = g._all.map(here).filter(Boolean);
+  }
+  S.lay = lay;
+  S.model = { ...st.model, tables };
+  S.diffRes = st.diff;
+  S.relSet = new Set(st.model.rels);
+  S.order = tables.slice().sort(byDegree);
+  S.sel = keep != null ? byId.get(keep) || null : null;
+}
+
+function startTimeline(pos) {
+  S.diff = null;
+  S.subKeys = null;
+  S.pick = new Set();
+  S.time = { pos };
+  rebuild();
+}
+function stopTimeline() {
+  S.time = null;
+  rebuild();
+}
+
+// Adım değişimi: model ve fark değişir, yerleşim ve kamera aynı kalır
+function timeGo(i) {
+  if (!S.tl) return;
+  applyStep(i);
+  buildIndex();
+  computeImpact();
+  refreshEmphasis();
+  renderPanel();
+  renderList();
+  renderDiff();
+  if (!$('#namingPop').hidden) renderNaming();
+  if (!$('#report').hidden) renderReport();
+  renderTimeBar();
+  resetHud();
+  invalidate();
+}
+
+function stopPlay() {
+  if (S.tl && S.tl.timer) { clearInterval(S.tl.timer); S.tl.timer = null; }
+}
+function togglePlay() {
+  if (!S.tl) return;
+  if (S.tl.timer) { stopPlay(); renderTimeBar(); return; }
+  if (S.tl.pos >= S.tl.tl.steps.length - 1) timeGo(0);
+  S.tl.timer = setInterval(() => {
+    if (!S.tl) return;
+    if (S.tl.pos >= S.tl.tl.steps.length - 1) { stopPlay(); renderTimeBar(); return; }
+    timeGo(S.tl.pos + 1);
+  }, 1400);
+  renderTimeBar();
+}
+
+// Çubuk bir kez kurulur, sonra yalnızca değerleri güncellenir (kaydırıcı sürüklenirken yeniden yazılmasın)
+function renderTimeBar() {
+  const el = $('#timeBar');
+  if (!S.tl) { el.hidden = true; el.innerHTML = ''; return; }
+  const n = S.tl.tl.steps.length, i = S.tl.pos;
+  if (!el.firstChild) {
+    el.innerHTML = `<span class="pb-title">${esc(t('tlTitle'))}</span>
+      <button class="tb-btn" data-act="time-prev" title="${esc(t('tlPrev'))}" aria-label="${esc(t('tlPrev'))}">\u{2039}</button>
+      <button class="tb-btn" data-act="time-play"></button>
+      <button class="tb-btn" data-act="time-next" title="${esc(t('tlNext'))}" aria-label="${esc(t('tlNext'))}">\u{203A}</button>
+      <input type="range" id="tbRange" min="0" max="${n - 1}" step="1" aria-label="${esc(t('tlTitle'))}">
+      <span class="tb-ver"><b></b> <i></i></span>
+      <span class="tb-chips"></span>
+      <button class="p-close" data-act="time-close" title="${esc(t('tlClose'))}" aria-label="${esc(t('tlClose'))}">×</button>`;
+  }
+  el.hidden = false;
+  const f = S.tl.files[i], s = S.tl.tl.steps[i].diff.summary;
+  const play = el.querySelector('[data-act="time-play"]');
+  play.textContent = S.tl.timer ? '\u{275A}\u{275A}' : '\u{25B6}';
+  play.title = t(S.tl.timer ? 'tlPause' : 'tlPlay');
+  play.setAttribute('aria-label', play.title);
+  el.querySelector('[data-act="time-prev"]').disabled = i === 0;
+  el.querySelector('[data-act="time-next"]').disabled = i === n - 1;
+  const range = $('#tbRange');
+  range.max = n - 1;
+  if (document.activeElement !== range || Number(range.value) !== i) range.value = i;
+  el.querySelector('.tb-ver b').textContent = fileLabel(f.path);
+  el.querySelector('.tb-ver').title = f.path;
+  el.querySelector('.tb-ver i').textContent = `${i + 1} / ${n}`;
+  const chip = (cls, sign, v) => (v ? `<i class="${cls}">${sign}${v}</i>` : '');
+  el.querySelector('.tb-chips').innerHTML = chip('d-added', '+', s.added) + chip('d-changed', '~', s.changed) + chip('d-removed', '\u{2212}', s.removed)
+    || `<i class="none">${esc(t('tlNoChange'))}</i>`;
+}
+
+$('#timeBar').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b || !S.tl) return;
+  e.stopPropagation();
+  const a = b.dataset.act;
+  if (a === 'time-prev') { stopPlay(); timeGo(S.tl.pos - 1); }
+  else if (a === 'time-next') { stopPlay(); timeGo(S.tl.pos + 1); }
+  else if (a === 'time-play') togglePlay();
+  else if (a === 'time-close') stopTimeline();
+});
+$('#timeBar').addEventListener('input', e => {
+  if (e.target.id !== 'tbRange' || !S.tl) return;
+  stopPlay();
+  timeGo(Number(e.target.value));
+});
+
+// Panel: seçili tablonun sürümler boyunca geçmişi; bir satıra tıklanınca o adıma gidilir
+function timeHistoryHtml(tb) {
+  if (!S.tl) return '';
+  const { tl, files, pos } = S.tl;
+  const h = NS.tableHistory(tl, tl.idOf.get(tb));
+  if (!h.length) return '';
+  return `<section class="tlhist"><h3>${esc(t('tlHistory'))} <span>${h.length}</span></h3>
+    <ul class="df-changes">${h.map(x => `<li class="d-${x.status}${x.step === pos ? ' on' : ''}" data-step="${x.step}" tabindex="0"><b>${esc(fileLabel(files[x.step].path))}</b> ${esc(historyText(x))}</li>`).join('')}</ul></section>`;
+}
+function historyText(x) {
+  if (x.status === 'added') return t('tlCreated');
+  if (x.status === 'removed') return t('tlDropped');
+  const e = x.entry, parts = [];
+  if (e.renamed) parts.push(t('tlRenamed', { a: e.before.name, b: e.after.name }));
+  if (e.cols.length) parts.push(t('tlCols', { n: e.cols.length }));
+  if (e.pk) parts.push('PK');
+  if (e.fks.length) parts.push(t('tlFks', { n: e.fks.length }));
+  return parts.join(' · ');
+}
 
 /* ─── Etki analizi ─── */
 
@@ -1209,6 +1394,7 @@ function renderPanel() {
     </div>
     <div class="p-body">
       ${diffPanelHtml(tb)}
+      ${timeHistoryHtml(tb)}
       ${S.impactRes && S.impactRes.root === tb ? impactHtml(S.impactRes) : ''}
       <section>
         <h3>${esc(t(mongo ? 'fields' : 'columns'))} <span>${tb.columns.length}</span></h3>
@@ -1232,6 +1418,8 @@ function renderPanel() {
 $('#panel').addEventListener('click', e => {
   const hist = e.target.closest('[data-hist]');
   if (hist) { goHistory(Number(hist.dataset.hist)); return; }
+  const step = e.target.closest('[data-step]');
+  if (step) { stopPlay(); timeGo(Number(step.dataset.step)); return; }
   const act = e.target.closest('[data-act]');
   if (act) {
     const a = act.dataset.act;
@@ -1267,7 +1455,7 @@ $('#panel').addEventListener('click', e => {
   }
 });
 $('#panel').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.target.matches('li[data-go]')) e.target.click();
+  if (e.key === 'Enter' && e.target.matches('li[data-go], li[data-step]')) e.target.click();
 });
 
 /* ─── Arama ─── */
@@ -1439,7 +1627,8 @@ window.addEventListener('keydown', e => {
     else if (S.sel) select(null);
     else if (S.full) exitSubset();
     else if (S.pick.size) { S.pick = new Set(); afterPick(); }
-  } else if (e.key === 'f' || e.key === 'F') fitView(true);
+  } else if ((e.key === ',' || e.key === '.') && S.tl) { stopPlay(); timeGo(S.tl.pos + (e.key === ',' ? -1 : 1)); }
+  else if (e.key === 'f' || e.key === 'F') fitView(true);
   else if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey) setColumns(!S.columns);
   else if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.metaKey) {
     setList(!S.list);
@@ -1599,6 +1788,8 @@ NS.onLangChange(() => {
     renderViews();
     renderPickBar();
     renderDiff();
+    $('#timeBar').innerHTML = '';
+    renderTimeBar();
     resetHud();
   }
   if (S.title && S.files.length > 1 && /^\d+ /.test(S.title)) $('#fileName').textContent = t('nFiles', { n: S.files.filter(f => f.text != null).length });
@@ -1659,6 +1850,13 @@ if (params.get('sample')) {
     if (dv) {
       const f = versionFiles().find(x => fileLabel(x.path) === dv || fileLabel(x.path).startsWith(dv + '__'));
       if (f) startDiff({ mode: 'version', version: f.path });
+    }
+    // ?time=V4: zaman çizelgesini bu sürümde açar (?time=1 baştan)
+    const tv = params.get('time');
+    if (tv) {
+      const vers = versionFiles();
+      const i = vers.findIndex(x => fileLabel(x.path) === tv || fileLabel(x.path).startsWith(tv + '__'));
+      startTimeline(Math.max(0, i));
     }
     // ?sub=A,B,C&near=1: bu tablolarla (ve komşularıyla) alt diyagram
     const subNames = (params.get('sub') || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);

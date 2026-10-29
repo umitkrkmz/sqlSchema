@@ -9,6 +9,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 - **Şema farkı:** açık dosyalar önceki bir sürümle karşılaştırılır (migration klasöründe bir sürüm ya da ayrıca seçilen dosyalar). Eklenen, silinen, değişen ve adı değişen tablolar haritada renklenir; panelde kolon, PK ve FK farkları; ad değişikliği tahmini; Markdown rapor; `?diff=V3`.
   Schema diff: the open files are compared with an earlier version (a version of a migration folder or separately chosen files). Added, removed, changed and renamed tables are coloured on the map; column, PK and FK differences in the panel; rename guesses; a Markdown report; `?diff=V3`.
+- **Migration zaman çizelgesi:** sürümler sırayla oynatılır. Yerleşim bütün sürümlerden bir kez kurulur, tablolar yerinde kalır; her adım bir öncekine göre fark olarak renklenir. Kaydırıcı, `,` / `.`, oynatma; panelde tablonun sürüm geçmişi; `?time=V4`.
+  Migration timeline: the versions are played in order. The layout is built once from every version and tables stay in place; each step is coloured as a diff against the previous one. Slider, `,` / `.`, playback; the table's version history in the panel; `?time=V4`.
 
 ## [0.6.0] - 2026-10-29
 
