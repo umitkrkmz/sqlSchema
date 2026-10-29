@@ -8,7 +8,8 @@
  *   ?pop=naming|report|files|diff|audit   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
  *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)   ?impact=1 (select ile)
  *   ?diff=V3 (migration klasöründe bu sürümle karşılaştır)   ?time=V4 (zaman çizelgesi bu sürümde; ?time=1 baştan)
- *   ?audit=1 (tasarım denetimi haritada)   ?fix=1 (düzeltme önerileri penceresi)   ?std=1 (standart ve kurallar)   ?review=1 (değişiklik incelemesi; diff ya da time ile)
+ *   ?audit=1 (tasarım denetimi haritada)   ?fix=1 (düzeltme önerileri penceresi)   ?std=1 (standart ve kurallar)   ?doc=1 (standart belgesi)
+ *   ?review=1 (değişiklik incelemesi; diff ya da time ile)
  */
 (function (NS) {
 'use strict';
@@ -783,6 +784,7 @@ function renderStd() {
       <span class="grow">${saved ? esc(t('stdActive', { date: saved.updated.slice(0, 10) })) : ''}</span>
       ${saved ? `<button class="btn ghost" data-std-act="clear">${esc(t('stdClear'))}</button>` : ''}
       <button class="btn ghost" data-std-act="reset">${esc(t('stdReset'))}</button>
+      <button class="btn ghost" data-std-act="doc" title="${esc(t('docHint'))}">${esc(t('docBtn'))}</button>
       <button class="btn ghost" data-std-act="file" title="${esc(t('debtFileTip'))}">${esc(t('debtFile'))}</button>
       <button class="btn" data-std-act="save">${esc(t('stdSave'))}</button>
       <button class="btn ghost" data-std-act="close">${esc(t('fixClose'))}</button>
@@ -817,6 +819,108 @@ $('#stdDlg').addEventListener('click', e => {
   else if (act === 'reset') { S.stdDraft = { standard: { ...stdProposal().standard }, severity: {} }; renderStd(); }
   else if (act === 'clear') { storeRules({ standard: null, severity: {}, updated: new Date().toISOString() }); toast(t('stdCleared'), 3000); $('#stdDlg').close(); }
   else if (act === 'file') { saveStd(); downloadProject(); }
+  else if (act === 'doc') { $('#stdDlg').close(); openDoc(); }
+});
+
+/* ─── Yazılı standart belgesi ─── */
+
+// Kayıtlı standarttan (yoksa öneriden) ekibe gönderilecek Markdown belge. Her maddede ekibin kendi şemasından örnekler:
+// doğrular standarda uyan adlardan, yanlışlar o standartla yapılan denetimin bulgularından seçilir.
+function standardDoc() {
+  const m = S.full ? S.full.model : S.model;
+  const sql = { ...m, tables: m.tables.filter(tb => !tb.external && !tb.embedded && tb.dialect !== 'mongodb' && tb.dialect !== 'cassandra') };
+  const saved = currentRules(), prop = stdProposal();
+  const st = saved && saved.standard ? saved.standard : prop.standard, sev = saved ? saved.severity : {};
+  const profile = NS.namingProfile(sql);
+  const audit = NS.auditModel(sql, { standard: st, severity: sev });
+  const code = s => '`' + String(s).replace(/`/g, "'") + '`';
+  const label = (dim, key) => t('nk_' + dim + '_' + key, { n: st.nameLimit || 30 });
+  const bucket = (dim, key) => { const d = profile.dims.find(x => x.id === dim); const b = d && d.buckets.find(x => x.key === key); return b ? b.items : []; };
+  const byName = (a, b) => (b.t.deg || 0) - (a.t.deg || 0) || String(a.t.name).localeCompare(String(b.t.name));
+  const okName = n => (!st.nameLimit || n.length <= st.nameLimit) && (st.ascii === false || !/[^\x00-\x7F]/.test(n));
+  const pick = (list, n = 3) => [...new Set(list)].slice(0, n);
+  const wrong = test => pick(audit.findings.filter(test).map(f => (f.t ? f.t.name : '') + (f.col ? '.' + f.col : '')).filter(Boolean));
+  const ex = (right, bad) => {
+    const parts = [];
+    if (right.length) parts.push(`${t('docRight')}: ${right.map(code).join(', ')}`);
+    if (bad.length) parts.push(`${t('docWrong')}: ${bad.map(code).join(', ')}`);
+    return parts.length ? '  \n  ' + parts.join(' · ') : '';
+  };
+  const out = [];
+  const title = S.title || '';
+  out.push(`# ${t('stdDocTitle', { title })}`, '', t('docIntro', { date: new Date().toISOString().slice(0, 10) }), '');
+  if (!saved || !saved.standard) out.push(`> ${t('docProposed')}`, '');
+
+  // Adlandırma
+  out.push(`## ${t('stdNaming')}`, '');
+  const undecided = t('docUndecided');
+  const tableRules = [st.tableCase ? label('tableCase', st.tableCase) : null, st.tableNumber ? label('tableNumber', st.tableNumber).toLowerCase() : null,
+    st.nameLimit ? t('docMaxLen', { n: st.nameLimit }) : null, st.ascii !== false ? t('docAscii') : null].filter(Boolean);
+  const tablesOk = (st.tableCase ? bucket('tableCase', st.tableCase) : bucket('tableCase', 'upperSnake').concat(bucket('tableCase', 'lowerSnake')))
+    .filter(it => okName(it.t.name) && (!st.tableNumber || bucket('tableNumber', st.tableNumber).some(x => x.t === it.t))).sort(byName).map(it => it.t.name);
+  const tablesBad = wrong(f => (f.rule === 'naming-case' && !f.col) || f.rule === 'naming-number' || (f.rule === 'name-too-long' && f.data.kind === 'table') || (f.rule === 'non-ascii-name' && f.data.names.includes(f.t.name)));
+  out.push(`- **${t('docTables')}:** ${tableRules.join(', ') || undecided}.${ex(pick(tablesOk), tablesBad)}`);
+  const colRules = [st.columnCase ? label('columnCase', st.columnCase) : null, st.nameLimit ? t('docMaxLen', { n: st.nameLimit }) : null, st.ascii !== false ? t('docAscii') : null].filter(Boolean);
+  const colsOk = (st.columnCase ? bucket('columnCase', st.columnCase) : []).filter(it => okName(it.c)).sort(byName);
+  const spread = []; const seenT = new Set();
+  for (const it of colsOk) if (!seenT.has(it.t) && spread.length < 3) { seenT.add(it.t); spread.push(it.t.name + '.' + it.c); }
+  const colsBad = wrong(f => (f.rule === 'naming-case' && f.col) || (f.rule === 'name-too-long' && f.data.kind === 'column'));
+  out.push(`- **${t('docColumns')}:** ${colRules.join(', ') || undecided}.${ex(spread, colsBad)}`);
+  // birincil anahtar: kalıp ve en sık tip
+  if (st.pkStyle) {
+    const items = bucket('pkStyle', st.pkStyle).filter(it => it.c).sort(byName);
+    const types = new Map();
+    for (const it of items) { const c = it.t.colIdx.get(String(it.c).toUpperCase()); const ty = c && c.type ? String(c.type).toUpperCase().replace(/\s+/g, '') : null; if (ty) types.set(ty, (types.get(ty) || 0) + 1); }
+    const top = [...types.entries()].sort((a, b) => b[1] - a[1])[0];
+    const type = top ? t('docPkType', { type: top[0], pct: Math.round(top[1] * 100 / items.length) }) : '';
+    out.push(`- **${t('docPk')}:** ${code(label('pkStyle', st.pkStyle))}${type ? ', ' + type : ''}. ${t('docPkEvery')}${ex(pick(items.map(it => it.t.name + '.' + it.c)), wrong(f => f.rule === 'pk-style'))}`);
+  } else out.push(`- **${t('docPk')}:** ${undecided}. ${t('docPkEvery')}`);
+  if (st.fkStyle) {
+    const items = bucket('fkStyle', st.fkStyle).sort(byName).map(it => `${it.t.name}.${it.c} \u{2192} ${it.ref.name}`);
+    const roles = bucket('fkStyle', 'role').sort(byName).map(it => `${it.t.name}.${it.c} \u{2192} ${it.ref.name}`);
+    out.push(`- **${t('docFk')}:** ${code(label('fkStyle', st.fkStyle))}. ${t('docFkRole')}${ex(pick(items, 2).concat(pick(roles, 1)), wrong(f => f.rule === 'fk-style'))}`);
+  } else out.push(`- **${t('docFk')}:** ${undecided}. ${t('docFkRole')}`);
+  out.push(`- **${t('docConstraints')}:** ${t('docConstraintNames')}${ex([], wrong(f => f.rule === 'system-name').map(n => n))}`, '');
+
+  // Zorunlular
+  const req = [];
+  if (st.comments === 'tables' || st.comments === 'all') req.push(`- ${t('docComments')[st.comments]}`);
+  if ((st.auditColumns || []).length) req.push(`- ${t('docAuditCols', { cols: st.auditColumns.map(code).join(', ') })}`);
+  if (req.length) out.push(`## ${t('stdRequired')}`, '', ...req, '');
+
+  // Veri tipleri ve anahtarlar: kapalı olmayan kuralların önerileri
+  const advice = group => NS.AUDIT_RULES.filter(r => r.group === group && sev[r.id] !== 'off' && !r.standard).map(r => `- **${ruleText(r.id).title}.** ${ruleText(r.id).fix}`);
+  out.push(`## ${t('docKeys')}`, '', ...advice('keys'), `- ${t('docRef')}`, '');
+  out.push(`## ${t('docTypes')}`, '', ...advice('types'), ...advice('norm'), '');
+
+  // Denetim: kural önemleri (standarda bağlı kurallar yalnızca standartta tanımlıysa)
+  const active = r => !r.standard || (r.id === 'naming-number' && st.tableNumber) || (r.id === 'missing-comment' && st.comments) || (r.id === 'missing-audit' && (st.auditColumns || []).length);
+  const names = t('stdSevNames');
+  out.push(`## ${t('docSeverity')}`, '', t('docSeverityIntro'), '', `| ${t('docRule')} | ${t('docLevel')} |`, '|---|---|');
+  for (const r of NS.AUDIT_RULES.filter(active)) out.push(`| ${ruleText(r.id).title} | ${names[sev[r.id] || r.severity]}${sev[r.id] ? '' : ' (' + t('stdDefaultMark') + ')'} |`);
+  out.push('', `---`, '', `_${t('docFooter')}_`, '');
+  return out.join('\n');
+}
+
+function openDoc() {
+  $('#docBody').innerHTML = `<h3>${esc(t('docBtn'))}</h3>
+    <p>${esc(t('docHint'))}</p>
+    <pre id="docPre" tabindex="0">${esc(standardDoc())}</pre>
+    <div class="row">
+      <button class="btn ghost" data-doc-act="copy">${esc(t('fixCopy'))}</button>
+      <button class="btn ghost" data-doc-act="download">${esc(t('namingMd'))}</button>
+      <button class="btn" data-doc-act="close">${esc(t('fixClose'))}</button>
+    </div>`;
+  const d = $('#docDlg');
+  if (!d.open) d.showModal();
+}
+$('#docDlg').addEventListener('click', e => {
+  const b = e.target.closest('[data-doc-act]');
+  if (!b) return;
+  const act = b.dataset.docAct;
+  if (act === 'close') $('#docDlg').close();
+  else if (act === 'copy') copyPre($('#docPre'));
+  else if (act === 'download') downloadText($('#docPre').textContent, fileStem() + '-' + t('docFile') + '.md', 'text/markdown;charset=utf-8');
 });
 
 const debtVars = (a, d) => ({ accepted: d.accepted, total: a.debt.total, left: a.debt.left, paid: a.debt.paid.length, pct: a.debt.total ? Math.round(a.debt.paid.length * 100 / a.debt.total) : 0 });
@@ -2382,6 +2486,7 @@ NS.onLangChange(() => {
     if ($('#fixDlg').open) renderFix();
     if ($('#reviewDlg').open) renderReview();
     if ($('#stdDlg').open) renderStd();
+    if ($('#docDlg').open) openDoc();
     resetHud();
   }
   if (S.title && S.files.length > 1 && /^\d+ /.test(S.title)) $('#fileName').textContent = t('nFiles', { n: S.files.filter(f => f.text != null).length });
@@ -2478,6 +2583,8 @@ if (params.get('sample')) {
     if (params.get('fix') === '1') openFix();
     // ?std=1: standart ve kurallar düzenleyicisi
     if (params.get('std') === '1') openStd();
+    // ?doc=1: yazılı standart belgesi
+    if (params.get('doc') === '1') openDoc();
     // ?review=1: karşılaştırma ya da zaman çizelgesiyle birlikte değişiklik incelemesi
     if (params.get('review') === '1' && getReview()) openReview();
     invalidate();

@@ -535,6 +535,21 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   }
   const missing = [...used].filter(k => !en.has(k) || !tr.has(k));
   check('i18n: kullanılan her anahtar iki dilde de var', !missing.length, missing);
+  // aynı sözlükte iki kez yazılan anahtar sessizce öncekini ezer (ör. sayfa başlığı docTitle)
+  const dupKeys = [];
+  let dict = '';
+  const seenKeys = new Set();
+  for (const line of fs.readFileSync(path.join(ROOT, 'js', 'i18n.js'), 'utf8').split('\n')) {
+    const d = /^ {2}(tr|en): \{/.exec(line);
+    if (d) { dict = d[1]; continue; }
+    const k = /^ {4}([A-Za-z_]+):/.exec(line);
+    if (!dict || !k) continue;
+    // dizgiler ve satır içi alt nesneler ({ safe: ..., review: ... }) atılır; yalnızca sözlüğün kendi anahtarları kalır
+    let top = line.replace(/'(?:[^'\\]|\\.)*'/g, "''").replace(/`[^`]*`/g, '``');
+    while (/\{[^{}]*\}/.test(top)) top = top.replace(/\{[^{}]*\}/g, '()');
+    for (const m of top.matchAll(/(?:^ {4}|, )([A-Za-z_]+): /g)) { const id = dict + ':' + m[1]; if (seenKeys.has(id)) dupKeys.push(id); seenKeys.add(id); }
+  }
+  check('i18n: sözlükte yinelenen anahtar yok', !dupKeys.length, dupKeys);
   // denetim kurallarının metni: her kural iki dilde başlık, neden, öneri ve ayrıntı işleviyle
   const ruleText = l => NS.i18nRaw(l, 'auditRules');
   const noText = ['tr', 'en'].flatMap(l => NS.AUDIT_RULES.filter(r => { const x = ruleText(l)[r.id]; return !x || !x.title || !x.why || !x.fix || typeof x.what !== 'function'; }).map(r => l + ':' + r.id));

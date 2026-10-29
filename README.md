@@ -429,7 +429,8 @@ Kurallar dört grupta toplanır:
 - **Zorunlular:** ad uzunluğu sınırı (Oracle'da 30 önerilir), yalnızca ASCII, açıklama zorunluluğu (tablolar ya da tablolar ve kolonlar), denetim kolonları (ör. `CREATED_AT, CREATED_BY`).
 - **Kuralların önemi:** her denetim kuralı hata, uyarı, bilgi ya da kapalı yapılabilir.
 - **Etkisi:** kaydedilince denetim baskın kalıp yerine standarda göre yapılır ("PK adı kalıba uymuyor: <TABLO>_ID (standart: ID)"). Standarda bağlı üç kural yalnızca standartta tanımlıysa çalışır: tekil / çoğul, eksik açıklama, eksik denetim kolonu.
-- **Paylaşmak:** standart, borç kaydıyla aynı `<ad>.sqlschema.json` proje dosyasına yazılır. Klasörü açan herkes ve komut satırı aynı standardı kullanır. Yazılı bir standart belgesi bu dosyadan üretilecek.
+- **Paylaşmak:** standart, borç kaydıyla aynı `<ad>.sqlschema.json` proje dosyasına yazılır. Klasörü açan herkes ve komut satırı aynı standardı kullanır.
+- **Standart belgesi:** pencerenin **Standart belgesi** düğmesi ekibe gönderilecek bir Markdown belge üretir: tablo ve kolon adları, PK (en sık tipiyle), FK, kısıt adları, zorunlular, anahtar ve veri tipi önerileri, kuralların önem tablosu. Her maddede **doğru** örnekler standarda uyan adlardan, **yanlış** örnekler o standartla yapılan denetimin bulgularından, yani ekibin kendi şemasından seçilir. Henüz kaydedilmiş standart yoksa belge öneriden üretilir ve bunu söyler. `?doc=1` belgeyi açar.
 
 <img src="docs/images/tr/standart-ve-kurallar.png" alt="Standart ve kurallar: profilden önerilen standart, belirgin baskın kalıbı olmayan PK için ekip kararı" width="900">
 
@@ -1072,7 +1073,8 @@ The rules fall into four groups:
 - **Requirements:** a name length limit (30 is proposed on Oracle), ASCII only, required comments (tables, or tables and columns), audit columns (e.g. `CREATED_AT, CREATED_BY`).
 - **Rule severity:** every audit rule can be set to error, warning, info or off.
 - **Effect:** once saved, the audit checks against the standard instead of the dominant patterns ("PK name does not follow the pattern: <TABLE>_ID (standard: ID)"). Three rules run only when the standard defines them: singular / plural, missing comments, missing audit columns.
-- **Sharing:** the standard is written to the same `<name>.sqlschema.json` project file as the debt register. Everyone who opens the folder, and the command line, use the same standard. A written standard document will be generated from this file.
+- **Sharing:** the standard is written to the same `<name>.sqlschema.json` project file as the debt register. Everyone who opens the folder, and the command line, use the same standard.
+- **Standard document:** the **Standard document** button generates a Markdown document for the team: table and column names, PK (with its most common type), FK, constraint names, requirements, key and data type advice, and the rule severity table. For each item, **right** examples come from names that follow the standard and **wrong** examples from the audit findings under that standard, i.e. from the team's own schema. With no saved standard yet, the document is generated from the proposal and says so. `?doc=1` opens it.
 
 <img src="docs/images/en/standart-ve-kurallar.png" alt="Standard and rules: a standard proposed from the profile, a team decision for a PK without a clear dominant pattern" width="900">
 
