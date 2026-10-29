@@ -5,6 +5,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+## [0.5.0] - 2026-10-29
+
 ### Eklendi · Added
 
 - **Açıklamadaki kod değerleri:** `1 = Aktif, 2 = Pasif`, `A: Aktif; P: Pasif`, `E-Evet / H-Hayır` gibi değer listeleri kolon açıklamasından okunur; panelde kutucuk, kartta `≡` işareti olarak görünür ve aramada bulunur.
@@ -94,7 +96,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 - **Geliştirme araçları:** test seti, ekran görüntüsü üreticisi.
   Test suite and screenshot generator.
 
-[Yayımlanmamış · Unreleased]: ../../compare/v0.4.0...HEAD
+[Yayımlanmamış · Unreleased]: ../../compare/v0.5.0...HEAD
+[0.5.0]: ../../compare/v0.4.0...v0.5.0
 [0.4.0]: ../../compare/v0.3.1...v0.4.0
 [0.3.1]: ../../compare/v0.3.0...v0.3.1
 [0.3.0]: ../../compare/v0.2.1...v0.3.0
