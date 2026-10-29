@@ -23,9 +23,11 @@ const natural = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensiti
 const baseName = p => String(p).split('/').pop();
 const dirName = p => { const i = String(p).lastIndexOf('/'); return i < 0 ? '' : p.slice(0, i); };
 
-// skip: atlanma nedeni kodu (arayüz çevirir: config, ext, down, undo)
+// skip: atlanma nedeni kodu (arayüz çevirir: config, ext, down, undo, project)
+// *.sqlschema.json sqlSchema'nın proje dosyasıdır (borç kaydı, görünümler): şema değil, arayüz ayrıca okur
 function classify(path) {
   const name = baseName(path);
+  if (/.sqlschema.json$/i.test(name)) return { path, name, skip: 'project' };
   if (IGNORED.test(path)) return { path, name, skip: 'config' };
   if (!SQL_EXT.test(name) && !MONGO_EXT.test(name)) return { path, name, skip: 'ext' };
   if (/\.down\.sql$/i.test(name)) return { path, name, skip: 'down' };

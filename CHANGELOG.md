@@ -9,6 +9,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 - **Tasarım denetimi:** 29 kural (anahtarlar ve bütünlük, veri tipleri, normalizasyon, adlandırma); her bulgu ne, neden ve öneriyle. Hata / uyarı / bilgi, addan tahmin edilen bulgular işaretli. Haritada gösterme, panelde tablonun bulguları, en çok bulgu olan tablolar, Markdown inceleme belgesi; `?audit=1`, `?pop=audit`.
   Design audit: 29 rules (keys and integrity, data types, normalisation, naming); each finding with what, why and a suggestion. Error / warning / info, findings guessed from names marked as such. Show on map, the table's findings in the panel, the tables with the most findings, a Markdown review document; `?audit=1`, `?pop=audit`.
+- **Borç kaydı:** o anki denetim bulguları "kabul edilmiş borç" olarak kaydedilir; yalnızca yeni bulgular hata sayılır ve haritada görünür, düzeltilenler ödenmiş sayılır. Kayıt tarayıcıda proje adına göre ve paylaşılabilir `*.sqlschema.json` proje dosyasında tutulur; klasördeki proje dosyası otomatik okunur (şema olarak ayrıştırılmaz).
+  Debt register: the current audit findings are recorded as "accepted debt"; only new findings count as errors and show on the map, and fixed ones count as paid off. The register is kept in the browser under the project name and in a shareable `*.sqlschema.json` project file; a project file in the folder is read automatically (not parsed as schema).
 - **"Hatalı tasarım (DBA incelemesi)" örneği:** düzgün bir şemaya özensiz eklenmiş migration'lar; her denetim kuralı tetiklenir.
   "Flawed design (DBA review)" sample: careless migrations added to a clean schema; every audit rule fires.
 - Benzersiz olmayan indeksler (`CREATE INDEX`) modelde tutulur (FK indeksi ve gereksiz indeks denetimi için).

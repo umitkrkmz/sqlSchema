@@ -424,6 +424,13 @@ Kurallar dört grupta toplanır:
 - **Zaman çizelgesiyle:** her sürümde denetim yeniden hesaplanır; bir bulgunun hangi migration'la geldiği görünür.
 - **Bağlantı:** `?audit=1` denetimi haritada açar, `?pop=audit` pencereyi açar.
 
+**Borç kaydı: geçmişi affet, geleceği denetle.** Dağınık bir veritabanında ilk denetim yüzlerce bulgu çıkarır; yüzlerce eski tabloyu bir anda düzeltmek de gerçekçi değildir.
+- **Kabul etmek:** pencerede **Mevcut bulguları borç olarak kabul et** o anki bulguları kaydeder. Kayıttaki bulgular ayrı bir **Kabul edilmiş borç** listesinde durur, hata sayılmaz ve haritada renk almaz. Bundan sonra yalnızca yeni bulgular öne çıkar: yeni bir migration'ın getirdiği PK'siz tablo hemen görünür.
+- **İlerleme:** düzeltilen bulgular **ödenen borç** olarak sayılır; çubuk borcun ne kadarının ödendiğini gösterir.
+- **Ekiple paylaşmak:** **Proje dosyasını indir** borç kaydını (ve kayıtlı görünümleri) `<ad>.sqlschema.json` dosyasına yazar. Dosyayı şema klasörüne koyup depoya ekleyin: klasörü açan herkes aynı borcu görür. Dosya şemayı içermez.
+- **Saklama:** kayıt tarayıcıda proje adına göre de tutulur; yeni migration eklenince kaybolmaz. Klasördeki dosya ile tarayıcıdaki kayıttan daha yeni olanı geçerlidir.
+- **Kimlik:** bir bulgu kural, tablo ve kolon adıyla eşleşir. Tablonun adı değişirse bulgu yeni sayılır.
+
 <img src="docs/images/tr/tasarim-denetimi.png" alt="Tasarım denetimi: hatalı tablolar haritada kırmızı, panelde KAMPANYA tablosunun bulguları" width="900">
 
 **Hatalı tasarım (DBA incelemesi)** örneği bu özellik için hazırlanmıştır: düzgün bir başlangıç şemasına üç geliştiricinin özensiz eklediği migration'lar. Her kural en az bir kez tetiklenir.
@@ -975,6 +982,13 @@ The rules fall into four groups:
 - **In the window:** the ten tables with the most findings are listed. **Download Markdown** writes every finding with its reason and suggestion into a review document.
 - **With the timeline:** the audit is recomputed at each version, so you can see which migration brought a finding.
 - **Link:** `?audit=1` shows the audit on the map, `?pop=audit` opens the window.
+
+**Debt register: forgive the past, audit the future.** In a messy database the first audit finds hundreds of problems, and fixing hundreds of old tables at once is not realistic.
+- **Accepting:** **Accept current findings as debt** in the window records the current findings. Recorded findings sit in a separate **Accepted debt** list, are not counted as errors and are not coloured on the map. From then on only new findings stand out: a table without a PK brought by a new migration shows up at once.
+- **Progress:** fixed findings count as **paid-off debt**; a bar shows how much of the debt has been paid.
+- **Sharing with the team:** **Download project file** writes the debt register (and saved views) to `<name>.sqlschema.json`. Put it in the schema folder and commit it: everyone who opens the folder sees the same debt. The file does not contain the schema.
+- **Storage:** the register is also kept in the browser under the project name, so it survives new migrations. Between the folder's file and the browser's copy, the newer one wins.
+- **Identity:** a finding is matched by rule, table and column name. If a table is renamed, its findings count as new.
 
 <img src="docs/images/en/tasarim-denetimi.png" alt="Design audit: tables with errors in red on the map, findings of the KAMPANYA table in the panel" width="900">
 

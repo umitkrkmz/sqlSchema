@@ -3,13 +3,17 @@
  * Tablo tasarım denetimi: kurallar modeli tarar, bulguları kod olarak döndürür; metin (ne, neden, nasıl) arayüzde.
  * Kesin olmayan kurallar adlardan tahmin yürütür; bu yüzden önemleri "uyarı" ya da "bilgi"dir.
  *
- *   auditModel(model) → {
- *     findings: [{ rule, severity: error | warning | info, t, col, tables, data }]
+ *   auditModel(model, { debt }) → {
+ *     findings: [{ rule, severity: error | warning | info, t, col, tables, data, key, debt }]
  *       t: bulgunun tablosu (şema genelindeki bulgularda null; o zaman tables ilgili tabloları verir)
  *       col: kolon adı ya da null · data: kurala özgü ayrıntı (tip, hedef, kolon listesi ...)
  *     byTable: Map(tablo → bulgular) · counts: { error, warning, info } · skipped: [{ rule, reason }]
  *     tables: denetlenen tablo sayısı · clean: hata ve uyarısı olmayan tablo sayısı
+ *     debt: { total, left, paid: [anahtar], counts } (opts.debt verildiyse)
  *   }
+ *   Borç: opts.debt kabul edilmiş bulgu anahtarlarıdır. Eşleşen bulgular debt: true olur, counts ve clean yalnızca
+ *   yeni bulguları sayar; kayıtta olup artık bulunmayanlar ödenmiştir (paid).
+ *   findingKey(f): kural, tablo (şemasıyla) ve kolonlardan kalıcı kimlik: 'fk-no-index:SATIS.SIPARIS.KAMPANYA_ID'
  *   AUDIT_RULES: [{ id, group, severity, guess }]   gruplar: keys, types, norm, naming; guess: bulgu addan tahmin
  */
 (function (NS) {
@@ -131,7 +135,7 @@ const SYSTEM_NAME = /^SYS_C\d+$|^(PK|FK|UQ|DF|CK)__.+__[0-9A-F]{6,}$/i;
 
 /* ─── Denetim ─── */
 
-function auditModel(model) {
+function auditModel(model, opts = {}) {
   const findings = [];
   const skipped = [];
   const add = (rule, t, col, data, tables, severity) => findings.push({ rule, severity: severity || SEVERITY.get(rule), t: t || null, col: col || null, tables: tables || (t ? [t] : []), data: data || {} });
@@ -306,10 +310,27 @@ function auditModel(model) {
   findings.sort((a, b) => order.get(a.rule) - order.get(b.rule) || String(a.t ? a.t.name : '').localeCompare(String(b.t ? b.t.name : '')) || String(a.col || '').localeCompare(String(b.col || '')));
   const byTable = new Map();
   for (const f of findings) for (const tb of f.tables) { if (!byTable.has(tb)) byTable.set(tb, []); byTable.get(tb).push(f); }
-  const counts = { error: 0, warning: 0, info: 0 };
-  for (const f of findings) counts[f.severity]++;
-  const clean = sql.filter(tb => !(byTable.get(tb) || []).some(f => f.severity !== 'info')).length;
-  return { findings, byTable, counts, skipped, tables: sql.length, clean };
+  const keys = new Set(opts.debt || []);
+  const seen = new Set();
+  const counts = { error: 0, warning: 0, info: 0 }, debtCounts = { error: 0, warning: 0, info: 0 };
+  for (const f of findings) {
+    f.key = findingKey(f);
+    f.debt = keys.has(f.key);
+    if (f.debt) seen.add(f.key);
+    (f.debt ? debtCounts : counts)[f.severity]++;
+  }
+  const clean = sql.filter(tb => !(byTable.get(tb) || []).some(f => f.severity !== 'info' && !f.debt)).length;
+  const debt = opts.debt ? { total: keys.size, left: seen.size, paid: [...keys].filter(k => !seen.has(k)), counts: debtCounts } : null;
+  return { findings, byTable, counts, skipped, tables: sql.length, clean, debt };
+}
+
+// Bulgunun kalıcı kimliği: tablo nesneleri her kurulumda yenilenir, ad ve kolonlar kalır.
+// Tablo düzeyindeki toplu bulgularda kolon listesi de kimliğe girer: listeye yeni kolon eklenirse bulgu yeniden görünür.
+function findingKey(f) {
+  const tn = tb => U((tb.schema ? tb.schema + '.' : '') + tb.name);
+  const where = f.t ? tn(f.t) : f.tables.map(tn).sort().join('+');
+  const list = f.col ? [f.col] : f.data.cols || f.data.names || [];
+  return f.rule + ':' + where + (list.length ? '.' + list.map(U).sort().join(',') : '');
 }
 
 // Mantıksal kolonun kodlaması: BOOLEAN, izin verilen değerler (E/H, Y/N, 0/1 ...) ya da adı mantıksal gibi duran NUMBER(1)
@@ -324,5 +345,5 @@ function boolEncoding(c, ti, w) {
   return null;
 }
 
-Object.assign(NS, { auditModel, AUDIT_RULES, typeInfo });
+Object.assign(NS, { auditModel, AUDIT_RULES, typeInfo, findingKey });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});

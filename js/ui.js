@@ -143,7 +143,9 @@ function setFiles(files, title, opts = {}) {
   S.subKeys = null;
   S.pick = new Set();
   S.diff = S.time = null;
+  S.audit = null;
   S.title = title;
+  readProject(files);
   $('#fileName').textContent = title;
   $('#fileName').title = title;
   toast(t('parsing'), 0);
@@ -193,8 +195,10 @@ async function loadEntries(list, append) {
   for (const { path, file } of list) {
     const rec = { path, size: file.size, include: true };
     const c = classify(path);
-    if (c.skip) rec.skipReason = c.skip;
-    else if (file.size > MAX_FILE) rec.skipReason = 'tooBig';
+    if (c.skip) {
+      rec.skipReason = c.skip;
+      if (c.skip === 'project' && file.size <= MAX_FILE) rec.projectText = await readFileText(file);
+    } else if (file.size > MAX_FILE) rec.skipReason = 'tooBig';
     else if ((total += file.size) > MAX_TOTAL) rec.skipReason = 'total';
     else rec.text = await readFileText(file);
     out.push(rec);
@@ -453,11 +457,10 @@ function namingMarkdown() {
 
 // Bulgular js/audit.js'te (kod döner); burada metin, pencere, panel ve harita.
 // Denetim tembel kurulur ve görüntülenen modele bağlı saklanır: alt diyagramda tam model, karşılaştırmada "sonra" denetlenir.
-S.audit = null;      // { src, res }
-S.auditMap = false;  // haritada: en ağır bulguya göre renk; hata ve uyarısı olmayanlar geri planda
+S.audit = null;      // { src, stamp, res }
+S.auditMap = false;  // haritada: en ağır yeni bulguya göre renk; hata ve uyarısı olmayanlar geri planda
 S.auditSev = null;   // tablo → en ağır önem (render.js)
 S.auditCols = null;  // tablo → Map(KOLON → önem) (kartta satır rengi)
-const AUDIT_RULE = new Map(NS.AUDIT_RULES.map(r => [r.id, r]));
 const SEV_RANK = { error: 0, warning: 1, info: 2 };
 const SEV_KEY = { error: 'sevError', warning: 'sevWarning', info: 'sevInfo' };
 const AUDIT_GROUPS = ['keys', 'types', 'norm', 'naming'];
@@ -465,14 +468,17 @@ const AUDIT_GROUPS = ['keys', 'types', 'norm', 'naming'];
 function getAudit() {
   const src = S.full ? S.full.model : S.model;
   if (!src) return null;
-  if (!S.audit || S.audit.src !== src) {
+  const debt = currentDebt();
+  const stamp = debt ? debt.updated : '';
+  if (!S.audit || S.audit.src !== src || S.audit.stamp !== stamp) {
     const m = S.diffRes ? { ...src, tables: src.tables.filter(tb => S.diffRes.byAfter.has(tb)) } : src;
-    S.audit = { src, res: NS.auditModel(m) };
+    S.audit = { src, stamp, res: NS.auditModel(m, { debt: debt ? debt.keys : null }) };
     applyAuditMap();
   }
   return S.audit.res;
 }
 
+// Haritada yalnızca yeni bulgular: kabul edilmiş borç renk almaz
 function applyAuditMap() {
   S.auditSev = S.auditCols = null;
   const a = S.auditMap && S.audit && S.audit.res;
@@ -482,6 +488,7 @@ function applyAuditMap() {
     const worse = (m, k, sev) => { if (!m.has(k) || SEV_RANK[sev] < SEV_RANK[m.get(k)]) m.set(k, sev); };
     for (const [tb, fs] of a.byTable) {
       for (const f of fs) {
+        if (f.debt) continue;
         worse(S.auditSev, tb, f.severity);
         const cols = f.col ? f.col.split(', ') : f.data.cols || [];
         if (!cols.length) continue;
@@ -526,48 +533,52 @@ const ruleText = id => t('auditRules')[id];
 const auditWhat = f => ruleText(f.rule).what(auditVars(f));
 const auditLabel = f => (f.t ? f.t.name + (f.col ? '.' + f.col : '') : f.col || '');
 const sevCounts = c => ['error', 'warning', 'info'].filter(s => c[s]).map(s => `<i class="sev-${s}">${esc(t(SEV_KEY[s], { n: c[s] }))}</i>`).join('');
+const countSev = fs => { const c = { error: 0, warning: 0, info: 0 }; for (const f of fs) c[f.severity]++; return c; };
+
+// Kural kural liste; open: açık kalacak kural kimlikleri (yeniden çizimde)
+function auditRulesHtml(list, open, prefix) {
+  const byRule = new Map();
+  for (const f of list) { if (!byRule.has(f.rule)) byRule.set(f.rule, []); byRule.get(f.rule).push(f); }
+  return AUDIT_GROUPS.map(g => {
+    const rules = NS.AUDIT_RULES.filter(r => r.group === g && byRule.has(r.id));
+    if (!rules.length) return '';
+    return `<h5>${esc(t('auditGroups')[g])}</h5>${rules.map(r => {
+      const fs = byRule.get(r.id), R = ruleText(r.id), max = 40, id = prefix + r.id;
+      const items = fs.slice(0, max).map(f => {
+        const tb = f.t || f.tables[0], what = auditWhat(f);
+        return `<li class="sev-${f.severity}" data-go="${esc(tb.key)}"${f.t && f.col && !f.col.includes(',') ? ` data-col="${esc(f.col)}"` : ''} tabindex="0"><b>${esc(auditLabel(f))}</b>${what ? ` <span>${esc(what)}</span>` : ''}</li>`;
+      }).join('');
+      return `<details class="au-rule sev-${r.severity}" data-rule="${id}"${open.has(id) ? ' open' : ''}><summary><i class="dot"></i><b>${esc(R.title)}</b>${r.guess ? `<em>${esc(t('auditGuess'))}</em>` : ''}<span class="n">${fs.length}</span></summary>
+        <p><b>${esc(t('auditWhy'))}:</b> ${esc(R.why)}</p><p><b>${esc(t('auditFix'))}:</b> ${esc(R.fix)}</p>
+        <ul class="au-items">${items}${fs.length > max ? `<li class="more">${esc(t('auditMore', { n: fs.length - max }))}</li>` : ''}</ul></details>`;
+    }).join('')}`;
+  }).join('');
+}
 
 function renderAudit() {
   const el = $('#auditPop');
   if (el.hidden && !S.auditMap) return;
   const a = getAudit();
   if (!a) { el.innerHTML = ''; return; }
-  // yeniden çizimde açık kurallar açık kalsın (haritada göster, dil değişimi)
+  // yeniden çizimde açık kurallar ve borç listesi açık kalsın (haritada göster, dil değişimi)
   const open = new Set([...el.querySelectorAll('details[open]')].map(d => d.dataset.rule));
-  const byRule = new Map();
-  for (const f of a.findings) { if (!byRule.has(f.rule)) byRule.set(f.rule, []); byRule.get(f.rule).push(f); }
-  const groups = AUDIT_GROUPS.map(g => {
-    const rules = NS.AUDIT_RULES.filter(r => r.group === g && byRule.has(r.id));
-    if (!rules.length) return '';
-    return `<h5>${esc(t('auditGroups')[g])}</h5>${rules.map(r => {
-      const fs = byRule.get(r.id), R = ruleText(r.id), max = 40;
-      const items = fs.slice(0, max).map(f => {
-        const tb = f.t || f.tables[0], what = auditWhat(f);
-        return `<li class="sev-${f.severity}" data-go="${esc(tb.key)}"${f.t && f.col && !f.col.includes(',') ? ` data-col="${esc(f.col)}"` : ''} tabindex="0"><b>${esc(auditLabel(f))}</b>${what ? ` <span>${esc(what)}</span>` : ''}</li>`;
-      }).join('');
-      return `<details class="au-rule sev-${r.severity}" data-rule="${r.id}"${open.has(r.id) ? ' open' : ''}><summary><i class="dot"></i><b>${esc(R.title)}</b>${r.guess ? `<em>${esc(t('auditGuess'))}</em>` : ''}<span class="n">${fs.length}</span></summary>
-        <p><b>${esc(t('auditWhy'))}:</b> ${esc(R.why)}</p><p><b>${esc(t('auditFix'))}:</b> ${esc(R.fix)}</p>
-        <ul class="au-items">${items}${fs.length > max ? `<li class="more">${esc(t('auditMore', { n: fs.length - max }))}</li>` : ''}</ul></details>`;
-    }).join('')}`;
-  }).join('');
-  // en çok bulgu: hata 10, uyarı 3, bilgi 1 ağırlıkla
+  const fresh = a.findings.filter(f => !f.debt), owed = a.findings.filter(f => f.debt);
+  // en çok yeni bulgu: hata 10, uyarı 3, bilgi 1 ağırlıkla
   const weight = fs => fs.reduce((s, f) => s + (f.severity === 'error' ? 10 : f.severity === 'warning' ? 3 : 1), 0);
-  const worst = [...a.byTable.entries()].filter(([, fs]) => fs.some(f => f.severity !== 'info'))
+  const worst = [...a.byTable.entries()].map(([tb, fs]) => [tb, fs.filter(f => !f.debt)]).filter(([, fs]) => fs.some(f => f.severity !== 'info'))
     .sort((x, y) => weight(y[1]) - weight(x[1]) || String(x[0].name).localeCompare(String(y[0].name))).slice(0, 10);
   const skipped = a.skipped.map(s => `<p class="nn">${esc(t(s.reason === 'noIndexes' ? 'auditSkipNoIndexes' : 'auditNone'))}</p>`).join('');
   el.innerHTML = `<h4>${esc(t('auditTitle'))}</h4>
     <p class="intro">${esc(t('auditIntro'))}</p>
     <p class="au-sum">${esc(t('auditSummary', a))}</p>
-    <p class="au-chips">${sevCounts(a.counts) || `<span class="nn">${esc(t('auditNone'))}</span>`}</p>
-    ${skipped}${groups}
-    ${worst.length > 1 ? `<h5>${esc(t('auditWorst'))}</h5><ul class="au-items au-worst">${worst.map(([tb, fs]) => {
-      const c = { error: 0, warning: 0, info: 0 };
-      for (const f of fs) c[f.severity]++;
-      return `<li data-go="${esc(tb.key)}" tabindex="0"><b>${esc(tb.name)}</b><span class="au-chips">${sevCounts(c)}</span></li>`;
-    }).join('')}</ul>` : ''}
+    <p class="au-chips">${sevCounts(a.counts) || `<span class="nn">${esc(t(a.debt ? 'debtNoNew' : 'auditNone'))}</span>`}</p>
+    ${debtHtml(a, owed, open)}
+    ${skipped}${auditRulesHtml(fresh, open, '')}
+    ${worst.length > 1 ? `<h5>${esc(t('auditWorst'))}</h5><ul class="au-items au-worst">${worst.map(([tb, fs]) =>
+      `<li data-go="${esc(tb.key)}" tabindex="0"><b>${esc(tb.name)}</b><span class="au-chips">${sevCounts(countSev(fs))}</span></li>`).join('')}</ul>` : ''}
     <div class="df-row">
-      ${a.findings.length ? `<button class="btn sm ${S.auditMap ? '' : 'ghost'}" data-act="audit-map">${esc(t(S.auditMap ? 'auditMapOff' : 'auditMap'))}</button>
-      <button class="btn sm ghost" data-act="audit-md">${esc(t('namingMd'))}</button>` : ''}
+      ${fresh.length ? `<button class="btn sm ${S.auditMap ? '' : 'ghost'}" data-act="audit-map">${esc(t(S.auditMap ? 'auditMapOff' : 'auditMap'))}</button>` : ''}
+      ${a.findings.length ? `<button class="btn sm ghost" data-act="audit-md">${esc(t('namingMd'))}</button>` : ''}
     </div>`;
 }
 
@@ -575,8 +586,12 @@ $('#auditPop').addEventListener('click', e => {
   const b = e.target.closest('[data-act]');
   if (b) {
     e.stopPropagation();
-    if (b.dataset.act === 'audit-map') setAuditMap(!S.auditMap);
-    else if (b.dataset.act === 'audit-md') downloadText(auditMarkdown(), fileStem() + '-' + t('auditFile') + '.md', 'text/markdown;charset=utf-8');
+    const act = b.dataset.act;
+    if (act === 'audit-map') setAuditMap(!S.auditMap);
+    else if (act === 'audit-md') downloadText(auditMarkdown(), fileStem() + '-' + t('auditFile') + '.md', 'text/markdown;charset=utf-8');
+    else if (act === 'debt-accept') acceptDebt();
+    else if (act === 'debt-clear') clearDebt();
+    else if (act === 'debt-file') downloadProject();
     return;
   }
   const li = e.target.closest('li[data-go]');
@@ -588,40 +603,149 @@ $('#auditPop').addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.matches('li[data-go]')) e.target.click();
 });
 
-// Panel: seçili tablonun bulguları (kapalı başlar; haritada gösterilirken açık)
+// Panel: seçili tablonun bulguları (kapalı başlar; haritada gösterilirken açık). Borç soluk ve etiketli.
 function auditPanelHtml(tb) {
   const a = getAudit();
   const fs = a && a.byTable.get(tb);
   if (!fs || !fs.length) return '';
-  const c = { error: 0, warning: 0, info: 0 };
-  for (const f of fs) c[f.severity]++;
-  return `<section class="auditsec"><details${S.auditMap ? ' open' : ''}><summary><h3>${esc(t('auditHead'))} <span class="au-chips">${sevCounts(c)}</span></h3></summary>
-    <ul class="au-items">${fs.map(f => {
+  const fresh = fs.filter(f => !f.debt), owed = fs.length - fresh.length;
+  const sorted = fresh.concat(fs.filter(f => f.debt));
+  return `<section class="auditsec"><details${S.auditMap ? ' open' : ''}><summary><h3>${esc(t('auditHead'))} <span class="au-chips">${sevCounts(countSev(fresh))}${owed ? `<i class="debt">${esc(t('debtCount', { n: owed }))}</i>` : ''}</span></h3></summary>
+    <ul class="au-items">${sorted.map(f => {
       const R = ruleText(f.rule), what = auditWhat(f);
-      const where = f.t === tb ? f.col : f.col || '';
-      return `<li class="sev-${f.severity}"><b>${esc(R.title)}</b>${where ? ` <code>${esc(where)}</code>` : ''}${what ? ` <span>${esc(what)}</span>` : ''}<small>${esc(t('auditFix'))}: ${esc(R.fix)}</small></li>`;
+      return `<li class="sev-${f.severity}${f.debt ? ' debt' : ''}"><b>${esc(R.title)}</b>${f.debt ? ` <em>${esc(t('debtTag'))}</em>` : ''}${f.col ? ` <code>${esc(f.col)}</code>` : ''}${what ? ` <span>${esc(what)}</span>` : ''}<small>${esc(t('auditFix'))}: ${esc(R.fix)}</small></li>`;
     }).join('')}</ul></details></section>`;
 }
 
-// İnceleme belgesi: kural kural, ne / neden / öneri ve bütün bulgular
+// İnceleme belgesi: yeni bulgular kural kural (ne / neden / öneri), sonra borcun özeti ve ödenenler
 function auditMarkdown() {
   const a = getAudit();
   const code = s => '`' + String(s).replace(/`/g, "'") + '`';
   const out = [`# ${t('auditTitle')} · ${S.title || ''}`, '', t('auditSummary', a), '',
-    ['error', 'warning', 'info'].filter(s => a.counts[s]).map(s => t(SEV_KEY[s], { n: a.counts[s] })).join(' · '), ''];
+    ['error', 'warning', 'info'].filter(s => a.counts[s]).map(s => t(SEV_KEY[s], { n: a.counts[s] })).join(' · ') || t(a.debt ? 'debtNoNew' : 'auditNone'), ''];
   for (const s of a.skipped) out.push('> ' + t(s.reason === 'noIndexes' ? 'auditSkipNoIndexes' : 'auditNone'), '');
+  const fresh = a.findings.filter(f => !f.debt);
   for (const g of AUDIT_GROUPS) {
-    const rules = NS.AUDIT_RULES.filter(r => r.group === g && a.findings.some(f => f.rule === r.id));
+    const rules = NS.AUDIT_RULES.filter(r => r.group === g && fresh.some(f => f.rule === r.id));
     if (!rules.length) continue;
     out.push(`## ${t('auditGroups')[g]}`, '');
     for (const r of rules) {
-      const fs = a.findings.filter(f => f.rule === r.id), R = ruleText(r.id);
+      const fs = fresh.filter(f => f.rule === r.id), R = ruleText(r.id);
       out.push(`### ${R.title} (${fs.length})${r.guess ? ' · ' + t('auditGuess') : ''}`, '', `**${t('auditWhy')}:** ${R.why}`, '', `**${t('auditFix')}:** ${R.fix}`, '');
       for (const f of fs) { const what = auditWhat(f), label = auditLabel(f); out.push(`- ${label ? code(label) : ''}${label && what ? ' ' : ''}${what}`); }
       out.push('');
     }
   }
+  if (a.debt) {
+    const d = currentDebt();
+    out.push(`## ${t('debtHead')}`, '', t('debtSummary', debtVars(a, d)), '');
+    for (const r of NS.AUDIT_RULES) {
+      const n = a.findings.filter(f => f.debt && f.rule === r.id).length;
+      if (n) out.push(`- ${ruleText(r.id).title}: ${n}`);
+    }
+    out.push('');
+    if (a.debt.paid.length) {
+      out.push(`### ${t('debtPaid')} (${a.debt.paid.length})`, '');
+      for (const k of a.debt.paid) out.push('- ' + paidText(k));
+      out.push('');
+    }
+  }
   return out.join('\n');
+}
+
+/* ─── Borç kaydı ─── */
+
+// "Geçmişi affet, geleceği denetle": o anki bulgular kabul edilmiş borç olarak kaydedilir; bundan sonra yalnızca yeni
+// bulgular hata sayılır. Kayıt bulgu anahtarlarıdır (audit.js findingKey). İki kaynak:
+//   - klasördeki *.sqlschema.json: şemayla birlikte depoya konur, klasörü açan herkes aynı borcu görür
+//   - tarayıcı: proje adına göre (dosya kümesine göre değil; yeni migration eklenince kayıt kaybolmasın)
+// İkisi de varsa daha yeni olan geçerli. Borcu kaldırmak boş bir kayıt yazar; böylece dosyadaki kaydı da örter.
+S.project = null;   // { name, data }: klasörden okunan proje dosyası
+
+const hash36 = str => { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0; return h.toString(36); };
+const debtStoreKey = () => 'sqlschema.debt.' + hash36(String(S.title || ''));
+const validDebt = d => (d && Array.isArray(d.keys) && typeof d.updated === 'string'
+  ? { keys: d.keys.map(String), accepted: String(d.accepted || d.updated).slice(0, 10), updated: d.updated } : null);
+
+function currentDebt() {
+  let local = null;
+  try { local = validDebt(JSON.parse(localStorage.getItem(debtStoreKey()) || 'null')); } catch (err) { /* depolama kapalı */ }
+  const file = S.project && validDebt(S.project.data.debt);
+  const d = local && file ? (local.updated >= file.updated ? local : file) : local || file;
+  return d && d.keys.length ? d : null;
+}
+function storeDebt(d) {
+  try { localStorage.setItem(debtStoreKey(), JSON.stringify(d)); } catch (err) { toast(t('viewsNoStorage')); }
+  refreshAfterDebt();
+}
+function refreshAfterDebt() {
+  S.audit = null;
+  getAudit();
+  renderAudit();
+  renderPanel();
+  invalidate();
+}
+
+function acceptDebt() {
+  const a = getAudit();
+  if (!a || !a.findings.length) return;
+  const now = new Date().toISOString();
+  const prev = currentDebt();
+  storeDebt({ keys: [...new Set(a.findings.map(f => f.key))], accepted: prev ? prev.accepted : now.slice(0, 10), updated: now });
+  toast(t('debtAccepted', { n: a.findings.length }), 4000);
+}
+function clearDebt() {
+  storeDebt({ keys: [], accepted: '', updated: new Date().toISOString() });
+  toast(t('debtCleared'), 3000);
+}
+
+// Proje dosyası: borç ve kayıtlı görünümler; şemayı içermez
+function downloadProject() {
+  const d = currentDebt();
+  const data = { app: 'sqlSchema', kind: 'project', version: 1, debt: d || { keys: [], accepted: '', updated: new Date().toISOString() }, views: loadViews() };
+  downloadText(JSON.stringify(data, null, 2) + '\n', fileStem() + '.sqlschema.json', 'application/json');
+  toast(t('debtFileTip'), 6000);
+}
+
+function readProject(files) {
+  S.project = null;
+  for (const f of files) {
+    if (f.skipReason !== 'project' || f.projectText == null) continue;
+    try {
+      const data = JSON.parse(f.projectText);
+      if (data && data.app === 'sqlSchema' && (data.kind === 'project' || data.kind === 'views')) { S.project = { name: baseName(f.path), data }; return; }
+    } catch (err) { /* bozuk dosya: yok sayılır */ }
+  }
+}
+
+const debtVars = (a, d) => ({ accepted: d.accepted, total: a.debt.total, left: a.debt.left, paid: a.debt.paid.length, pct: a.debt.total ? Math.round(a.debt.paid.length * 100 / a.debt.total) : 0 });
+// ödenen bir borcun anahtarı: 'kural:TABLO.KOLON' → "Kural başlığı: TABLO.KOLON"
+function paidText(key) {
+  const i = key.indexOf(':'), R = ruleText(key.slice(0, i));
+  return (R ? R.title : key.slice(0, i)) + ': ' + key.slice(i + 1);
+}
+
+function debtHtml(a, owed, open) {
+  if (!a.debt) {
+    return a.findings.length ? `<div class="au-debt"><p class="df-hint">${esc(t('debtHint'))}</p>
+      <div class="df-row"><button class="btn sm ghost" data-act="debt-accept">${esc(t('debtAccept'))}</button></div></div>` : '';
+  }
+  const d = currentDebt(), v = debtVars(a, d);
+  const file = S.project && validDebt(S.project.data.debt);
+  const src = file && file.updated === d.updated ? t('debtSrcFile', { name: S.project.name }) : t('debtSrcLocal');
+  const paid = a.debt.paid.length ? `<details class="au-rule" data-rule="debt-paid"${open.has('debt-paid') ? ' open' : ''}><summary><i class="dot paid"></i><b>${esc(t('debtPaid'))}</b><span class="n">${a.debt.paid.length}</span></summary>
+    <ul class="au-items">${a.debt.paid.slice(0, 60).map(k => `<li class="paid">${esc(paidText(k))}</li>`).join('')}</ul></details>` : '';
+  return `<div class="au-debt">
+    <h5>${esc(t('debtHead'))} <small>${esc(src)}</small></h5>
+    <p>${esc(t('debtSummary', v))}</p>
+    <div class="au-bar" title="${esc(t('debtProgress', v))}"><i style="width:${v.pct}%"></i></div>
+    ${owed.length ? `<details class="au-debtlist" data-rule="debt-list"${open.has('debt-list') ? ' open' : ''}><summary>${esc(t('debtList', { n: owed.length }))}</summary>${auditRulesHtml(owed, open, 'debt:')}</details>` : ''}
+    ${paid}
+    <div class="df-row">
+      <button class="btn sm ghost" data-act="debt-accept" title="${esc(t('debtAcceptMoreTitle'))}">${esc(t('debtAcceptMore'))}</button>
+      <button class="btn sm ghost" data-act="debt-file" title="${esc(t('debtFileTip'))}">${esc(t('debtFile'))}</button>
+      <button class="btn sm ghost" data-act="debt-clear">${esc(t('debtClear'))}</button>
+    </div></div>`;
 }
 
 function downloadText(text, name, type) {
@@ -826,13 +950,12 @@ $('#pickBar').addEventListener('keydown', e => {
 // göre saklanır; aynı dosyalar açılınca geri gelir. .sqlschema.json olarak dışa/içe aktarılır, şemayı taşımaz.
 function viewsFingerprint() {
   const paths = (S.ordered || []).filter(f => f.include && f.result).map(f => f.path).sort().join('\n');
-  let h = 5381;
-  for (let i = 0; i < paths.length; i++) h = ((h << 5) + h + paths.charCodeAt(i)) >>> 0;
-  return h.toString(36);
+  return hash36(paths);
 }
 function loadViews() {
   try {
-    const v = JSON.parse(localStorage.getItem('sqlschema.views.' + viewsFingerprint()) || '[]');
+    const raw = localStorage.getItem('sqlschema.views.' + viewsFingerprint());
+    const v = raw != null ? JSON.parse(raw) : (S.project && S.project.data.views) || [];
     return Array.isArray(v) ? v.filter(x => x && typeof x.name === 'string' && Array.isArray(x.tables)) : [];
   } catch (err) { return []; }
 }
@@ -898,7 +1021,10 @@ $('#viewFile').addEventListener('change', async () => {
   if (!file) return;
   try {
     const data = JSON.parse(await file.text());
-    if (!data || data.app !== 'sqlSchema' || data.kind !== 'views' || !Array.isArray(data.views)) throw new Error('kind');
+    if (!data || data.app !== 'sqlSchema' || (data.kind !== 'views' && data.kind !== 'project')) throw new Error('kind');
+    const debt = data.kind === 'project' && validDebt(data.debt);
+    if (debt) storeDebt(debt);
+    if (!Array.isArray(data.views) || !data.views.length) { if (debt) toast(t('debtImported', { n: debt.keys.length }), 3000); else throw new Error('empty'); return; }
     const incoming = data.views.filter(v => v && typeof v.name === 'string' && Array.isArray(v.tables)).map(v => ({ name: v.name.slice(0, 80), tables: v.tables.map(String), near: !!v.near }));
     const names = new Set(incoming.map(v => v.name));
     storeViews(loadViews().filter(v => !names.has(v.name)).concat(incoming));

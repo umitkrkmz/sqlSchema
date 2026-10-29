@@ -269,7 +269,7 @@ const EXPECT = {
     check('sozluk: veri satırları sayıldı, INSERT raporda kalır', m.stats.dataRows === 42 && m.stats.skipped.some(([k, n]) => k === 'INSERT' && n === 42), [m.stats.dataRows, m.stats.skipped]);
     check('sozluk: TIP_ID kolonları SOZLUK_TIP\'e tahmin edilmez', !m.rels.some(r => r.kind === 'implicit'), m.rels.filter(r => r.kind === 'implicit').map(r => r.child.name + '.' + r.cols[0]));
   },
-  hatali({ model: m, migration }, all) {
+  hatali({ model: m, migration }, all, s) {
     check('hatali: Flyway tanındı, 14 tablo', migration === 'Flyway' && m.stats.tables === 14, [migration, m.stats.tables]);
     const a = NS.auditModel(m);
     const got = a.findings.map(f => `${f.rule} ${f.t ? f.t.name : f.tables.map(t => t.name).join('+')}${f.col ? '.' + f.col : ''}`);
@@ -293,6 +293,21 @@ const EXPECT = {
     const bi = a.findings.find(f => f.rule === 'bool-inconsistent');
     check('hatali denetim: mantıksal kodlamalar', same(bi.data.encodings.map(e => e.enc), ['E/H', 'Y/N', 'NUMBER(1)']), bi.data.encodings.map(e => e.enc));
     check('hatali denetim: tabloya göre bulgular', a.byTable.get(find(m, 'KAMPANYA')).length === 9 && !a.byTable.has(find(m, 'SIPARIS_KALEM')), a.byTable.get(find(m, 'KAMPANYA')).map(f => f.rule));
+    // borç kaydı: V3'teki bulgular kabul edilir; son hâlde yalnızca V4 ve V5'in getirdikleri yeni sayılır
+    const hfiles = s.files.map(p => ({ path: 'hatali/' + p, text: fs.readFileSync(path.join(ROOT, 'samples', 'hatali', p), 'utf8') }));
+    const upToV = n => hfiles.filter(f => +/\/V(\d+)__/.exec(f.path)[1] <= n);
+    const keysV3 = NS.auditModel(build(upToV(3)).model).findings.map(f => f.key);
+    check('borç: bulgu anahtarı kalıcı ve okunur', same(NS.auditModel(build(hfiles).model).findings.map(f => f.key), a.findings.map(f => f.key)) && keysV3.includes('no-pk:KAMPANYA_KATILIM') && keysV3.includes('fk-type-mismatch:KAMPANYA_KATILIM.MUSTERI_ID') && keysV3.includes('repeating-group:MUSTERI.TEL1,TEL2,TEL3'), keysV3.slice(0, 5));
+    const ab3 = NS.auditModel(m, { debt: keysV3 });
+    const newRules = [...new Set(ab3.findings.filter(f => !f.debt).map(f => f.rule))].sort();
+    check('borç: kabul edilenler yeni sayılmaz', ab3.debt.total === 21 && ab3.debt.left === 21 && !ab3.debt.paid.length && same(ab3.counts, { error: 1, warning: 8, info: 5 }) && same(ab3.debt.counts, { error: 6, warning: 12, info: 3 }), [ab3.debt, ab3.counts]);
+    check('borç: yeni bulgular V4 ve V5\'ten', same(newRules, ['disabled-fk', 'fk-cycle', 'fk-missing', 'fk-no-index', 'name-too-long', 'naming-case', 'number-no-precision', 'orphan-table', 'pk-style', 'system-name', 'wide-table']), newRules);
+    // düzeltilen bulgu ödenmiş sayılır; temiz tablo sayısı yalnızca yeni bulgulara bakar
+    const fixed = build(hfiles.concat([{ path: 'hatali/db/migration/V6__duzeltme.sql', text: 'ALTER TABLE KAMPANYA_KATILIM ADD CONSTRAINT PK_KAMPANYA_KATILIM PRIMARY KEY (KAMPANYA_ID, MUSTERI_ID);\n' }])).model;
+    const af = NS.auditModel(fixed, { debt: keysV3 });
+    // PK (KAMPANYA_ID, MUSTERI_ID) KAMPANYA_ID'nin FK indeksini de karşılar
+    check('borç: düzeltilen bulgular ödendi', same(af.debt.paid, ['no-pk:KAMPANYA_KATILIM', 'fk-no-index:KAMPANYA_KATILIM.KAMPANYA_ID']) && af.debt.left === 19 && af.clean > a.clean, [af.debt.paid, af.clean]);
+    check('borç: proje dosyası şema sayılmaz', NS.classify('satis/db/satis.sqlschema.json').skip === 'project');
     // indeks işlemi: benzersiz olmayan indeks modelde, kolonu silinince indeks de gider
     check('hatali: indeksler modelde', find(m, 'MUSTERI_NOTU').indexes.length === 2 && find(m, 'SIPARIS').indexes.length === 2);
     // mevcut örneklerde yanlış alarm makul
@@ -436,7 +451,7 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   }
   // 'skip_' + kod biçimindeki dinamik anahtarlar: files.js ve ui.js'teki bütün atlama kodları
   used.delete('skip_');
-  for (const code of ['config', 'ext', 'down', 'undo', 'tooBig', 'total']) used.add('skip_' + code);
+  for (const code of ['config', 'ext', 'down', 'undo', 'project', 'tooBig', 'total']) used.add('skip_' + code);
   // adlandırma profilinin boyut ('nd_' + boyut) ve kova ('nk_' + boyut + '_' + kova) anahtarları
   used.delete('nd_');
   used.delete('nk_');

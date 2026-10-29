@@ -27,12 +27,12 @@ Betikler `index.html`'de şu sırayla yüklenir ve her biri `globalThis.sqlSchem
 | `js/lexer.js` | tokenizer, ifade ayırıcı (`;`, `/`, `GO`, `DELIMITER`), lehçe tahmini | yok |
 | `js/sql-parser.js` | DDL → sıralı işlem listesi (`create`, `fk`, `pk`, `rename`, `drop` ...; ayrıntı dosya başında) | yok |
 | `js/mongo.js` | `$jsonSchema`, Mongoose ve JSON belgelerinden aynı işlem listesi | yok |
-| `js/files.js` | dosya sıralama (Flyway, golang-migrate), ayrıştırıcı seçimi, ayrı veritabanı adları | yok |
+| `js/files.js` | dosya sıralama (Flyway, golang-migrate), ayrıştırıcı seçimi, ayrı veritabanı adları; `*.sqlschema.json` proje dosyası şema sayılmaz | yok |
 | `js/model.js` | işlemleri dosya sırasıyla uygular; FK çözümleme, kardinalite, ara tablo, tahmini ilişki | yok |
 | `js/diff.js` | iki modelin farkı (tablo, kolon, PK, FK), ad değişikliği tahmini; zaman çizelgesi (sürüm adımları, tablo soyu, geçmiş) | yok |
 | `js/layout.js` | veritabanı → şema → takımyıldız (dosyaya ya da ada göre) → yıldız, deterministik kuvvet yerleşimi | yok |
 | `js/conventions.js` | adlandırma profili: boyutlar, kovalar, oranlar, baskın kalıba uymayanlar (kod döndürür, metin değil) | yok |
-| `js/audit.js` | tasarım denetimi: kurallar (`AUDIT_RULES`), bulgular kod olarak; metinleri `i18n.js`'teki `auditRules` | yok |
+| `js/audit.js` | tasarım denetimi: kurallar (`AUDIT_RULES`), bulgular kod olarak; metinleri `i18n.js`'teki `auditRules`. Bulgu anahtarı (`findingKey`) ve borç kaydı | yok |
 | `js/sample-small.js` | gömülü küçük örnek | yok |
 | `samples/catalog.js` | örnek kataloğu (üretilir) | yok |
 | `js/render.js` | canvas çizimi, kamera, karga ayağı | var |
