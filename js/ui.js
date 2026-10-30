@@ -1940,7 +1940,7 @@ function stopDiff() {
 function versionFiles() {
   return (S.ordered || []).filter(f => f.include && f.result);
 }
-const fileLabel = p => baseName(p).replace(/\.[^.]+$/, '');
+const fileLabel = NS.fileLabel;
 
 // Karşılaştırmanın iki yanının adı; zaman çizelgesinde bir önceki ve şimdiki sürüm
 function diffSides() {

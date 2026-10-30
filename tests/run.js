@@ -596,6 +596,25 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   check('denetim kolonu tanıma', !badAudit.length, badAudit);
 }
 
+// Sürümü klasör adında olan migration'lar: Prisma (migration.sql) ve Diesel (up.sql / down.sql)
+{
+  const prisma = build([
+    { path: 'prisma/migrations/20240301090000_orders/migration.sql', text: 'CREATE TABLE orders (id INT PRIMARY KEY, customer_id INT REFERENCES customers(id));' },
+    { path: 'prisma/migrations/20240115120000_init/migration.sql', text: 'CREATE TABLE customers (id INT PRIMARY KEY);' },
+    { path: 'prisma/migrations/migration_lock.toml', text: 'provider = "postgresql"' },
+  ]);
+  check('Prisma: klasör sırası ve sürüm adı', prisma.migration === 'Prisma' && same(prisma.order.map(NS.fileLabel), ['20240115120000_init', '20240301090000_orders']) && prisma.model.rels.length === 1, [prisma.migration, prisma.order]);
+  const diesel = build([
+    { path: 'migrations/2024-02-01-000000_add_email/up.sql', text: 'ALTER TABLE users ADD email VARCHAR(100);' },
+    { path: 'migrations/2024-02-01-000000_add_email/down.sql', text: 'ALTER TABLE users DROP COLUMN email;' },
+    { path: 'migrations/2024-01-10-083000_create_users/up.sql', text: 'CREATE TABLE users (id SERIAL PRIMARY KEY);' },
+    { path: 'migrations/2024-01-10-083000_create_users/down.sql', text: 'DROP TABLE users;' },
+  ]);
+  const users = diesel.model.tables.find(t => t.name === 'users');
+  check('Diesel: up.sql sırayla, down.sql atlanır', diesel.migration === 'Diesel' && diesel.skipped.length === 2 && diesel.skipped.every(s => s.reason === 'down') && users && users.columns.length === 2, [diesel.migration, diesel.order, diesel.skipped.map(s => s.reason)]);
+  check('genel ad sürüm klasöründe değilse sıradan dosya', NS.classify('db/schema/migration.sql').kind === 'plain' && NS.fileLabel('db/V3__x.sql') === 'V3__x');
+}
+
 // Dil desteği: iki sözlük aynı anahtarlara sahip, HTML ve kodda kullanılan her anahtar tanımlı
 {
   const tr = new Set(NS.i18nKeys('tr')), en = new Set(NS.i18nKeys('en'));

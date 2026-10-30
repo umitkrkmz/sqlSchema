@@ -136,7 +136,7 @@ function main() {
   const after = build(files, o.separate);
   if (!after.model.tables.length) { process.stderr.write('sqlschema-lint: tablo bulunamadı\n'); process.exit(2); }
   if (o.since) {
-    const base = p => path.basename(p).replace(/\.[^.]+$/, '');
+    const base = p => p ? NS.fileLabel(p) : '';
     const i = after.ordered.findIndex(f => base(f.path) === o.since || base(f.path).startsWith(o.since + '__'));
     if (i < 0) usage(`--since: ${o.since} sürümü bulunamadı`);
     before = build(after.ordered.slice(0, i), o.separate).model;

@@ -28,7 +28,7 @@ Betikler `index.html`'de şu sırayla yüklenir ve her biri `globalThis.sqlSchem
 | `js/lexer.js` | tokenizer, ifade ayırıcı (`;`, `/`, `GO`, `DELIMITER`), lehçe tahmini | yok |
 | `js/sql-parser.js` | DDL → sıralı işlem listesi (`create`, `fk`, `pk`, `rename`, `drop` ...; ayrıntı dosya başında) | yok |
 | `js/mongo.js` | `$jsonSchema`, Mongoose ve JSON belgelerinden aynı işlem listesi | yok |
-| `js/files.js` | dosya sıralama (Flyway, golang-migrate), ayrıştırıcı seçimi, ayrı veritabanı adları; `*.sqlschema.json` proje dosyası şema sayılmaz | yok |
+| `js/files.js` | dosya sıralama (Flyway, golang-migrate; Prisma ve Diesel'de sürüm klasör adında, `fileLabel`), ayrıştırıcı seçimi, ayrı veritabanı adları; `*.sqlschema.json` proje dosyası şema sayılmaz | yok |
 | `js/model.js` | işlemleri dosya sırasıyla uygular; FK çözümleme, kardinalite, ara tablo, tahmini ilişki | yok |
 | `js/diff.js` | iki modelin farkı (tablo, kolon, varsayılan, PK, FK, UNIQUE), ad değişikliği tahmini; zaman çizelgesi (sürüm adımları, tablo soyu, geçmiş) | yok |
 | `js/fixes.js` | bulgu başına lehçeye uygun düzeltme SQL'i, risk düzeyi; notlar kod (`FIX_NOTES`), metinleri `fixNotes` | yok |

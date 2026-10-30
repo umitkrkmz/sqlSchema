@@ -56,7 +56,7 @@ draw.io kadar elle uğraştırmaz, veri modelleme aracı kadar ağır değildir.
 - **Saf HTML, CSS ve JavaScript.** Bağımlılık yok, derleme adımı yok; klasörü açmanız yeterli.
 - **Gizlilik:** dosyalar tarayıcıdan çıkmaz, hiçbir sunucuya gönderilmez.
 - **Sekiz veritabanı:** Oracle, SQL Server, MySQL, MariaDB, PostgreSQL, SQLite, Cassandra ve MongoDB.
-- **Tek dosya, birden fazla dosya ya da bütün bir klasör:** bölünmüş dökümler, migration klasörleri (Flyway, golang-migrate), çok veritabanlı projeler.
+- **Tek dosya, birden fazla dosya ya da bütün bir klasör:** bölünmüş dökümler, migration klasörleri (Flyway, golang-migrate, Prisma, Diesel), çok veritabanlı projeler.
 - **Karga ayağı notasyonu:** kardinalite `NOT NULL`, `UNIQUE` ve PK bilgisinden çıkarılır.
 - **Tahmini ilişkiler:** FK tanımlı olmayan eski sistemlerde, Cassandra'da ve MongoDB'de bağlantılar kolon adlarından bulunur.
 - **Adlandırma profili:** şemada hangi adlandırma kalıplarının ne oranda kullanıldığını ve baskın kalıba uymayan tabloları gösterir.
@@ -278,6 +278,8 @@ Migration klasörlerinde dosya bir modülü değil bir sürümü gösterir; orad
 | Flyway | `V1__init.sql`, `V1_1__x.sql`, `V2__y.sql` | Sürüm numarasına göre (V10, V2'den sonra). `R__*.sql` en sonda, `U*__` geri alma betikleri atlanır. |
 | golang-migrate, dbmate | `000001_x.up.sql` | `.down.sql` atlanır. |
 | Zaman damgalı | `20240115093000_x.sql` | Zaman sırasına göre. |
+| Prisma | `20240115093000_init/migration.sql` | Sürüm klasör adındadır; klasör sırasına göre. Zaman çizelgesinde sürüm adı klasör adıdır. |
+| Diesel | `2024-01-15-093000_init/up.sql` | Klasör sırasına göre; `down.sql` atlanır. |
 | Numaralı / diğer | `01_tables.sql`, `a2.sql < a10.sql` | Doğal ad sırası. |
 
 Migration'lar baştan sona uygulanır ve harita şemanın **son hâlini** gösterir. Bunun için şu ifadeler işlenir:
@@ -761,7 +763,7 @@ It is less manual than draw.io and lighter than a data-modelling tool. The goal 
 - **Plain HTML, CSS and JavaScript.** No dependencies, no build step; just open the folder.
 - **Privacy:** files never leave the browser and are not sent to any server.
 - **Eight databases:** Oracle, SQL Server, MySQL, MariaDB, PostgreSQL, SQLite, Cassandra and MongoDB.
-- **One file, many files or a whole folder:** split dumps, migration folders (Flyway, golang-migrate), multi-database projects.
+- **One file, many files or a whole folder:** split dumps, migration folders (Flyway, golang-migrate, Prisma, Diesel), multi-database projects.
 - **Crow's foot notation:** cardinality is derived from `NOT NULL`, `UNIQUE` and primary keys.
 - **Inferred relationships:** links are found from column names in legacy systems without FKs, in Cassandra and in MongoDB.
 - **Naming profile:** shows which naming patterns the schema uses, in what proportion, and which tables depart from the dominant pattern.
@@ -985,6 +987,8 @@ In a migration folder a file is a version, not a module; there, and for MongoDB,
 | Flyway | `V1__init.sql`, `V1_1__x.sql`, `V2__y.sql` | By version number (V10 after V2). `R__*.sql` last, `U*__` undo scripts skipped. |
 | golang-migrate, dbmate | `000001_x.up.sql` | `.down.sql` skipped. |
 | Timestamped | `20240115093000_x.sql` | By time. |
+| Prisma | `20240115093000_init/migration.sql` | The version is in the folder name; by folder order. On the timeline the version name is the folder name. |
+| Diesel | `2024-01-15-093000_init/up.sql` | By folder order; `down.sql` skipped. |
 | Numbered / other | `01_tables.sql`, `a2.sql < a10.sql` | Natural name order. |
 
 Migrations are applied from first to last, and the map shows the **final state** of the schema. These statements are applied:

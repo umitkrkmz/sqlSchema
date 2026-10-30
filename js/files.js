@@ -7,6 +7,8 @@
  *   golang-migrate / dbmate   000001_x.up.sql            .down.sql atlanır
  *   Zaman damgalı 20240115093000_x.sql
  *   Numaralı      01_tables.sql, 02_fks.sql
+ *   Prisma        20240115093000_init/migration.sql      sürüm klasör adında
+ *   Diesel        2024-01-15-093000_init/up.sql          down.sql atlanır
  *   Diğerleri     doğal ad sırası (a2.sql < a10.sql)
  * Sıra yanlış olsa da sorun çıkmaz: model.js, tablosu henüz tanımlanmamış ALTER'ları sona saklar.
  */
@@ -22,6 +24,20 @@ const IGNORED = /(^|\/)(node_modules|\.git|dist|build|coverage)\/|(^|\/)(package
 const natural = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 const baseName = p => String(p).split('/').pop();
 const dirName = p => { const i = String(p).lastIndexOf('/'); return i < 0 ? '' : p.slice(0, i); };
+// Adı her sürümde aynı olan dosyalar (Prisma, Diesel): sürüm ve görünen ad klasörden gelir
+const GENERIC = /^(migration|up|down)\.sql$/i;
+const FOLDER_VERSION = [
+  { re: /^(\d{14})_/, tool: 'Prisma', version: m => [Number(m[1])] },
+  { re: /^(\d{4})-(\d{2})-(\d{2})-(\d{6})_/, tool: 'Diesel', version: m => [Number(m.slice(1, 5).join(''))] },
+];
+function folderVersion(path) {
+  if (!GENERIC.test(baseName(path))) return null;
+  const folder = baseName(dirName(path));
+  for (const v of FOLDER_VERSION) { const m = v.re.exec(folder); if (m) return { folder, tool: v.tool, version: v.version(m) }; }
+  return null;
+}
+// Sürümün görünen adı: V3__pricing, Prisma'da 20240115093000_init
+const fileLabel = p => { const fv = folderVersion(p); return fv ? fv.folder : baseName(p).replace(/\.[^.]+$/, ''); };
 
 // skip: atlanma nedeni kodu (arayüz çevirir: config, ext, down, undo, project)
 // *.sqlschema.json sqlSchema'nın proje dosyasıdır (borç kaydı, görünümler): şema değil, arayüz ayrıca okur
@@ -31,6 +47,8 @@ function classify(path) {
   if (IGNORED.test(path)) return { path, name, skip: 'config' };
   if (!SQL_EXT.test(name) && !MONGO_EXT.test(name)) return { path, name, skip: 'ext' };
   if (/\.down\.sql$/i.test(name)) return { path, name, skip: 'down' };
+  const fv = folderVersion(path);
+  if (fv) return /^down\./i.test(name) ? { path, name, skip: 'down' } : { path, name, kind: 'migration', tool: fv.tool, version: fv.version };
   if (/^U\d[\w.]*__/i.test(name)) return { path, name, skip: 'undo' };
   let m;
   if ((m = /^V(\d+(?:[._]\d+)*)__/i.exec(name))) return { path, name, kind: 'migration', tool: 'Flyway', version: m[1].split(/[._]/).map(Number) };
@@ -129,5 +147,5 @@ function commonPrefix(lists) {
   return i;
 }
 
-Object.assign(NS, { classify, orderFiles, parseFile, databaseNames, harmonizeDialects });
+Object.assign(NS, { classify, fileLabel, orderFiles, parseFile, databaseNames, harmonizeDialects });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});
