@@ -378,7 +378,10 @@ function itemName(it) {
 function currentProfile() {
   const scope = S.lay.schemas.find(s => schemaKey(s) === S.namingScope);
   if (!scope) S.namingScope = '';
-  return { scope, profile: namingProfile(S.model, scope ? { filter: tb => tb.schemaRef === scope } : {}) };
+  const opts = scope ? { filter: tb => tb.schemaRef === scope } : {};
+  const p = namingProfile(S.model, opts);
+  // tip boyutları (audit.js) aynı pencerede ve stile göre boyada; tutarlılık puanına katılmaz
+  return { scope, profile: { ...p, dims: p.dims.concat(NS.typeProfile(S.model, opts).dims) } };
 }
 
 function renderNaming() {
@@ -387,7 +390,7 @@ function renderNaming() {
   const scopes = S.lay.schemas.filter(s => s.tables.some(tb => !tb.external && !tb.embedded));
   const scopeSel = scopes.length > 1 ? `<label class="scope">${esc(t('namingScope'))}
     <select id="namingScope"><option value="">${esc(t('namingAll'))}</option>${scopes.map(s => `<option value="${esc(schemaKey(s))}" ${schemaKey(s) === S.namingScope ? 'selected' : ''}>${esc(scopeLabel(s))} (${s.tables.length})</option>`).join('')}</select></label>` : '';
-  const dims = p.dims.map(d => {
+  const dimHtml = d => {
     const counted = d.buckets.filter(b => !b.neutral && b.n);
     const neutral = d.buckets.filter(b => b.neutral && b.n);
     if (!d.total) {
@@ -408,7 +411,11 @@ function renderNaming() {
     const outs = d.outliers.length ? `<details><summary>${esc(outliersTitle(d))}</summary><ul class="no">${d.outliers.slice(0, MAX).map(it => `<li data-go="${esc(it.t.key)}" data-col="${esc(it.c || '')}" tabindex="0">${esc(itemName(it))}</li>`).join('')}${d.outliers.length > MAX ? `<li class="more">${esc(t('namingMore', { n: d.outliers.length - MAX }))}</li>` : ''}</ul></details>` : '';
     const mapBtn = `<button class="nd-map${S.styleDim === d.id ? ' on' : ''}" data-style-dim="${d.id}" title="${esc(t('styleMapTitle'))}" aria-pressed="${S.styleDim === d.id}">${esc(t('styleMapBtn'))}</button>`;
     return `<section class="nd"><h5>${esc(t('nd_' + d.id))}${mapBtn}</h5><div class="nbar">${bar}</div><ul class="nb">${rows}</ul>${mixed}${extra}${outs}</section>`;
-  }).join('');
+  };
+  // boş tip boyutu gösterilmez (MongoDB, ya da tarih / tutar kolonu yok)
+  const typeDims = p.dims.filter(d => d.group === 'types' && d.total);
+  const dims = p.dims.filter(d => !d.group).map(dimHtml).join('') +
+    (typeDims.length ? `<h4 class="ng">${esc(t('namingTypes'))}</h4><p class="intro">${esc(t('namingTypesIntro'))}</p>${typeDims.map(dimHtml).join('')}` : '');
   el.innerHTML = `
     <h4>${esc(t('namingTitle'))}</h4>
     <p class="intro">${esc(t('namingIntro'))}</p>
@@ -514,8 +521,13 @@ function namingMarkdown() {
   const code = s => '`' + String(s).replace(/`/g, "'") + '`';
   const out = [`# ${t('namingTitle')} · ${S.title || ''}${scope ? ' · ' + scopeLabel(scope) : ''}`, ''];
   out.push(`**${t('namingScore')}:** ${p.score == null ? '–' : fmtPct(p.score)} · ${t('namingCounts', p)}`, '', `> ${t('namingIntro')}`, '');
+  let typesHead = false;
   for (const d of p.dims) {
-    out.push(`## ${t('nd_' + d.id)}`, '');
+    if (d.group === 'types') {
+      if (!d.total) continue;
+      if (!typesHead) { out.push(`## ${t('namingTypes')}`, '', `> ${t('namingTypesIntro')}`, ''); typesHead = true; }
+    }
+    out.push(`${d.group ? '###' : '##'} ${t('nd_' + d.id)}`, '');
     if (!d.total) { out.push(t(d.id === 'fkStyle' ? 'namingNoFk' : d.id === 'pkStyle' ? 'namingNoPk' : 'namingEmpty'), ''); continue; }
     out.push(`| ${t('namingPattern')} | ${t('namingShare')} | ${t('namingCount')} | ${t('namingExample')} |`, '|---|---:|---:|---|');
     for (const b of d.buckets.filter(x => !x.neutral && x.n)) {

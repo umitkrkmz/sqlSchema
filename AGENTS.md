@@ -37,7 +37,7 @@ Betikler `index.html`'de şu sırayla yüklenir ve her biri `globalThis.sqlSchem
 | `js/privacy.js` | KVKK haritası: kişisel veri kolonları (kategori kodlarıyla), FK / `@ref` zinciriyle kişiyle ilişkilendirilebilen tablolar | yok |
 | `js/layout.js` | veritabanı → şema → takımyıldız (dosyaya ya da ada göre) → yıldız, deterministik kuvvet yerleşimi | yok |
 | `js/conventions.js` | adlandırma profili: boyutlar, kovalar, oranlar, baskın kalıba uymayanlar; profilden standart önerisi (`proposeStandard`) (kod döndürür, metin değil) | yok |
-| `js/audit.js` | tasarım denetimi: kurallar (`AUDIT_RULES`), bulgular kod olarak; metinleri `i18n.js`'teki `auditRules`. Bulgu anahtarı (`findingKey`), borç kaydı, değişiklik incelemesi (`reviewChange`); `opts.standard` ve `opts.severity` ile ekibin standardı ve kural önemleri | yok |
+| `js/audit.js` | tasarım denetimi: kurallar (`AUDIT_RULES`), bulgular kod olarak; metinleri `i18n.js`'teki `auditRules`. Bulgu anahtarı (`findingKey`), borç kaydı, değişiklik incelemesi (`reviewChange`); tip profili (`typeProfile`, adlandırma penceresinin tip boyutları); `opts.standard` ve `opts.severity` ile ekibin standardı ve kural önemleri | yok |
 | `js/sample-small.js` | gömülü küçük örnek | yok |
 | `samples/catalog.js` | örnek kataloğu (üretilir) | yok |
 | `js/render.js` | canvas çizimi, kamera, karga ayağı | var |

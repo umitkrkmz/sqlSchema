@@ -386,6 +386,44 @@ function boolEncoding(c, ti, w) {
   return null;
 }
 
+/* ─── Tip profili ─── */
+
+// Adlandırma profilinin tip boyutları: aynı anlamdaki kolonlar hangi tiplerle tutuluyor. Kurallarla aynı sınıflandırıcı;
+// tarih ve tutar addan tahmindir. Mantıksal kolonlarda değer listesi yoksa CHAR(1) ayrı sayılır (E/H mi Y/N mi bilinmez).
+//   typeProfile(model, { filter }) → { dims: [{ id, group: 'types', ... namingProfile'daki boyutla aynı }] }
+const TYPE_DIMS = {
+  dateType: { keys: ['date', 'text', 'number', 'other'] },
+  amountType: { keys: ['decimal', 'integer', 'float', 'text', 'other'] },
+  boolType: { keys: ['bool', 'EH', 'YN', 'ZO', 'TF', 'TRUEFALSE', 'number1', 'char1'] },
+};
+const BOOL_KEY = { 'BOOLEAN': 'bool', 'E/H': 'EH', 'Y/N': 'YN', '0/1': 'ZO', 'T/F': 'TF', 'TRUE/FALSE': 'TRUEFALSE', 'NUMBER(1)': 'number1' };
+function typeProfile(model, opts = {}) {
+  const keep = opts.filter || (() => true);
+  const acc = {};
+  for (const [id, def] of Object.entries(TYPE_DIMS)) acc[id] = new Map(def.keys.map(k => [k, []]));
+  for (const tb of model.tables) {
+    if (tb.external || tb.embedded || tb.dropped || tb.dialect === 'mongodb' || tb.dialect === 'cassandra' || !keep(tb)) continue;
+    for (const c of tb.columns) {
+      if (!c.type) continue;
+      const ti = typeInfo(c.type);
+      const w = words(c.name), lw = w[w.length - 1] || '';
+      const it = { t: tb, c: c.name };
+      // SQLite'ta tarih tipi yoktur; metin tarih orada olağandır
+      if (ti.family === 'date' || (isDateName(w) && tb.dialect !== 'sqlite')) {
+        acc.dateType.get(ti.family === 'date' || ti.family === 'text' || ti.family === 'number' ? ti.family : 'other').push(it);
+      }
+      if (AMOUNT.has(lw)) {
+        const k = ti.family === 'number' ? (ti.float ? 'float' : ti.base in INTS ? 'integer' : 'decimal') : ti.family === 'text' ? 'text' : 'other';
+        acc.amountType.get(k).push(it);
+      }
+      const enc = boolEncoding(c, ti, w);
+      if (enc) acc.boolType.get(BOOL_KEY[enc]).push(it);
+      else if (BOOL_NAME.test(w.join('_')) && ti.family === 'text' && ti.len === 1) acc.boolType.get('char1').push(it);
+    }
+  }
+  return { dims: Object.entries(TYPE_DIMS).map(([id, def]) => ({ ...NS.profileDim(id, def, acc[id]), group: 'types' })) };
+}
+
 // Değişiklik incelemesi (PR, yeni migration): "sonra"da olup "önce"de olmayan bulgular bu değişiklikle gelmiştir, tersi
 // giderilmiştir. Adı değişen tablolar farktan eşlenir; eski bulgu yeni adıyla "yeni" görünmez. Borç kaydındakiler sayılmaz.
 //   reviewChange(before, after, { diff, debt, standard, severity }) → { diff, findings, fixed, counts, before, after }
@@ -407,5 +445,5 @@ function reviewChange(before, after, opts = {}) {
   return { diff, findings, fixed, counts, before: a0, after: a1 };
 }
 
-Object.assign(NS, { auditModel, reviewChange, auditVars, AUDIT_RULES, typeInfo, findingKey });
+Object.assign(NS, { auditModel, typeProfile, reviewChange, auditVars, AUDIT_RULES, typeInfo, findingKey });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});

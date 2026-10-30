@@ -176,23 +176,26 @@ function namingProfile(model, opts = {}) {
     add('fkStyle', fkStyleOf(r), { t: r.child, c: r.cols[0], ref: r.parent });
   }
 
-  const dims = [];
-  for (const [id, def] of Object.entries(DIMS)) {
-    const neutral = def.neutral || [];
-    const buckets = def.keys.map(key => ({ key, n: acc[id].get(key).length, neutral: neutral.includes(key), items: acc[id].get(key) }));
-    const counted = buckets.filter(b => !b.neutral);
-    const total = counted.reduce((s, b) => s + b.n, 0);
-    for (const b of buckets) b.pct = b.neutral || !total ? null : Math.round(b.n * 1000 / total) / 10;
-    let dom = null;
-    for (const b of counted) if (b.n && (!dom || b.n > dom.n)) dom = b;
-    const outliers = dom ? counted.filter(b => b !== dom).flatMap(b => b.items) : [];
-    const share = dom ? dom.n / total : null;
-    dims.push({ id, total, dominant: dom ? dom.key : null, share, clear: dom ? share >= clearAt : false, buckets, outliers });
-  }
+  const dims = Object.entries(DIMS).map(([id, def]) => profileDim(id, def, acc[id], clearAt));
   // Tutarlılık: her boyutta baskın kalıba uyanların oranının ortalaması (boş boyutlar hariç)
   const scored = dims.filter(d => d.total);
   const score = scored.length ? Math.round(scored.reduce((s, d) => s + d.share, 0) / scored.length * 100) : null;
   return { tables: tables.length, columns, fks, score, dims, nameLimit: NAME_LIMIT, clearAt };
+}
+
+// Kovalardan boyut özeti: oranlar, baskın kalıp ve ona uymayanlar. Tip profili (audit.js) de bunu kullanır.
+//   def: { keys, neutral }, acc: Map(kova → öğeler)
+function profileDim(id, def, acc, clearAt = CLEAR_AT) {
+  const neutral = def.neutral || [];
+  const buckets = def.keys.map(key => ({ key, n: acc.get(key).length, neutral: neutral.includes(key), items: acc.get(key) }));
+  const counted = buckets.filter(b => !b.neutral);
+  const total = counted.reduce((s, b) => s + b.n, 0);
+  for (const b of buckets) b.pct = b.neutral || !total ? null : Math.round(b.n * 1000 / total) / 10;
+  let dom = null;
+  for (const b of counted) if (b.n && (!dom || b.n > dom.n)) dom = b;
+  const outliers = dom ? counted.filter(b => b !== dom).flatMap(b => b.items) : [];
+  const share = dom ? dom.n / total : null;
+  return { id, total, dominant: dom ? dom.key : null, share, clear: dom ? share >= clearAt : false, buckets, outliers };
 }
 
 // Standart önerisi: her boyutta baskın kalıp belirginse (%60 ve üstü) o önerilir; değilse öneri boş kalır, seçenekler
@@ -222,5 +225,5 @@ function proposeStandard(profile, opts = {}) {
   return { standard, choices, clear };
 }
 
-Object.assign(NS, { namingProfile, proposeStandard, STD_DIMS, caseOf, isPlural, isAudit, pkStyleOf, fkStyleOf });
+Object.assign(NS, { namingProfile, profileDim, proposeStandard, STD_DIMS, caseOf, isPlural, isAudit, pkStyleOf, fkStyleOf });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});

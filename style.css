@@ -734,6 +734,7 @@ body:not(.loaded) .legend, body:not(.loaded) .hud { display: none; }
 .nb li:hover .ex { color: var(--text); }
 .nb .sw { width: 8px; height: 8px; border-radius: 2px; }
 .nd h5 { display: flex; align-items: center; }
+.naming-pop h4.ng { margin-top: 16px; }
 .nd-map { margin-left: auto; padding: 0 6px; border: 1px solid var(--line-2); border-radius: 4px; background: none; color: var(--dim); font: 10px var(--sans); letter-spacing: 0; text-transform: none; cursor: pointer; }
 .nd-map:hover, .nd-map.on { border-color: var(--accent); color: var(--accent); }
 .style-bar { flex-wrap: wrap; max-width: calc(100% - 24px); font-size: 12px; border-color: var(--line-2); }

@@ -307,6 +307,11 @@ const EXPECT = {
     check('hatali denetim: sayılar ve temiz tablolar', same(a.counts, { error: 7, warning: 20, info: 8 }) && a.clean === 3 && !a.skipped.length, [a.counts, a.clean]);
     const bi = a.findings.find(f => f.rule === 'bool-inconsistent');
     check('hatali denetim: mantıksal kodlamalar', same(bi.data.encodings.map(e => e.enc), ['E/H', 'Y/N', 'NUMBER(1)']), bi.data.encodings.map(e => e.enc));
+    // tip profili: kurallarla aynı sınıflandırma; metin tarih, FLOAT tutar ve üç ayrı mantıksal kodlama
+    const tp = NS.typeProfile(m).dims, nz = id => tp.find(d => d.id === id).buckets.filter(b => b.n).map(b => b.key + '=' + b.n);
+    check('hatali tip profili', same(nz('dateType'), ['date=6', 'text=2']) && same(nz('amountType'), ['decimal=4', 'float=1']) && same(nz('boolType'), ['EH=1', 'YN=1', 'number1=1']), tp.map(d => nz(d.id)));
+    const textDates = tp[0].buckets.find(b => b.key === 'text').items.map(it => it.c).sort();
+    check('hatali tip profili: metin tarihler denetimle aynı', same(textDates, a.findings.filter(f => f.rule === 'date-as-text').map(f => f.col).sort()), textDates);
     check('hatali denetim: tabloya göre bulgular', a.byTable.get(find(m, 'KAMPANYA')).length === 9 && !a.byTable.has(find(m, 'SIPARIS_KALEM')), a.byTable.get(find(m, 'KAMPANYA')).map(f => f.rule));
     // borç kaydı: V3'teki bulgular kabul edilir; son hâlde yalnızca V4 ve V5'in getirdikleri yeni sayılır
     const hfiles = s.files.map(p => ({ path: 'hatali/' + p, text: fs.readFileSync(path.join(ROOT, 'samples', 'hatali', p), 'utf8') }));
@@ -610,7 +615,7 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   // adlandırma profilinin boyut ('nd_' + boyut) ve kova ('nk_' + boyut + '_' + kova) anahtarları
   used.delete('nd_');
   used.delete('nk_');
-  for (const d of NS.namingProfile(all.kucuk.model).dims) {
+  for (const d of NS.namingProfile(all.kucuk.model).dims.concat(NS.typeProfile(all.kucuk.model).dims)) {
     used.add('nd_' + d.id);
     for (const b of d.buckets) used.add('nk_' + d.id + '_' + b.key);
   }

@@ -386,11 +386,13 @@ Ekipte yazılı bir adlandırma standardı yoksa ilk adım, şemada fiilen ne ku
 | Yabancı anahtar kolonu | `<HEDEF>_ID`, `<HEDEF>_NO / _KOD`, rol önekli (`GONDEREN_MUSTERI_ID`, `AGENT_USER_ID → APP_USER`), hedefin PK adıyla aynı, yalnızca rol adı (`SAHIBI`), hedef adını içermeyen (`CHZ_REF`) |
 | Tablo adı | tekil / çoğul (tahmini), `TBL_` gibi önekler |
 | Karakterler ve uzunluk | Türkçe / ASCII dışı karakter, 30 karakteri aşan adlar |
+| Veri tipleri | tarih kolonları (tarih tipi, metin, `YYYYMMDD` sayı), tutar kolonları (ondalık, tamsayı, `FLOAT`, metin), evet / hayır kolonları (`BOOLEAN`, E/H, Y/N, 0/1, değerleri yazılmamış `CHAR(1)` / `NUMBER(1)`) |
 
 - Her boyutta **baskın kalıp** ve ona **uymayanlar** listelenir. Listedeki bir ada tıklamak tabloyu seçer.
 - En çok kullanılan kalıbın payı %60'ın altındaysa "baskın" denmez; pencere **belirgin baskın kalıp yok** uyarısı gösterir. %51'e %49 gibi bir dağılım, şemada iki ayrı alışkanlık olduğunu söyler.
 - **Kapsam** seçimiyle profil tek bir şema için hesaplanır. Böylece hangi modülün hangi alışkanlıkla yazıldığı ayrılır.
-- **Tutarlılık** puanı, her boyutta baskın kalıba uyan adların ortalama oranıdır.
+- **Tutarlılık** puanı, her boyutta baskın kalıba uyan adların ortalama oranıdır. Veri tipleri puana katılmaz.
+- **Veri tipleri** bölümü aynı anlamdaki kolonların hangi tiplerle tutulduğunu gösterir. Tarih ve tutar kolonları addan tahmin edilir; tasarım denetimi aynı sınıflandırmayı kullanır. Böylece "tarihlerin %8'i metin" gibi bir oran, denetimin tek tek bulduğu kolonların toplamını verir.
 - **Haritada:** her boyutun başlığındaki **haritada** düğmesi haritayı o boyuta göre boyar; her kalıp penceredeki rengini alır. Baskın kalıba uymayan bir öğesi olan tablo o kalıbın rengiyle öne çıkar. Kolon düzeyindeki boyutlarda (harf düzeni, FK, karakter) kartta ilgili kolon satırları da renklenir. Böylece hangi ekibin şemanın neresini yazdığı bir bakışta görünür. `?style=pkStyle` bu görünümü açar.
 - **Markdown indir** profili ekiple paylaşmak için bir dosyaya yazar.
 
@@ -1091,11 +1093,13 @@ When a team has no written naming standard, the first step is to see what the sc
 | Foreign key column | `<TARGET>_ID`, `<TARGET>_NO / _CODE`, role prefix (`SENDER_CUSTOMER_ID`, `AGENT_USER_ID → APP_USER`), same as the target PK, role name only (`OWNER`), not containing the target name (`CHZ_REF`) |
 | Table name | singular / plural (estimated), prefixes such as `TBL_` |
 | Characters and length | Turkish / non-ASCII characters, names longer than 30 characters |
+| Data types | date columns (date type, text, `YYYYMMDD` number), amount columns (decimal, integer, `FLOAT`, text), yes / no columns (`BOOLEAN`, E/H, Y/N, 0/1, `CHAR(1)` / `NUMBER(1)` with no values written) |
 
 - Each dimension lists the **dominant pattern** and the names that **do not follow it**. Clicking a name selects its table.
 - If the most used pattern has less than 60%, it is not called dominant; the window shows **no clear dominant pattern**. A 51% to 49% split means the schema has two separate habits.
 - **Scope** computes the profile for a single schema, which separates the habits of different modules.
-- The **consistency** score is the average share of names that follow the dominant pattern in each dimension.
+- The **consistency** score is the average share of names that follow the dominant pattern in each dimension. Data types do not count towards it.
+- The **Data types** section shows which types hold columns with the same meaning. Date and amount columns are guessed from their names; the design audit uses the same classification, so a share such as "8% of dates are text" adds up the columns the audit finds one by one.
 - **On the map:** the **on map** button in each dimension's heading colours the map by that dimension; each pattern takes its colour from the window. A table with an item outside the dominant pattern stands out in that pattern's colour. For column-level dimensions (case, FK, characters) the matching column rows on the card are tinted too. You see at a glance which team wrote which part of the schema. `?style=pkStyle` opens this view.
 - **Download Markdown** writes the profile to a file to share with the team.
 
