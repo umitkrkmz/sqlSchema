@@ -7,8 +7,17 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ### Eklendi · Added
 
+- **EF Core model özeti:** .NET projelerinde `Migrations/*ModelSnapshot.cs` SQL'e çevirmeden okunur: şema, kolon, tip, NULL, varsayılan, açıklama, PK, UNIQUE, indeks, CHECK, FK ve silme davranışı, owned tipler, TPH / TPT / TPC kalıtım, çoka çok ara tablolar; sağlayıcı (SQL Server, PostgreSQL, Oracle, MySQL, SQLite) tahmin edilir. Proje klasörü olduğu gibi açılabilir; entity sınıfları, migration kodu, `appsettings.json`, `bin/` ve `obj/` atlanır. Panelde snapshot'tan gelen tablolara **EF Core** etiketi. Yeni örnek: **Bayi portalı (EF Core)**, DBA betikleriyle karma proje.
+  EF Core model snapshot: in .NET projects `Migrations/*ModelSnapshot.cs` is read without converting it to SQL: schema, columns, types, NULL, defaults, comments, PK, UNIQUE, indexes, CHECK, FKs and delete behaviour, owned types, TPH / TPT / TPC inheritance, many-to-many join tables; the provider (SQL Server, PostgreSQL, Oracle, MySQL, SQLite) is guessed. The project folder can be opened as it is; entity classes, migration code, `appsettings.json`, `bin/` and `obj/` are skipped. Tables from the snapshot carry an **EF Core** tag in the panel. New sample: **Dealer portal (EF Core)**, a mixed project with DBA scripts.
 - **Yol bulma:** paneldeki **Yol bul** ile iki tablo arasındaki ilişki zinciri; haritada yalnızca yol parlak, panelde adım adım kolonlar (`A.KOLON → B.KOLON`), kısadan uzuna beş seçenek. Sözlük tablolarından ve denetim kolonlarından geçilmez; tanımlı yol yoksa tahmini ilişkiler kullanılır. JOIN SQL'i üretilmez; `?path=A,B`.
   Finding a path: **Find path** in the panel shows the chain of relationships between two tables; only the path stays bright on the map, the panel lists the columns step by step (`A.COL → B.COL`), with five options from shortest to longest. Lookup tables and audit columns are not passed through; inferred relationships are used when there is no declared path. No JOIN SQL is generated; `?path=A,B`.
+
+### Değişti · Changed
+
+- **Tahmini ilişki:** PK'si aynı zamanda FK olan 1:1 alt tablo (`DealerProfiles.DealerId`) artık tahminin hedefi olmaz; `DealerId` kolonu `Dealers`'a bağlanır.
+  Inferred relationships: a 1:1 child table whose PK is also an FK (`DealerProfiles.DealerId`) is no longer a target; a `DealerId` column links to `Dealers`.
+- **Tasarım denetimi:** kayıt, geçmiş ve arşiv tabloları PascalCase adlarla da tanınır (`OrdersHistory`, `AuditLogs`); PK'siz olmaları bilgi düzeyinde kalır.
+  Design audit: log, history and archive tables are recognised with PascalCase names too (`OrdersHistory`, `AuditLogs`); a missing PK stays at info level.
 
 ## [0.11.0] - 2026-10-30
 

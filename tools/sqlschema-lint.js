@@ -22,7 +22,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'files', 'model', 'diff', 'conventions', 'audit', 'fixes']) require(path.join(ROOT, 'js', f + '.js'));
+for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'efcore', 'files', 'model', 'diff', 'conventions', 'audit', 'fixes']) require(path.join(ROOT, 'js', f + '.js'));
 const NS = globalThis.sqlSchema;
 const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
 

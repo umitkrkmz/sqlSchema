@@ -296,5 +296,26 @@
       "sector": "Dealer sales",
       "scenario": "Tables three developers carelessly added to a clean baseline: a table without a PK, text dates, FLOAT amounts, unindexed FKs, a cycle, a key-value table. For trying the design audit."
     }
+  },
+  {
+    "id": "bayi",
+    "title": "Bayi portalı (EF Core)",
+    "sector": "Telekom",
+    "dialect": "SQL Server",
+    "scenario": ".NET uygulamasının EF Core model özeti (ModelSnapshot.cs) ile DBA'nın elle yazdığı raporlama ve arşiv betikleri birlikte: owned tip, TPH / TPT kalıtım, çoka çok ara tablo.",
+    "files": [
+      "db/dba/01_raporlama.sql",
+      "db/dba/02_arsiv.sql",
+      "src/Portal.Data/Migrations/20240115093000_Initial.cs",
+      "src/Portal.Data/Migrations/PortalDbContextModelSnapshot.cs",
+      "src/Portal.Data/PortalDbContext.cs",
+      "src/Portal.Domain/Sales/Dealer.cs",
+      "src/Portal.Web/appsettings.json"
+    ],
+    "en": {
+      "title": "Dealer portal (EF Core)",
+      "sector": "Telecom",
+      "scenario": "The EF Core model snapshot (ModelSnapshot.cs) of a .NET application together with the reporting and archive scripts the DBA wrote by hand: owned types, TPH / TPT inheritance, a many-to-many join table."
+    }
   }
 ];

@@ -15,11 +15,13 @@
 (function (NS) {
 'use strict';
 
-const { parseSQL, parseMongo, looksLikeMongo, detectDialect } = NS;
+const { parseSQL, parseMongo, looksLikeMongo, parseEfCore, looksLikeEfSnapshot, detectDialect } = NS;
 
 const SQL_EXT = /\.(sql|ddl|pls|pks|pkb|plb|tab|cql|psql|txt)$/i;
 const MONGO_EXT = /\.(json|jsonl|ndjson|js|mjs|cjs|ts)$/i;
-const IGNORED = /(^|\/)(node_modules|\.git|dist|build|coverage)\/|(^|\/)(package(-lock)?|tsconfig|jsconfig|composer|bower|manifest|\.?eslintrc|\.?prettierrc|angular|vercel|firebase)(\.[\w-]+)?\.json$|\.(config|conf|min)\.(js|json)$/i;
+const IGNORED = /(^|\/)(node_modules|\.git|dist|build|coverage|bin|obj)\/|(^|\/)(package(-lock)?|tsconfig|jsconfig|composer|bower|manifest|\.?eslintrc|\.?prettierrc|angular|vercel|firebase|appsettings|launchSettings)(\.[\w-]+)?\.json$|\.(config|conf|min)\.(js|json)$/i;
+// .NET projesinde yalnızca EF Core model özeti okunur; entity sınıfları ve migration kodu atlanır
+const EF_SNAPSHOT = /ModelSnapshot\.cs$/i;
 
 const natural = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 const baseName = p => String(p).split('/').pop();
@@ -45,6 +47,7 @@ function classify(path) {
   const name = baseName(path);
   if (/.sqlschema.json$/i.test(name)) return { path, name, skip: 'project' };
   if (IGNORED.test(path)) return { path, name, skip: 'config' };
+  if (EF_SNAPSHOT.test(name)) return { path, name, kind: 'plain' };
   if (!SQL_EXT.test(name) && !MONGO_EXT.test(name)) return { path, name, skip: 'ext' };
   if (/\.down\.sql$/i.test(name)) return { path, name, skip: 'down' };
   const fv = folderVersion(path);
@@ -96,6 +99,11 @@ function orderFiles(files) {
 // Dosyayı uygun ayrıştırıcıya yollar. null: dosyada şema bilgisi yok.
 function parseFile(path, text) {
   const name = baseName(path);
+  if (EF_SNAPSHOT.test(name)) {
+    if (!looksLikeEfSnapshot(text, name)) return null;
+    const r = parseEfCore(text, { file: path });
+    return r.ops.length ? r : null;
+  }
   if (MONGO_EXT.test(name)) {
     if (!looksLikeMongo(text, name)) return null;
     const r = parseMongo(text, { file: path });

@@ -180,10 +180,10 @@
   </form>
 </dialog>
 
-<input type="file" id="file" multiple accept=".sql,.ddl,.txt,.pls,.pks,.pkb,.tab,.cql,.js,.mjs,.cjs,.ts,.json,.jsonl,.ndjson" hidden>
+<input type="file" id="file" multiple accept=".sql,.ddl,.txt,.pls,.pks,.pkb,.tab,.cql,.js,.mjs,.cjs,.ts,.json,.jsonl,.ndjson,.cs" hidden>
 <input type="file" id="folder" webkitdirectory multiple hidden>
 <input type="file" id="viewFile" accept=".json,application/json" hidden>
-<input type="file" id="diffFile" multiple accept=".sql,.ddl,.txt,.pls,.pks,.pkb,.tab,.cql,.js,.mjs,.cjs,.ts,.json,.jsonl,.ndjson" hidden>
+<input type="file" id="diffFile" multiple accept=".sql,.ddl,.txt,.pls,.pks,.pkb,.tab,.cql,.js,.mjs,.cjs,.ts,.json,.jsonl,.ndjson,.cs" hidden>
 <input type="file" id="diffFolder" webkitdirectory multiple hidden>
 
 <!-- Sıra önemli: her dosya globalThis.sqlSchema ad alanına ekler, sonrakiler öncekileri kullanır -->
@@ -191,6 +191,7 @@
 <script src="js/lexer.js"></script>
 <script src="js/sql-parser.js"></script>
 <script src="js/mongo.js"></script>
+<script src="js/efcore.js"></script>
 <script src="js/files.js"></script>
 <script src="js/model.js"></script>
 <script src="js/diff.js"></script>

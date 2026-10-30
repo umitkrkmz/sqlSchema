@@ -663,6 +663,8 @@ function inferImplicit(all, rels, getCol, U) {
       idTables.get(t.db).push(t);
       continue;
     }
+    // PK'si aynı zamanda FK olan 1:1 alt tablo (DealerProfiles.DealerId → Dealers) asıl tablo sayılmaz
+    if (fkColSet.has(t) && fkColSet.get(t).has(pk)) continue;
     const k = t.db + '|' + pk;
     if (!pkIndex.has(k)) pkIndex.set(k, []);
     pkIndex.get(k).push(t);

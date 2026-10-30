@@ -120,7 +120,9 @@ const AMOUNT = new Set(['TUTAR', 'TUTARI', 'AMOUNT', 'AMT', 'PRICE', 'FIYAT', 'F
 const QUANTITY = new Set(['ADET', 'ADEDI', 'QTY', 'QUANTITY', 'MIKTAR', 'MIKTARI', 'COUNT', 'SAYI', 'SAYISI']);
 const DESCRIPTIVE = new Set(['ACIKLAMA', 'ACIKLAMASI', 'DESCRIPTION', 'DESC', 'NOTE', 'NOTES', 'NOT', 'NOTU', 'NOTLAR', 'COMMENT', 'COMMENTS', 'MESSAGE', 'MESAJ', 'MESAJI', 'BODY', 'CONTENT', 'ICERIK', 'ICERIGI', 'PAYLOAD', 'JSON', 'XML', 'DETAIL', 'DETAILS', 'DETAY', 'TEXT', 'METIN', 'ADRES', 'ADDRESS', 'URL', 'PATH', 'YOL', 'SQL', 'QUERY', 'SORGU', 'DATA', 'VERI', 'HATA', 'ERROR', 'STACK', 'TRACE', 'RAW', 'RECORD', 'KAYIT', 'VALUE', 'DEGER', 'DEGERI']);
 const GENERIC = new Set(['VALUE', 'DEGER', 'DEGERI', 'VAL', 'DATA', 'VERI']);
-const APPEND_ONLY = /(^|_)(HIST|HISTORY|LOG|LOGS|AUDIT|ARCHIVE|ARC|ARSIV|GECMIS|BAK|BCK|BACKUP|TMP|TEMP|STG|STAGING|CDR|EVENTS?)$|^(STG|TMP|FACT)_/i;
+// PascalCase adlar da (OrdersHistory, AuditLogs): ad kelimelere bölünüp alt çizgiyle birleştirilerek denetlenir
+const APPEND_ONLY_RE = /(^|_)(HIST|HISTORY|LOG|LOGS|AUDIT|ARCHIVE|ARC|ARSIV|GECMIS|BAK|BCK|BACKUP|TMP|TEMP|STG|STAGING|CDR|EVENTS?)$|^(STG|TMP|FACT)_/i;
+const appendOnly = name => APPEND_ONLY_RE.test(name) || APPEND_ONLY_RE.test(words(name).join('_'));
 const FK_FLAG = new Set(['other', 'roleOnly', 'targetOther']);
 const SHORT = new Set(['NAME', 'AD', 'ADI', 'CODE', 'KOD', 'KODU', 'TITLE', 'BASLIK', 'STATUS', 'DURUM', 'DURUMU', 'TYPE', 'TIP', 'TIPI', 'NO', 'NUMARA', 'NUMARASI', 'EMAIL', 'EPOSTA', 'PHONE', 'TELEFON', 'TEL', 'GSM']);
 const FIXED = new Set(['TCKN', 'TC', 'KIMLIK', 'IBAN', 'UUID', 'GUID', 'HASH', 'MD5', 'SHA', 'SHA1', 'SHA256', 'CHECKSUM', 'VKN', 'IMEI', 'IMSI', 'ICCID', 'MSISDN']);
@@ -164,7 +166,7 @@ function auditModel(model, opts = {}) {
   const profile = NS.namingProfile && sql.length >= 3 ? NS.namingProfile({ ...model, tables: sql }) : null;
   const pkDim = profile && profile.dims.find(d => d.id === 'pkStyle');
   const pkStyle = pkDim && pkDim.clear ? pkDim.dominant : null;
-  for (const tb of sql) if (!tb.pk.length && !tb.noColumns) add('no-pk', tb, null, APPEND_ONLY.test(tb.name) ? { appendOnly: true } : { pkStyle }, null, APPEND_ONLY.test(tb.name) ? 'info' : null);
+  for (const tb of sql) if (!tb.pk.length && !tb.noColumns) add('no-pk', tb, null, appendOnly(tb.name) ? { appendOnly: true } : { pkStyle }, null, appendOnly(tb.name) ? 'info' : null);
   for (const r of fks) {
     r.cols.forEach((c, i) => {
       const a = colOf(r.child, c), b = r.refCols[i] && colOf(r.parent, r.refCols[i]);
@@ -174,7 +176,7 @@ function auditModel(model, opts = {}) {
     if (r.disabled) add('disabled-fk', r.child, r.cols.join(', '), { parent: r.parent, name: r.name, refCols: r.refCols });
   }
   for (const w of (model.stats && model.stats.warnings) || []) if (w.kind === 'ref' && w.t && inSql.has(w.t)) add('ref-broken', w.t, w.col, { target: w.target });
-  for (const r of rels) if (r.kind === 'implicit' && !APPEND_ONLY.test(r.child.name)) add('fk-missing', r.child, r.cols.join(', '), { parent: r.parent, refCol: r.refCols[0] });
+  for (const r of rels) if (r.kind === 'implicit' && !appendOnly(r.child.name)) add('fk-missing', r.child, r.cols.join(', '), { parent: r.parent, refCol: r.refCols[0] });
 
   // FK indeksi: dosyalarda hiç indeks yoksa indeksler döküme alınmamıştır; o zaman denetlenmez.
   // MySQL / MariaDB (InnoDB) FK için indeksi kendisi kurar.
@@ -304,7 +306,7 @@ function auditModel(model, opts = {}) {
       if (cols.length) add('missing-comment', tb, null, { kind: 'columns', cols });
     }
     const auditCols = (std.auditColumns || []).filter(c => !tb.colIdx.has(U(c)));
-    if (auditCols.length && !APPEND_ONLY.test(tb.name)) add('missing-audit', tb, null, { cols: auditCols });
+    if (auditCols.length && !appendOnly(tb.name)) add('missing-audit', tb, null, { cols: auditCols });
     const sys = cons.filter(n => SYSTEM_NAME.test(n));
     if (sys.length) add('system-name', tb, null, { names: sys });
   }

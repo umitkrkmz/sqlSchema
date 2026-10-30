@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'files', 'model', 'diff', 'layout', 'conventions', 'audit', 'fixes', 'migrate', 'export', 'privacy', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
+for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'efcore', 'files', 'model', 'diff', 'layout', 'conventions', 'audit', 'fixes', 'migrate', 'export', 'privacy', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
 require(path.join(ROOT, 'samples', 'catalog.js'));
 const NS = globalThis.sqlSchema;
 
@@ -224,6 +224,26 @@ const EXPECT = {
     check('iot: map<text, text> tek kolon', find(m, 'sites').colIdx.get('TAGS').type === 'map<text,text>');
     check('iot: ölçüm → cihaz (tahmini)', rel(m, 'readings_by_device_day', 'device_id', 'devices', 'implicit'));
     check('iot: keyspace\'ler arası tahmin', rel(m, 'rollup_daily_by_site', 'site_id', 'sites', 'implicit'));
+  },
+  // EF Core model özeti + DBA betikleri (karma proje)
+  bayi({ model: m, skipped }) {
+    const fk = m.rels.filter(r => r.kind === 'fk').length, imp = m.rels.filter(r => r.kind === 'implicit').length;
+    check('bayi: 18 tablo, 21 FK, 3 tahmini; yalnızca SQL Server', m.stats.tables === 18 && fk === 21 && imp === 3 && same(m.stats.dialects, ['tsql']), [m.stats.tables, fk, imp, m.stats.dialects]);
+    check('bayi: yalnızca ModelSnapshot.cs okunur; entity, migration ve appsettings atlanır', same(skipped.map(x => x.reason).sort(), ['config', 'ext', 'ext', 'ext']), skipped.map(x => x.file.path));
+    check('bayi: görünüm varlığı tablo olmaz', !find(m, 'vw_DealerSalesSummary') && !find(m, 'DealerSalesSummary'));
+    const d = find(m, 'Dealers'), col = n => d.colIdx.get(n.toUpperCase());
+    check('bayi: şema, PK, HasColumnName, varsayılan', d.schema === 'sales' && same(d.pk, ['Id']) && !!col('VKN') && !col('TaxNumber') && col('CreatedAt').default === 'getutcdate()' && !col('CreatedAt').nullable);
+    check('bayi: owned tip aynı tabloda Address_* kolonları, sahibin anahtarı tekrar yok', !!col('Address_City') && !col('Address_City').nullable && !!col('Address_PostalCode') && col('Address_PostalCode').nullable && !col('DealerId'));
+    check('bayi: açıklama ve CHECK değerleri', d.comment === 'Yetkili satış noktaları' && /ana bayi/.test(col('ParentDealerId').comment) && same(col('Status').allowed, ['1', '2', '3']));
+    check('bayi: OwnsMany kendi tablosunda, sahibine CASCADE FK', (rel(m, 'DealerContacts', 'DealerId', 'Dealers', 'fk') || {}).onDelete === 'CASCADE');
+    const cu = find(m, 'Customers');
+    check('bayi: TPH türetilmiş kolonlar temel tabloda ve NULL olabilir', cu.schema === 'crm' && ['NationalId', 'CompanyTitle', 'BirthDate'].every(c => cu.colIdx.get(c.toUpperCase()) && cu.colIdx.get(c.toUpperCase()).nullable) && !find(m, 'IndividualCustomer'));
+    check('bayi: TPT türetilmiş tablo anahtarı ve temel tabloya FK', same(find(m, 'CardPayments').pk, ['Id']) && !!rel(m, 'CardPayments', 'Id', 'Payments', 'fk') && !find(m, 'CardPayments').colIdx.has('AMOUNT'));
+    check('bayi: bire bir HasForeignKey(tip, kolon) ve çoka çok ara tablo', !!rel(m, 'DealerProfiles', 'DealerId', 'Dealers', 'fk') && !!rel(m, 'DealerRegion', 'DealersId', 'Dealers', 'fk') && !!rel(m, 'DealerRegion', 'RegionsId', 'Regions', 'fk'));
+    check('bayi: OnDelete ve HasConstraintName', (rel(m, 'Users', 'DealerId', 'Dealers', 'fk') || {}).onDelete === 'SET NULL' && (rel(m, 'Dealers', 'ParentDealerId', 'Dealers', 'fk') || {}).name === 'FK_Dealers_ParentDealer');
+    check('bayi: varsayılan şema, bileşik ve adlı indeks, alternatif anahtar', find(m, 'AuditLogs').schema === 'portal' && find(m, 'Orders').indexes.some(x => x.name === 'IX_Orders_Dealer_Date' && same(x.cols, ['DealerId', 'OrderedAt'])) && find(m, 'Regions').uniques.some(u => same(u.cols, ['Code'])));
+    check('bayi: DBA betiğinin FK\'si EF tablosuna bağlanır', !!rel(m, 'DealerMonthlyTarget', 'DealerId', 'Dealers', 'fk') && !!rel(m, 'CommissionRate', 'CategoryId', 'ProductCategories', 'fk'));
+    check('bayi: 1:1 alt tablonun PK\'si tahmine hedef olmaz', !!rel(m, 'OrdersHistory', 'DealerId', 'Dealers', 'implicit'));
   },
   sosyal({ model: m }) {
     check('sosyal: MongoDB', m.stats.dialects.includes('mongodb'), m.stats.dialects);
@@ -594,6 +614,36 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   const notAudit = ['CUSTOMER_ID', 'KAYIT_TAR', 'CREATED_AT', 'SAHIBI', 'USER_ID', 'KAYIT_NO'];
   const badAudit = audit.filter(n => !NS.isAudit(n)).concat(notAudit.filter(n => NS.isAudit(n)));
   check('denetim kolonu tanıma', !badAudit.length, badAudit);
+}
+
+// EF Core: örnekte olmayan biçimler (TPC, bileşik FK + HasPrincipalKey, eski HasName, @"..." metin, Npgsql)
+{
+  const src = `partial class X : ModelSnapshot { protected override void BuildModel(ModelBuilder modelBuilder) {
+    NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+    modelBuilder.Entity("A.Vehicle", b => {
+      b.Property<Guid>("Id").HasColumnType("uuid");
+      b.Property<string>("Plate").IsRequired().HasColumnType("text").HasComment(@"Plaka ""34 ABC 1""");
+      b.HasKey("Id"); b.ToTable("vehicles"); b.UseTpcMappingStrategy(); });
+    modelBuilder.Entity("A.Truck", b => { b.HasBaseType("A.Vehicle"); b.Property<int>("Axles").HasColumnType("integer"); b.ToTable("trucks"); });
+    modelBuilder.Entity("A.Branch", b => {
+      b.Property<string>("Country").HasColumnType("text"); b.Property<string>("Code").HasColumnType("text");
+      b.HasKey("Country", "Code"); b.HasIndex("Code").HasName("ix_branch_code"); b.ToTable("branches"); });
+    modelBuilder.Entity("A.Visit", b => {
+      b.Property<long>("Id").HasColumnType("bigint"); b.Property<string>("BranchCountry").HasColumnType("text"); b.Property<string>("BranchCode").HasColumnType("text");
+      b.HasKey("Id"); b.ToTable("visits"); });
+    modelBuilder.Entity("A.Visit", b => {
+      b.HasOne("A.Branch", "Branch").WithMany().HasForeignKey("BranchCountry", "BranchCode").HasPrincipalKey("Country", "Code"); });
+  } }`;
+  const r = NS.parseEfCore(src, { file: 'XModelSnapshot.cs' });
+  const m = NS.buildModel([{ ...r, db: 'main' }]);
+  const tr = m.tables.find(t => t.name === 'trucks'), v = m.tables.find(t => t.name === 'vehicles');
+  check('EF Core: Npgsql sağlayıcısı', r.dialect === 'postgres', r.dialect);
+  check('EF Core: TPC somut tablo temel kolonları taşır', same(cols(tr), ['Id', 'Plate', 'Axles']) && same(tr.pk, ['Id']) && !m.rels.some(x => x.child === tr), cols(tr));
+  check('EF Core: @"..." metin', v.colIdx.get('PLATE').comment === 'Plaka "34 ABC 1"', v.colIdx.get('PLATE').comment);
+  const fk = m.rels.find(x => x.child.name === 'visits');
+  check('EF Core: bileşik FK ve HasPrincipalKey', fk && same(fk.cols, ['BranchCountry', 'BranchCode']) && same(fk.refCols, ['Country', 'Code']) && fk.parent.name === 'branches', fk && [fk.cols, fk.refCols]);
+  check('EF Core: eski HasName ile indeks adı', m.tables.find(t => t.name === 'branches').indexes.some(x => x.name === 'ix_branch_code'));
+  check('EF Core: snapshot olmayan .cs okunmaz', NS.classify('src/Models/Dealer.cs').skip === 'ext' && NS.parseFile('x/YModelSnapshot.cs', 'class Y {}') === null);
 }
 
 // Yol vurgulama: iki tablo arasındaki ilişki zincirleri, kısadan uzuna

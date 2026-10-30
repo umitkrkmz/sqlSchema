@@ -28,6 +28,7 @@ function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
 const dialectName = d => DIALECTS[d] || d || '?';
+const isEfSnapshot = p => /ModelSnapshot\.cs$/i.test(String(p || ''));
 const baseName = p => String(p).split('/').pop();
 const params = new URLSearchParams(location.search);
 
@@ -313,7 +314,7 @@ function renderFiles() {
       return `<li class="${f.include ? '' : 'off'}">
         <label><input type="checkbox" data-file="${esc(f.path)}" ${f.include ? 'checked' : ''}>
         <span class="fp" title="${esc(f.path)}">${esc(f.path)}</span></label>
-        <span class="fm"><i>${esc(dialectName(f.result.dialect))}</i>${st.tables} ${esc(t(f.result.dialect === 'mongodb' ? 'collectionsWord' : 'tablesWord'))}${st.errors.length ? ` · <b class="err">${esc(t('nErrors', { n: st.errors.length }))}</b>` : ''}</span>
+        <span class="fm"><i>${esc(dialectName(f.result.dialect))}${f.result.orm === 'efcore' ? ' \u{00B7} EF Core' : ''}</i>${st.tables} ${esc(t(f.result.dialect === 'mongodb' ? 'collectionsWord' : 'tablesWord'))}${st.errors.length ? ` · <b class="err">${esc(t('nErrors', { n: st.errors.length }))}</b>` : ''}</span>
       </li>`;
     }).join('')}</ol>
     ${noSchema.length ? `<details><summary>${esc(t('noSchemaFiles', { n: noSchema.length }))}</summary><ul class="skip">${noSchema.map(f => `<li>${esc(f.path)}</li>`).join('')}</ul></details>` : ''}
@@ -2532,6 +2533,8 @@ function renderPanel() {
     tb.dictionary ? tag('t-ref', 'tagDict') : '',
     tb.noColumns ? '<span class="tag">AS SELECT</span>' : '',
     tb.dialect ? `<span class="tag">${esc(dialectName(tb.dialect))}</span>` : '',
+    // karma projede tablonun ORM'den mi DBA betiğinden mi geldiği
+    tb.files.some(isEfSnapshot) ? `<span class="tag t-ref" title="${esc(t('tagEfTitle'))}">EF Core</span>` : '',
   ].join('');
   const rows = tb.columns.map(c => {
     const k = keyTag(tb, c);
@@ -2867,7 +2870,8 @@ $('#pasteDlg').addEventListener('close', () => {
   const dlg = $('#pasteDlg');
   if (dlg.returnValue === 'ok') {
     const txt = $('#pasteText').value;
-    if (txt.trim()) loadText(txt, /^\s*[[{]/.test(txt) ? 'paste.json' : /\$jsonSchema|createCollection|Schema\(/.test(txt) ? 'paste.js' : 'paste.sql');
+    // EF Core model özeti önce: HasDefaultSchema( Mongoose'un Schema( kalıbına da uyar
+    if (txt.trim()) loadText(txt, NS.looksLikeEfSnapshot(txt, 'x.cs') ? 'PastedModelSnapshot.cs' : /^\s*[[{]/.test(txt) ? 'paste.json' : /\$jsonSchema|createCollection|Schema\(/.test(txt) ? 'paste.js' : 'paste.sql');
   }
 });
 

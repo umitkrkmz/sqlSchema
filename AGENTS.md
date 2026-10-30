@@ -28,6 +28,7 @@ Betikler `index.html`'de şu sırayla yüklenir ve her biri `globalThis.sqlSchem
 | `js/lexer.js` | tokenizer, ifade ayırıcı (`;`, `/`, `GO`, `DELIMITER`), lehçe tahmini | yok |
 | `js/sql-parser.js` | DDL → sıralı işlem listesi (`create`, `fk`, `pk`, `rename`, `drop` ...; ayrıntı dosya başında) | yok |
 | `js/mongo.js` | `$jsonSchema`, Mongoose ve JSON belgelerinden aynı işlem listesi | yok |
+| `js/efcore.js` | EF Core model özeti (`*ModelSnapshot.cs`) → aynı işlem listesi; küçük C# okuyucu, owned tip, TPH / TPT / TPC, sağlayıcı tahmini (`result.orm = 'efcore'`) | yok |
 | `js/files.js` | dosya sıralama (Flyway, golang-migrate; Prisma ve Diesel'de sürüm klasör adında, `fileLabel`), ayrıştırıcı seçimi, ayrı veritabanı adları; `*.sqlschema.json` proje dosyası şema sayılmaz | yok |
 | `js/model.js` | işlemleri dosya sırasıyla uygular; FK çözümleme, kardinalite, ara tablo, tahmini ilişki; etki analizi (`impactOf`), iki tablo arası yollar (`pathsBetween`) | yok |
 | `js/diff.js` | iki modelin farkı (tablo, kolon, varsayılan, PK, FK, UNIQUE), ad değişikliği tahmini; zaman çizelgesi (sürüm adımları, tablo soyu, geçmiş) | yok |
@@ -43,7 +44,7 @@ Betikler `index.html`'de şu sırayla yüklenir ve her biri `globalThis.sqlSchem
 | `js/render.js` | canvas çizimi, kamera, karga ayağı | var |
 | `js/ui.js` | yükleme, dosya listesi, arama, panel, rapor, URL parametreleri | var |
 
-Veri akışı: `dosyalar → orderFiles → parseFile (parseSQL | parseMongo) → buildModel → layoutModel → render`.
+Veri akışı: `dosyalar → orderFiles → parseFile (parseSQL | parseMongo | parseEfCore) → buildModel → layoutModel → render`.
 
 ## Değişmezler
 
@@ -51,7 +52,7 @@ Bunları bozan bir değişiklik yapmayın; gerekirse önce bir issue açın.
 
 1. **Bağımlılık ve derleme yok.** npm paketi, paketleyici, TypeScript derlemesi ya da CDN betiği eklenmez. Yalnızca Google Fonts bağlantısı vardır ve olmadan da çalışır.
 2. **Klasik betikler, ES modülü değil.** `type="module"` ve `import` kullanılmaz; sayfa `file://` ile açıldığında da çalışmalıdır. Her dosya `(function (NS) { ... })(globalThis.sqlSchema = globalThis.sqlSchema || {})` kalıbını izler ve dışa açtıklarını `Object.assign(NS, {...})` ile verir.
-3. **Çekirdek DOM'a dokunmaz.** `lexer`, `sql-parser`, `mongo`, `files`, `model`, `diff`, `layout`, `conventions`, `audit`, `fixes`, `migrate`, `export`, `privacy` Node'da `require` edilebilmelidir; testler buna dayanır.
+3. **Çekirdek DOM'a dokunmaz.** `lexer`, `sql-parser`, `mongo`, `efcore`, `files`, `model`, `diff`, `layout`, `conventions`, `audit`, `fixes`, `migrate`, `export`, `privacy` Node'da `require` edilebilmelidir; testler buna dayanır.
 4. **Yerleşim deterministiktir.** `Math.random` yoktur; aynı girdi her zaman aynı haritayı verir.
 5. **Kart boyutu ile yerleşim yarıçapı bağlıdır.** `render.js`'teki `CARD` (164 × en fazla 127) ile `layout.js`'teki `L.nodeR` (105) birlikte değişir; testler kart çakışmasını denetler.
 6. **Her arayüz metni iki dilde.** Kullanıcıya görünen her metin `js/i18n.js`'te hem `tr` hem `en` sözlüğünde bulunur ve `t('anahtar')` ile kullanılır. HTML'de `data-i18n`, `data-i18n-html`, `data-i18n-attr` kullanılır. Testler eksik anahtarı yakalar. Çekirdek modüller metin değil kod döndürür (ör. `skip: 'config'`, `warnings: [{ kind: 'dup', ... }]`); çeviri arayüzde yapılır.

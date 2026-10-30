@@ -38,16 +38,17 @@ draw.io kadar elle uğraştırmaz, veri modelleme aracı kadar ağır değildir.
 4. [Birden fazla dosya ve migration](#tr-coklu-dosya)
 5. [Desteklenen veritabanları](#tr-veritabanlari)
 6. [MongoDB](#tr-mongodb)
-7. [Adlandırma profili](#tr-adlandirma)
-8. [Tasarım denetimi](#tr-denetim)
-9. [Belge ve diyagram olarak dışa aktarmak](#tr-belge)
-10. [KVKK haritası](#tr-kvkk)
-11. [Örnekler](#tr-ornekler)
-12. [Şemayı dışa aktarmak](#tr-disa-aktarma)
-13. [Dil](#tr-dil)
-14. [Proje yapısı ve geliştirme](#tr-gelistirme)
-15. [Sınırlar](#tr-sinirlar)
-16. [Katkı, güvenlik, lisans](#tr-katki)
+7. [EF Core (kod öncelikli)](#tr-efcore)
+8. [Adlandırma profili](#tr-adlandirma)
+9. [Tasarım denetimi](#tr-denetim)
+10. [Belge ve diyagram olarak dışa aktarmak](#tr-belge)
+11. [KVKK haritası](#tr-kvkk)
+12. [Örnekler](#tr-ornekler)
+13. [Şemayı dışa aktarmak](#tr-disa-aktarma)
+14. [Dil](#tr-dil)
+15. [Proje yapısı ve geliştirme](#tr-gelistirme)
+16. [Sınırlar](#tr-sinirlar)
+17. [Katkı, güvenlik, lisans](#tr-katki)
 
 <a id="tr-one-cikanlar"></a>
 
@@ -56,6 +57,7 @@ draw.io kadar elle uğraştırmaz, veri modelleme aracı kadar ağır değildir.
 - **Saf HTML, CSS ve JavaScript.** Bağımlılık yok, derleme adımı yok; klasörü açmanız yeterli.
 - **Gizlilik:** dosyalar tarayıcıdan çıkmaz, hiçbir sunucuya gönderilmez.
 - **Sekiz veritabanı:** Oracle, SQL Server, MySQL, MariaDB, PostgreSQL, SQLite, Cassandra ve MongoDB.
+- **Kod öncelikli projeler:** EF Core model özeti (`ModelSnapshot.cs`) SQL'e çevirmeden okunur; DBA betikleriyle birlikte açılabilir.
 - **Tek dosya, birden fazla dosya ya da bütün bir klasör:** bölünmüş dökümler, migration klasörleri (Flyway, golang-migrate, Prisma, Diesel), çok veritabanlı projeler.
 - **Karga ayağı notasyonu:** kardinalite `NOT NULL`, `UNIQUE` ve PK bilgisinden çıkarılır.
 - **Tahmini ilişkiler:** FK tanımlı olmayan eski sistemlerde, Cassandra'da ve MongoDB'de bağlantılar kolon adlarından bulunur.
@@ -384,6 +386,28 @@ Gömülü nesneler ve nesne dizileri, sahibinin yanında duran **uydu** tablolar
 
 <img src="docs/images/tr/mongodb-uydular.png" alt="MongoDB: koleksiyonlar, uydu alt belgeler ve tahmini ilişkiler" width="900">
 
+<a id="tr-efcore"></a>
+
+### EF Core (kod öncelikli)
+
+Şeması .NET kodunda tanımlı projelerde (Entity Framework Core) SQL dosyası gerekmez: EF'in ürettiği model özeti **`Migrations/<Bağlam>ModelSnapshot.cs`** doğrudan okunur. Dosya araç tarafından üretildiği için düzenlidir ve modelin tamamını tek yerde tutar; kod çalıştırılmaz. Projenin klasörünü olduğu gibi açabilirsiniz: entity sınıfları, migration kodu, `appsettings.json`, `bin/` ve `obj/` atlanır.
+
+| Snapshot'ta | Haritada |
+|---|---|
+| `ToTable("Dealers", "sales")`, `HasDefaultSchema` | Şema ve tablo adı |
+| `Property<int?>`, `IsRequired`, `HasColumnType`, `HasColumnName`, `HasDefaultValue(Sql)`, `HasComment` | Kolon, tip, NULL, varsayılan, açıklama |
+| `HasKey`, `HasAlternateKey`, `HasIndex(...).IsUnique()`, `HasCheckConstraint` | PK, UNIQUE, indeks, CHECK değer listesi |
+| `HasOne(...).WithMany / WithOne().HasForeignKey(...)`, `OnDelete` | FK ve silme davranışı (bire bir, bileşik anahtar, `HasPrincipalKey`) |
+| `OwnsOne` / `OwnsMany` | Aynı tabloda `Address_City` gibi kolonlar ya da kendi tablosu |
+| `HasBaseType` | TPH (temel tabloya, kolonlar NULL olabilir), TPT (kendi tablosu ve temel tabloya FK), TPC (temel kolonlar kopyalanır) |
+| Çoka çok | EF'in ürettiği ara tablo (`DealerRegion`) |
+
+- **Sağlayıcı:** SQL Server, PostgreSQL (Npgsql), Oracle, MySQL ve SQLite snapshot'taki ek sınıf adlarından, olmazsa kolon tiplerinden anlaşılır.
+- **Karma projeler:** DBA betikleri (`.sql`) aynı klasörde ya da birlikte açılabilir; betikteki FK'ler EF tablolarına bağlanır. Panelde snapshot'tan gelen tabloların **EF Core** etiketi vardır; hangi tablonun kodda, hangisinin yalnızca DBA betiğinde tanımlı olduğu bir bakışta anlaşılır.
+- **Okunmayanlar:** `ToView` ile görünüme bağlanan varlıklar ve `HasData` tohum verisi. Migration geçmişi için `dotnet ef migrations script` çıktısı kullanılabilir (bkz. [Şemayı dışa aktarmak](#tr-disa-aktarma)).
+
+<img src="docs/images/tr/ef-core.png" alt="EF Core: bayi portalının model özeti ve DBA'nın raporlama tabloları birlikte" width="900">
+
 <a id="tr-adlandirma"></a>
 
 ### Adlandırma profili
@@ -613,6 +637,7 @@ Bulgular adlardan ve açıklamalardan tahmindir, hukuki görüş değildir; enva
 | Karışık adlandırma | Oracle | İki ekip, iki alışkanlık: PK `ID` ve `<TABLO>_ID`, kuralsız FK'ler, ORM tabloları |
 | Sözlük ağırlıklı | Oracle | Bütün kodlar tek bir `SOZLUK` tablosunda; 30'dan fazla kolon ona `@ref` ile bağlı |
 | Hatalı tasarım (DBA incelemesi) | Oracle | Düzgün bir şemaya özensiz eklenmiş migration'lar; her denetim kuralı tetiklenir |
+| Bayi portalı (EF Core) | SQL Server | .NET uygulamasının `ModelSnapshot.cs`'i ile DBA'nın raporlama ve arşiv betikleri birlikte: owned tip, TPH / TPT, çoka çok |
 
 <a id="tr-disa-aktarma"></a>
 
@@ -645,11 +670,11 @@ SELECT DBMS_METADATA.GET_DEPENDENT_DDL('COMMENT', table_name, owner) FROM all_ta
 SPOOL OFF
 ```
 
-**Şema kodda tanımlıysa (ORM, "code first").** sqlSchema ORM kodunu okumaz (Mongoose hariç); ama her ORM şemayı SQL olarak verebilir ve sonunda veritabanı aynıdır:
+**Şema kodda tanımlıysa (ORM, "code first").** sqlSchema ORM kodunu okumaz (EF Core model özeti ve Mongoose hariç); ama her ORM şemayı SQL olarak verebilir ve sonunda veritabanı aynıdır:
 
 | Araç | SQL'i almak |
 |---|---|
-| EF Core | `dotnet ef migrations script -o sema.sql` (bütün migration'lar) ya da `dotnet ef dbcontext script -o sema.sql` (modelin bugünkü hâli) |
+| EF Core | `Migrations/*ModelSnapshot.cs` doğrudan açılır (bkz. [EF Core](#tr-efcore)); SQL için `dotnet ef migrations script -o sema.sql` (bütün migration'lar) ya da `dotnet ef dbcontext script -o sema.sql` (modelin bugünkü hâli) |
 | Hibernate / JPA | `jakarta.persistence.schema-generation.scripts.action=create` ve `...scripts.create-target=sema.sql` ayarları DDL dosyası yazar. Flyway kullanılıyorsa `db/migration` klasörü doğrudan açılır; Liquibase'te `liquibase update-sql` |
 | Django | Her migration için `python manage.py sqlmigrate <uygulama> <numara>`; ya da migration'ları bir test veritabanına uygulayıp yukarıdaki dökümü alın |
 | Rails | `config.active_record.schema_format = :sql` ile `bin/rails db:schema:dump` → `db/structure.sql` |
@@ -769,16 +794,17 @@ It is less manual than draw.io and lighter than a data-modelling tool. The goal 
 4. [Multiple files and migrations](#en-multi-file)
 5. [Supported databases](#en-databases)
 6. [MongoDB](#en-mongodb)
-7. [Naming profile](#en-naming)
-8. [Design audit](#en-audit)
-9. [Exporting documents and diagrams](#en-docs)
-10. [Personal data map](#en-privacy)
-11. [Samples](#en-samples)
-12. [Exporting a schema](#en-export)
-13. [Language](#en-language)
-14. [Project layout and development](#en-development)
-15. [Limitations](#en-limitations)
-16. [Contributing, security, license](#en-contributing)
+7. [EF Core (code first)](#en-efcore)
+8. [Naming profile](#en-naming)
+9. [Design audit](#en-audit)
+10. [Exporting documents and diagrams](#en-docs)
+11. [Personal data map](#en-privacy)
+12. [Samples](#en-samples)
+13. [Exporting a schema](#en-export)
+14. [Language](#en-language)
+15. [Project layout and development](#en-development)
+16. [Limitations](#en-limitations)
+17. [Contributing, security, license](#en-contributing)
 
 <a id="en-highlights"></a>
 
@@ -787,6 +813,7 @@ It is less manual than draw.io and lighter than a data-modelling tool. The goal 
 - **Plain HTML, CSS and JavaScript.** No dependencies, no build step; just open the folder.
 - **Privacy:** files never leave the browser and are not sent to any server.
 - **Eight databases:** Oracle, SQL Server, MySQL, MariaDB, PostgreSQL, SQLite, Cassandra and MongoDB.
+- **Code-first projects:** the EF Core model snapshot (`ModelSnapshot.cs`) is read without converting it to SQL; it can be opened together with DBA scripts.
 - **One file, many files or a whole folder:** split dumps, migration folders (Flyway, golang-migrate, Prisma, Diesel), multi-database projects.
 - **Crow's foot notation:** cardinality is derived from `NOT NULL`, `UNIQUE` and primary keys.
 - **Inferred relationships:** links are found from column names in legacy systems without FKs, in Cassandra and in MongoDB.
@@ -1117,6 +1144,28 @@ Embedded objects and arrays of objects become **satellite** tables (`users.profi
 
 <img src="docs/images/en/mongodb-uydular.png" alt="MongoDB: collections, satellite sub-documents and inferred relationships" width="900">
 
+<a id="en-efcore"></a>
+
+### EF Core (code first)
+
+Projects whose schema is defined in .NET code (Entity Framework Core) need no SQL file: the model snapshot EF generates, **`Migrations/<Context>ModelSnapshot.cs`**, is read directly. Because the tool generates it, the file is regular and holds the whole model in one place; no code is run. You can open the project folder as it is: entity classes, migration code, `appsettings.json`, `bin/` and `obj/` are skipped.
+
+| In the snapshot | On the map |
+|---|---|
+| `ToTable("Dealers", "sales")`, `HasDefaultSchema` | Schema and table name |
+| `Property<int?>`, `IsRequired`, `HasColumnType`, `HasColumnName`, `HasDefaultValue(Sql)`, `HasComment` | Column, type, NULL, default, comment |
+| `HasKey`, `HasAlternateKey`, `HasIndex(...).IsUnique()`, `HasCheckConstraint` | PK, UNIQUE, index, CHECK value list |
+| `HasOne(...).WithMany / WithOne().HasForeignKey(...)`, `OnDelete` | FK and delete behaviour (one-to-one, composite keys, `HasPrincipalKey`) |
+| `OwnsOne` / `OwnsMany` | Columns such as `Address_City` in the same table, or a table of its own |
+| `HasBaseType` | TPH (into the base table, columns nullable), TPT (own table plus an FK to the base table), TPC (base columns copied) |
+| Many-to-many | The join table EF generates (`DealerRegion`) |
+
+- **Provider:** SQL Server, PostgreSQL (Npgsql), Oracle, MySQL and SQLite are recognised from the extension class names in the snapshot, or else from the column types.
+- **Mixed projects:** DBA scripts (`.sql`) can sit in the same folder or be opened together; their FKs connect to the EF tables. In the panel, tables from the snapshot carry an **EF Core** tag, so you see at a glance which tables the code defines and which exist only in DBA scripts.
+- **Not read:** entities mapped to a view with `ToView`, and `HasData` seed data. For the migration history, use the output of `dotnet ef migrations script` (see [Exporting a schema](#en-export)).
+
+<img src="docs/images/en/ef-core.png" alt="EF Core: the dealer portal's model snapshot together with the DBA's reporting tables" width="900">
+
 <a id="en-naming"></a>
 
 ### Naming profile
@@ -1346,6 +1395,7 @@ The samples under `samples/` are **synthetic**: they do not belong to any real o
 | Mixed naming | Oracle | Two teams, two habits: PK `ID` and `<TABLE>_ID`, irregular FKs, ORM tables |
 | Lookup-heavy | Oracle | Every code lives in a single `SOZLUK` table; more than 30 columns point to it with `@ref` |
 | Flawed design (DBA review) | Oracle | Careless migrations added to a clean schema; every audit rule fires |
+| Dealer portal (EF Core) | SQL Server | A .NET application's `ModelSnapshot.cs` together with the DBA's reporting and archive scripts: owned types, TPH / TPT, many-to-many |
 
 <a id="en-export"></a>
 
@@ -1378,11 +1428,11 @@ SELECT DBMS_METADATA.GET_DEPENDENT_DDL('COMMENT', table_name, owner) FROM all_ta
 SPOOL OFF
 ```
 
-**If the schema is defined in code (ORM, "code first").** sqlSchema does not read ORM code (except Mongoose), but every ORM can give the schema as SQL, and in the end the database is the same:
+**If the schema is defined in code (ORM, "code first").** sqlSchema does not read ORM code (except the EF Core model snapshot and Mongoose), but every ORM can give the schema as SQL, and in the end the database is the same:
 
 | Tool | Getting the SQL |
 |---|---|
-| EF Core | `dotnet ef migrations script -o schema.sql` (all migrations) or `dotnet ef dbcontext script -o schema.sql` (the model as it is today) |
+| EF Core | Open `Migrations/*ModelSnapshot.cs` directly (see [EF Core](#en-efcore)); for SQL, `dotnet ef migrations script -o schema.sql` (all migrations) or `dotnet ef dbcontext script -o schema.sql` (the model as it is today) |
 | Hibernate / JPA | The `jakarta.persistence.schema-generation.scripts.action=create` and `...scripts.create-target=schema.sql` settings write a DDL file. With Flyway, open the `db/migration` folder directly; with Liquibase, `liquibase update-sql` |
 | Django | `python manage.py sqlmigrate <app> <number>` for each migration; or apply the migrations to a test database and take a dump as above |
 | Rails | `config.active_record.schema_format = :sql`, then `bin/rails db:schema:dump` → `db/structure.sql` |

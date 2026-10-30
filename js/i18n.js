@@ -406,7 +406,7 @@ const DICT = {
     report: 'rapor',
 
     pasteTitle: 'Şema yapıştır',
-    pasteText: 'DDL metni (CREATE TABLE, ALTER TABLE), MongoDB doğrulayıcısı, Mongoose modeli ya da JSON belgeleri.',
+    pasteText: 'DDL metni (CREATE TABLE, ALTER TABLE), EF Core model özeti (ModelSnapshot.cs), MongoDB doğrulayıcısı, Mongoose modeli ya da JSON belgeleri.',
     cancel: 'Vazgeç', draw: 'Çiz',
 
     levels: ['Galaksi', 'Takımyıldız', 'Yakın plan'],
@@ -431,7 +431,7 @@ const DICT = {
     readingFiles: v => `${v.n} dosya okunuyor…`,
     loadingSample: v => `${v.s} yükleniyor…`,
     loadedSummary: v => `${v.files > 1 ? v.files + ' dosya · ' : ''}${v.tables} tablo, ${v.rels} ilişki, ${v.inferred} tahmini${v.sats ? ', ' + v.sats + ' uydu' : ''} · ${v.ms} ms`,
-    noSchemaFound: 'Bu dosyalarda tablo ya da koleksiyon tanımı bulunamadı. CREATE TABLE ifadeleri, MongoDB doğrulayıcıları, Mongoose modelleri ya da JSON belgeleri içeren dosyaları seçin.',
+    noSchemaFound: 'Bu dosyalarda tablo ya da koleksiyon tanımı bulunamadı. CREATE TABLE ifadeleri, EF Core model özeti (ModelSnapshot.cs), MongoDB doğrulayıcıları, Mongoose modelleri ya da JSON belgeleri içeren dosyaları seçin.',
     noTablesLeft: 'Seçili dosyalarda tablo kalmadı.',
     readError: v => `Dosya okunamadı: ${v.m}`,
     dropError: v => `Dosyalar okunamadı: ${v.m}`,
@@ -553,6 +553,7 @@ const DICT = {
     noColumnInfo: 'Kolon bilgisi yok',
     tagJunction: 'ara tablo (M:N)', tagEmbedded: 'gömülü belge', tagExternal: 'dosyada tanımı yok', tagNoPk: 'PK yok',
     tagRef: 'açıklamadan', tagRefTitle: 'Kolon açıklamasındaki @ref etiketiyle tanımlı',
+    tagEfTitle: 'Tablo EF Core model özetinden (ModelSnapshot.cs) geliyor; uygulama kodu tanımlıyor',
     tagDict: 'sözlük',
     dictUsage: 'Sözlük kullanımı', dictNoFilter: 'koşulsuz',
     dictMark: 'Sözlük olarak göster', dictUnmark: 'Sözlük değil',
@@ -970,7 +971,7 @@ const DICT = {
     report: 'report',
 
     pasteTitle: 'Paste a schema',
-    pasteText: 'DDL text (CREATE TABLE, ALTER TABLE), a MongoDB validator, a Mongoose model or JSON documents.',
+    pasteText: 'DDL text (CREATE TABLE, ALTER TABLE), an EF Core model snapshot (ModelSnapshot.cs), a MongoDB validator, a Mongoose model or JSON documents.',
     cancel: 'Cancel', draw: 'Draw',
 
     levels: ['Galaxy', 'Constellation', 'Close-up'],
@@ -995,7 +996,7 @@ const DICT = {
     readingFiles: v => `Reading ${plural(v.n, 'file', 'files')}…`,
     loadingSample: v => `Loading ${v.s}…`,
     loadedSummary: v => `${v.files > 1 ? v.files + ' files · ' : ''}${plural(v.tables, 'table', 'tables')}, ${plural(v.rels, 'relationship', 'relationships')}, ${v.inferred} inferred${v.sats ? ', ' + plural(v.sats, 'satellite', 'satellites') : ''} · ${v.ms} ms`,
-    noSchemaFound: 'No table or collection definitions were found. Choose files that contain CREATE TABLE statements, MongoDB validators, Mongoose models or JSON documents.',
+    noSchemaFound: 'No table or collection definitions were found. Choose files that contain CREATE TABLE statements, an EF Core model snapshot (ModelSnapshot.cs), MongoDB validators, Mongoose models or JSON documents.',
     noTablesLeft: 'No tables left in the selected files.',
     readError: v => `Could not read the file: ${v.m}`,
     dropError: v => `Could not read the files: ${v.m}`,
@@ -1117,6 +1118,7 @@ const DICT = {
     noColumnInfo: 'No column info',
     tagJunction: 'junction table (M:N)', tagEmbedded: 'embedded document', tagExternal: 'not defined in files', tagNoPk: 'no PK',
     tagRef: 'from comment', tagRefTitle: 'Declared with a @ref tag in the column comment',
+    tagEfTitle: 'The table comes from the EF Core model snapshot (ModelSnapshot.cs); the application code defines it',
     tagDict: 'lookup',
     dictUsage: 'Lookup usage', dictNoFilter: 'no condition',
     dictMark: 'Show as lookup table', dictUnmark: 'Not a lookup table',
