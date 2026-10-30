@@ -5,10 +5,10 @@
  *
  * URL parametreleri (paylaşılabilir bağlantılar ve belge görüntüleri için):
  *   ?lang=tr|en   ?sample=<örnek kimliği>   ?select=<tablo adı>   ?center=<tablo adı>   ?zoom=<1.6>   ?legend=0|1
- *   ?pop=naming|report|files|diff|audit   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
+ *   ?pop=naming|report|files|diff|audit|privacy   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
  *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)   ?impact=1 (select ile)
  *   ?diff=V3 (migration klasöründe bu sürümle karşılaştır)   ?time=V4 (zaman çizelgesi bu sürümde; ?time=1 baştan)
- *   ?audit=1 (tasarım denetimi haritada)   ?fix=1 (düzeltme önerileri penceresi)   ?std=1 (standart ve kurallar)   ?doc=1 (standart belgesi)
+ *   ?privacy=1 (KVKK haritası)   ?audit=1 (tasarım denetimi haritada)   ?fix=1 (düzeltme önerileri penceresi)   ?std=1 (standart ve kurallar)   ?doc=1 (standart belgesi)
  *   ?review=1 (değişiklik incelemesi; diff ya da time ile)   ?export=md|mermaid|plantuml|dbml|csv|svg
  */
 (function (NS) {
@@ -126,6 +126,7 @@ function rebuild() {
   renderDiff();
   renderTimeBar();
   refreshAudit();
+  refreshPrivacy();
   S.pick = new Set([...S.pick].filter(k => S.byKey.has(k)));
   renderPickBar();
   return true;
@@ -511,6 +512,7 @@ function refreshAudit() {
 }
 
 function setAuditMap(on) {
+  if (on && S.privMap) { S.privMap = false; applyPrivMap(); renderPrivacy(); }
   S.auditMap = on;
   getAudit();
   applyAuditMap();
@@ -1217,6 +1219,141 @@ $('#exportDlg').addEventListener('click', e => {
   }
 });
 
+/* ─── KVKK haritası ─── */
+
+// Kişisel veri tutuyor gibi duran kolonlar ve kişiyle ilişkilendirilebilen tablolar (privacy.js). Tahmindir, hukuki
+// görüş değildir; arayüz bunu her yerde söyler. Denetim haritasıyla aynı anda açık olmaz (renkler çakışır).
+S.priv = null;       // { src, res }
+S.privMap = false;
+S.privSev = null;    // tablo → special | personal | linked (render.js)
+S.privCols = null;   // tablo → Map(KOLON → kategori)
+
+function getPrivacy() {
+  const src = S.full ? S.full.model : S.model;
+  if (!src) return null;
+  if (!S.priv || S.priv.src !== src) {
+    const m = S.diffRes ? { ...src, tables: src.tables.filter(tb => S.diffRes.byAfter.has(tb)) } : src;
+    S.priv = { src, res: NS.privacyMap(m) };
+    applyPrivMap();
+  }
+  return S.priv.res;
+}
+function applyPrivMap() {
+  S.privSev = S.privCols = null;
+  const p = S.privMap && S.priv && S.priv.res;
+  if (p) {
+    S.privSev = new Map();
+    S.privCols = new Map();
+    for (const [tb, e] of p.tables) {
+      S.privSev.set(tb, e.cats.has('special') ? 'special' : 'personal');
+      S.privCols.set(tb, new Map(e.cols.map(x => [x.col.toUpperCase(), x.cat])));
+    }
+    for (const tb of p.linked.keys()) if (!S.privSev.has(tb)) S.privSev.set(tb, 'linked');
+  }
+  for (const tb of (S.model ? S.model.tables : [])) tb._rows = null;
+}
+function refreshPrivacy() {
+  if (!S.privMap && $('#privPop').hidden) { S.privSev = S.privCols = null; return; }
+  getPrivacy();
+  renderPrivacy();
+}
+function setPrivMap(on) {
+  if (on && S.auditMap) { S.auditMap = false; applyAuditMap(); renderAudit(); }
+  S.privMap = on;
+  getPrivacy();
+  applyPrivMap();
+  renderPrivacy();
+  renderPanel();
+  invalidate();
+}
+
+const privLabel = x => x.t.name + (x.col ? '.' + x.col : '');
+function renderPrivacy() {
+  const el = $('#privPop');
+  if (el.hidden && !S.privMap) return;
+  const p = getPrivacy();
+  if (!p) { el.innerHTML = ''; return; }
+  const open = new Set([...el.querySelectorAll('details[open]')].map(d => d.dataset.cat));
+  const cats = NS.PRIVACY_CATS.map(cat => {
+    const xs = p.columns.filter(x => x.cat === cat);
+    if (!xs.length) return '';
+    return `<details class="au-rule pv-${cat}" data-cat="${cat}"${open.has(cat) ? ' open' : ''}><summary><i class="dot"></i><b>${esc(t('privCats')[cat])}</b><span class="n">${xs.length}</span></summary>
+      <ul class="au-items">${xs.slice(0, 80).map(x => `<li data-go="${esc(x.t.key)}"${x.col ? ` data-col="${esc(x.col)}"` : ''} tabindex="0"><b>${esc(privLabel(x))}</b>${x.col ? '' : ` <span>${esc(t('privTable'))}</span>`}${x.src === 'comment' || (x.src === 'table' && x.col) ? ` <em>${esc(t('privSrc')[x.src])}</em>` : ''}</li>`).join('')}${xs.length > 80 ? `<li class="more">${esc(t('auditMore', { n: xs.length - 80 }))}</li>` : ''}</ul></details>`;
+  }).join('');
+  const linked = [...p.linked.entries()].sort((a, b) => a[1].depth - b[1].depth || String(a[0].name).localeCompare(String(b[0].name)));
+  el.innerHTML = `<h4>${esc(t('privTitle'))}</h4>
+    <p class="intro">${esc(t('privIntro'))}</p>
+    <p class="au-sum">${esc(t('privSummary', { personal: p.tables.size, linked: p.linked.size, tables: p.scanned }))}</p>
+    ${cats || `<p class="nn">${esc(t('privNone'))}</p>`}
+    ${linked.length ? `<details class="au-rule pv-linked" data-cat="linked"${open.has('linked') ? ' open' : ''}><summary><i class="dot"></i><b>${esc(t('privLinked'))}</b><span class="n">${linked.length}</span></summary>
+      <ul class="au-items">${linked.slice(0, 80).map(([tb, l]) => `<li data-go="${esc(tb.key)}" tabindex="0"><b>${esc(tb.name)}</b> <span>${esc(t('privVia', { via: l.via.name, depth: l.depth }))}</span></li>`).join('')}${linked.length > 80 ? `<li class="more">${esc(t('auditMore', { n: linked.length - 80 }))}</li>` : ''}</ul></details>` : ''}
+    <p class="nn pv-warn">${esc(t('privWarn'))}</p>
+    <div class="df-row">
+      ${p.tables.size ? `<button class="btn sm ${S.privMap ? '' : 'ghost'}" data-act="priv-map">${esc(t(S.privMap ? 'auditMapOff' : 'auditMap'))}</button>
+      <button class="btn sm ghost" data-act="priv-csv">${esc(t('privCsv'))}</button>
+      <button class="btn sm ghost" data-act="priv-md">${esc(t('namingMd'))}</button>` : ''}
+    </div>`;
+}
+
+$('#privPop').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (b) {
+    e.stopPropagation();
+    const act = b.dataset.act;
+    if (act === 'priv-map') setPrivMap(!S.privMap);
+    else if (act === 'priv-csv') downloadText('\u{FEFF}' + privacyCsv(), fileStem() + '-' + t('privFile') + '.csv', 'text/csv;charset=utf-8');
+    else if (act === 'priv-md') downloadText(privacyMarkdown(), fileStem() + '-' + t('privFile') + '.md', 'text/markdown;charset=utf-8');
+    return;
+  }
+  const li = e.target.closest('li[data-go]');
+  if (!li) return;
+  const tb = S.byKey.get(li.dataset.go);
+  if (tb) select(tb, { fly: true, col: li.dataset.col || null });
+});
+$('#privPop').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.matches('li[data-go]')) e.target.click();
+});
+
+// Panel: tablonun kişisel veri kolonları ya da kişiye hangi tablo üzerinden bağlandığı
+function privacyPanelHtml(tb) {
+  if (!S.privMap) return '';
+  const p = getPrivacy(), e = p && p.tables.get(tb), l = p && p.linked.get(tb);
+  if (!e && !l) return '';
+  const items = e ? NS.PRIVACY_CATS.filter(c => e.cats.has(c)).map(c => {
+    const cols = e.cols.filter(x => x.cat === c).map(x => x.col);
+    return `<li class="pv-${c}"><b>${esc(t('privCats')[c])}</b> ${cols.length ? `<code>${esc(cols.join(', '))}</code>` : `<span>${esc(t('privTable'))}</span>`}</li>`;
+  }).join('') : `<li class="pv-linked"><span>${esc(t('privVia', { via: l.via.name, depth: l.depth }))}</span></li>`;
+  return `<section class="auditsec privsec"><h3>${esc(t('privHead'))}</h3><ul class="au-items">${items}</ul><p class="nn">${esc(t('privWarn'))}</p></section>`;
+}
+
+// Envanter: kolon başına kategori ve kaynak; ilişkilendirilebilen tablolar ayrı satırlar
+function privacyCsv() {
+  const p = getPrivacy(), sep = NS.getLang() === 'tr' ? ';' : ',';
+  const f = v => { const s = String(v == null ? '' : v); return /["\n\r]/.test(s) || s.includes(sep) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const rows = [t('privCsvHead').map(f).join(sep)];
+  for (const x of p.columns) rows.push([x.t.schema || '', x.t.name, x.col || '', t('privCats')[x.cat], x.src === 'name' ? '' : t('privSrc')[x.src], t('privDirect')].map(f).join(sep));
+  for (const [tb, l] of p.linked) rows.push([tb.schema || '', tb.name, '', '', '', t('privVia', { via: l.via.name, depth: l.depth })].map(f).join(sep));
+  return rows.join('\r\n') + '\r\n';
+}
+function privacyMarkdown() {
+  const p = getPrivacy();
+  const q = tb => '`' + (tb.schema ? tb.schema + '.' : '') + tb.name + '`';
+  const out = [`# ${t('privMdTitle', { title: S.title || '' })}`, '', `> ${t('privWarn')}`, '', t('privSummary', { personal: p.tables.size, linked: p.linked.size, tables: p.scanned }), ''];
+  for (const cat of NS.PRIVACY_CATS) {
+    const xs = p.columns.filter(x => x.cat === cat);
+    if (!xs.length) continue;
+    out.push(`## ${t('privCats')[cat]} (${xs.length})`, '');
+    for (const x of xs) out.push(`- ${q(x.t)}${x.col ? '.`' + x.col + '`' : ' \u{2014} ' + t('privTable')}${x.src === 'comment' ? ' (' + t('privSrc').comment + ')' : ''}`);
+    out.push('');
+  }
+  if (p.linked.size) {
+    out.push(`## ${t('privLinked')} (${p.linked.size})`, '');
+    for (const [tb, l] of p.linked) out.push(`- ${q(tb)}: ${t('privVia', { via: l.via.name, depth: l.depth })}`);
+    out.push('');
+  }
+  return out.join('\n');
+}
+
 function downloadText(text, name, type) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type }));
@@ -1367,6 +1504,7 @@ function afterLayout() {
   renderNaming();
   renderPickBar();
   refreshAudit();
+  refreshPrivacy();
   resetHud();
   fitView(true);
 }
@@ -1864,6 +2002,7 @@ function timeGo(i) {
   if (!$('#report').hidden) renderReport();
   renderTimeBar();
   refreshAudit();
+  refreshPrivacy();
   resetHud();
   invalidate();
 }
@@ -2175,6 +2314,7 @@ function renderPanel() {
       ${diffPanelHtml(tb)}
       ${timeHistoryHtml(tb)}
       ${auditPanelHtml(tb)}
+      ${privacyPanelHtml(tb)}
       ${S.impactRes && S.impactRes.root === tb ? impactHtml(S.impactRes) : ''}
       <section>
         <h3>${esc(t(mongo ? 'fields' : 'columns'))} <span>${tb.columns.length}</span></h3>
@@ -2426,7 +2566,7 @@ let appendNext = false;
 fileInput.addEventListener('change', () => { loadEntries(fromInput(fileInput), appendNext); appendNext = false; fileInput.value = ''; });
 folderInput.addEventListener('change', () => { loadEntries(fromInput(folderInput), false); folderInput.value = ''; });
 
-const popovers = ['#sampleMenu', '#viewMenu', '#report', '#filesPop', '#namingPop', '#diffPop', '#auditPop'];
+const popovers = ['#sampleMenu', '#viewMenu', '#report', '#filesPop', '#namingPop', '#diffPop', '#auditPop', '#privPop'];
 function togglePop(sel) {
   for (const p of popovers) $(p).hidden = p === sel ? !$(p).hidden : true;
 }
@@ -2452,6 +2592,7 @@ document.addEventListener('click', e => {
     case 'files': togglePop('#filesPop'); break;
     case 'naming': togglePop('#namingPop'); break;
     case 'audit': togglePop('#auditPop'); renderAudit(); break;
+    case 'privacy': togglePop('#privPop'); renderPrivacy(); break;
     case 'diff': togglePop('#diffPop'); break;
     case 'std-open': $('#namingPop').hidden = true; openStd(); break;
     case 'naming-md': if (S.model) downloadText(namingMarkdown(), fileStem() + '-' + t('namingFile') + '.md', 'text/markdown;charset=utf-8'); break;
@@ -2574,6 +2715,7 @@ NS.onLangChange(() => {
     $('#timeBar').innerHTML = '';
     renderTimeBar();
     renderAudit();
+    renderPrivacy();
     if ($('#fixDlg').open) renderFix();
     if ($('#reviewDlg').open) renderReview();
     if ($('#stdDlg').open) renderStd();
@@ -2669,8 +2811,10 @@ if (params.get('sample')) {
     }
     // ?audit=1: denetim haritada
     if (params.get('audit') === '1') setAuditMap(true);
-    const pop = { naming: '#namingPop', report: '#report', files: '#filesPop', diff: '#diffPop', audit: '#auditPop' }[params.get('pop')];
-    if (pop) { togglePop(pop); if (pop === '#auditPop') renderAudit(); }
+    // ?privacy=1: KVKK haritası
+    if (params.get('privacy') === '1') setPrivMap(true);
+    const pop = { naming: '#namingPop', report: '#report', files: '#filesPop', diff: '#diffPop', audit: '#auditPop', privacy: '#privPop' }[params.get('pop')];
+    if (pop) { togglePop(pop); if (pop === '#auditPop') renderAudit(); if (pop === '#privPop') renderPrivacy(); }
     // ?fix=1: düzeltme önerileri penceresi
     if (params.get('fix') === '1') openFix();
     // ?std=1: standart ve kurallar düzenleyicisi

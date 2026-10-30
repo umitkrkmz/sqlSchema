@@ -32,6 +32,7 @@ const SCENES = {
   'duzeltme-onerileri': 'sample=hatali&fix=1&legend=0',
   'standart-ve-kurallar': 'sample=karisik&std=1&legend=0',
   'disa-aktarma': 'sample=kucuk&export=mermaid&legend=0',
+  'kvkk-haritasi': 'sample=saglik&privacy=1&pop=privacy&legend=0',
   'inceleme-raporu': 'sample=hatali&diff=V1&review=1&legend=0',
 };
 

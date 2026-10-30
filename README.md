@@ -41,12 +41,13 @@ draw.io kadar elle uğraştırmaz, veri modelleme aracı kadar ağır değildir.
 7. [Adlandırma profili](#tr-adlandirma)
 8. [Tasarım denetimi](#tr-denetim)
 9. [Belge ve diyagram olarak dışa aktarmak](#tr-belge)
-10. [Örnekler](#tr-ornekler)
-11. [Şemayı dışa aktarmak](#tr-disa-aktarma)
-12. [Dil](#tr-dil)
-13. [Proje yapısı ve geliştirme](#tr-gelistirme)
-14. [Sınırlar](#tr-sinirlar)
-15. [Katkı, güvenlik, lisans](#tr-katki)
+10. [KVKK haritası](#tr-kvkk)
+11. [Örnekler](#tr-ornekler)
+12. [Şemayı dışa aktarmak](#tr-disa-aktarma)
+13. [Dil](#tr-dil)
+14. [Proje yapısı ve geliştirme](#tr-gelistirme)
+15. [Sınırlar](#tr-sinirlar)
+16. [Katkı, güvenlik, lisans](#tr-katki)
 
 <a id="tr-one-cikanlar"></a>
 
@@ -540,6 +541,32 @@ Araç çubuğundaki **Dışa aktar** şemayı bir belge ya da başka bir aracın
 
 <img src="docs/images/tr/disa-aktarma.png" alt="Dışa aktarma: biçim ve kapsam seçimi, Mermaid önizlemesi" width="900">
 
+<a id="tr-kvkk"></a>
+
+### KVKK haritası
+
+"Kişisel veri hangi tablolarda? Bir müşterinin verisini silmemiz ya da maskelememiz gerekirse nereye bakmalıyız?" Alt bilgi çubuğundaki **KVKK** bağlantısı bunu şemadan çıkarır:
+
+- **Sınıflandırma:** kolon adı, açıklaması ve tablo adından beş kategori:
+  - **Kimlik:** TCKN, ad soyad, doğum tarihi, cinsiyet, uyruk
+  - **İletişim:** telefon, MSISDN, e-posta, adres ve adres tablosunun satırları
+  - **Finans:** IBAN, kart numarası ve kart belirteci, maaş, gelir
+  - **Konum / cihaz:** IP, IMEI, IMSI, ICCID, koordinat
+  - **Özel nitelikli (KVKK md. 6):** tanı, reçete, alerji, kan grubu, din, sendika, biyometrik veri. Tanı ve reçete gibi tabloların bütün kayıtları da sayılır.
+- **Kişiyle ilişkilendirilebilir tablolar:** kişisel veri tutan tablolara FK ya da `@ref` ile (zincir boyunca) bağlananlar: faturanın satırı, hesap üzerinden müşteriye bağlıdır. Panel hangi tablo üzerinden ve kaç adımda bağlandığını yazar.
+- **Yanlış alarmı azaltmak için:**
+  - Anahtar kolonlar veri sayılmaz (`ADDRESS_ID` adres değil, adres satırının kimliğidir).
+  - Kod katalogları (ICD-10, ilaç listesi) ve altyapının konumu (baz istasyonu, ATM) kişisel sayılmaz.
+  - Konum verisi ancak bir kişiye doğrudan bağlı tabloda sayılır.
+  - Teknik adresler (sunucu, eSIM sunucusu) ve cihaz parmak izi ayrılır.
+- **Haritada göster:** özel nitelikli veri tutan tablolar kırmızı, kişisel veri tutanlar sarı, kişiyle ilişkilendirilebilenler mavi; kartta kişisel veri kolonları renklenir.
+- **Envanter:** CSV (Excel) ve Markdown olarak indirilir.
+- **Bağlantı:** `?privacy=1` haritayı, `?pop=privacy` pencereyi açar.
+
+Bulgular adlardan ve açıklamalardan tahmindir, hukuki görüş değildir; envanteri veri sorumlusu ve hukuk birimiyle doğrulayın.
+
+<img src="docs/images/tr/kvkk-haritasi.png" alt="KVKK haritası: hastane şemasında özel nitelikli, kişisel ve kişiyle ilişkilendirilebilir tablolar" width="900">
+
 <a id="tr-ornekler"></a>
 
 ### Örnekler
@@ -629,6 +656,7 @@ js/                 tarayıcıda bu sırayla yüklenir; hepsi globalThis.sqlSche
   audit.js          tasarım denetimi: kurallar, bulgular (kod döner, metin arayüzde)
   fixes.js          düzeltme önerileri: lehçeye uygun SQL, risk düzeyi
   export.js         dışa aktarma: Markdown veri sözlüğü, Mermaid, PlantUML, DBML, CSV
+  privacy.js        KVKK haritası: kişisel veri kolonları, kişiyle ilişkilendirilebilen tablolar
   sample-small.js   gömülü küçük örnek
   render.js         canvas çizimi, kamera, karga ayağı
   ui.js             yükleme, dosya listesi, arama, panel, rapor, URL parametreleri
@@ -705,12 +733,13 @@ It is less manual than draw.io and lighter than a data-modelling tool. The goal 
 7. [Naming profile](#en-naming)
 8. [Design audit](#en-audit)
 9. [Exporting documents and diagrams](#en-docs)
-10. [Samples](#en-samples)
-11. [Exporting a schema](#en-export)
-12. [Language](#en-language)
-13. [Project layout and development](#en-development)
-14. [Limitations](#en-limitations)
-15. [Contributing, security, license](#en-contributing)
+10. [Personal data map](#en-privacy)
+11. [Samples](#en-samples)
+12. [Exporting a schema](#en-export)
+13. [Language](#en-language)
+14. [Project layout and development](#en-development)
+15. [Limitations](#en-limitations)
+16. [Contributing, security, license](#en-contributing)
 
 <a id="en-highlights"></a>
 
@@ -1206,6 +1235,32 @@ The **Flawed design (DBA review)** sample was made for this feature: migrations 
 
 <img src="docs/images/en/disa-aktarma.png" alt="Export: format and scope selection, Mermaid preview" width="900">
 
+<a id="en-privacy"></a>
+
+### Personal data map
+
+"Which tables hold personal data? If we have to delete or mask a customer's data, where do we look?" **privacy** in the bottom bar works this out from the schema (the categories follow Turkey's KVKK, which closely mirrors the GDPR):
+
+- **Classification:** five categories from the column name, comment and table name:
+  - **Identity:** national ID, name, date of birth, gender, nationality
+  - **Contact:** phone, MSISDN, email, address and the rows of an address table
+  - **Financial:** IBAN, card number and card token, salary, income
+  - **Location / device:** IP, IMEI, IMSI, ICCID, coordinates
+  - **Special category (KVKK art. 6, cf. GDPR art. 9):** diagnosis, prescription, allergy, blood type, religion, trade union, biometric data. Every row of tables such as diagnoses and prescriptions also counts.
+- **Tables that relate to a person:** tables linked to personal-data tables by an FK or `@ref` (along the chain): an invoice line relates to the customer through the account. The panel shows which table it goes through and in how many steps.
+- **To keep false alarms down:**
+  - Key columns are not data (`ADDRESS_ID` is the address row's identifier, not the address).
+  - Code catalogues (ICD-10, a drug list) and the location of infrastructure (cell sites, ATMs) are not personal.
+  - Location data counts only in a table directly linked to a person.
+  - Technical addresses (servers, eSIM servers) and device fingerprints are told apart.
+- **Show on map:** tables with special-category data in red, with personal data in yellow, those relating to a person in blue; personal-data columns are tinted on the card.
+- **Inventory:** downloaded as CSV (Excel) and Markdown.
+- **Link:** `?privacy=1` opens the map, `?pop=privacy` the window.
+
+Findings are guesses from names and comments, not legal advice; verify the inventory with the data controller and legal team.
+
+<img src="docs/images/en/kvkk-haritasi.png" alt="Personal data map: special-category, personal and person-related tables in a hospital schema" width="900">
+
 <a id="en-samples"></a>
 
 ### Samples
@@ -1295,6 +1350,7 @@ js/                 loaded in this order; each file adds to the globalThis.sqlSc
   audit.js          design audit: rules and findings (returns codes; text lives in the UI)
   fixes.js          fix suggestions: dialect-specific SQL, risk level
   export.js         export: Markdown data dictionary, Mermaid, PlantUML, DBML, CSV
+  privacy.js        personal data map: personal-data columns, tables relating to a person
   sample-small.js   embedded small sample
   render.js         canvas drawing, camera, crow's feet
   ui.js             loading, file list, search, panel, report, URL parameters

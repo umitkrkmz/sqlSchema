@@ -111,6 +111,8 @@ function cardRows(t) {
   t._diffCols = de && de.status === 'changed' ? new Map(de.cols.filter(c => c.after).map(c => [c.after.name.toUpperCase(), c.status])) : null;
   // denetim haritadayken bulgusu olan kolon satırları
   t._auditCols = !S.diffRes && S.auditCols ? S.auditCols.get(t) || null : null;
+  // KVKK haritası açıkken kişisel veri kolonları
+  t._privCols = !S.diffRes && S.privCols ? S.privCols.get(t) || null : null;
   t._rowIdx = new Map(t._rows.map((c, i) => [c.name.toUpperCase(), i]));
   t._h = CARD.head + Math.max(1, t._rows.length) * CARD.row + (t._more > 0 ? CARD.row : 0) + CARD.pad;
   return t._rows;
@@ -283,6 +285,8 @@ function nodeAlpha(t) {
   if (S.diffRes) { const d = diffOf(t); if (!d || d.status === 'same') return 0.35; }
   // denetim haritada: hata ve uyarısı olmayan tablolar geri planda
   else if (S.auditSev) { const sev = S.auditSev.get(t); if (!sev || sev === 'info') return 0.35; }
+  // KVKK haritası: kişisel veriyle ilgisi olmayan tablolar geri planda
+  else if (S.privSev) { if (!S.privSev.get(t)) return 0.35; }
   return 1;
 }
 
@@ -294,6 +298,10 @@ const diffColor = t => { const d = diffOf(t); return d && d.status !== 'same' ? 
 // Tasarım denetimi: hata kırmızı, uyarı sarı (bilgi renk almaz)
 const AUDIT_COLOR = { error: '#ef7b86', warning: '#f2b45a', info: '#6cc6dc' };
 const auditColor = t => { const s = !S.diffRes && S.auditSev && S.auditSev.get(t); return s && s !== 'info' ? AUDIT_COLOR[s] : null; };
+
+// KVKK haritası: özel nitelikli kırmızı, kişisel veri sarı, kişiyle ilişkilendirilebilen mavi
+const PRIV_COLOR = { special: '#ef7b86', personal: '#f2b45a', linked: '#6cc6dc' };
+const privColor = t => { const s = !S.diffRes && S.privSev && S.privSev.get(t); return s ? PRIV_COLOR[s] : null; };
 
 function relClass(r) {
   const em = S.em;
@@ -646,7 +654,7 @@ function drawStars(lv) {
     if (t.x < v.x0 || t.x > v.x1 || t.y < v.y0 || t.y > v.y1) continue;
     const a = nodeAlpha(t);
     const x = sx(t.x), y = sy(t.y), r = starR(t);
-    const col = diffColor(t) || auditColor(t) || schemaColor(t);
+    const col = diffColor(t) || auditColor(t) || privColor(t) || schemaColor(t);
     ctx.globalAlpha = a * (t.deg === 0 ? 0.6 : 1);
     if (t === em.active || t === S.sel) {
       const g = ctx.createRadialGradient(x, y, 0, x, y, r * 5);
@@ -802,7 +810,7 @@ function drawCards() {
     const rows = cardRows(t);
     const W = CARD.w * k, H = t._h * k;
     const x0 = sx(t.x) - W / 2, y0 = sy(t.y) - H / 2;
-    const col = diffColor(t) || auditColor(t) || schemaColor(t);
+    const col = diffColor(t) || auditColor(t) || privColor(t) || schemaColor(t);
     const a = nodeAlpha(t);
     const isSel = t === S.sel, isAct = t === em.active;
     ctx.globalAlpha = a;
@@ -853,6 +861,8 @@ function drawCards() {
       if (ds) { ctx.fillStyle = rgba(DIFF_COLOR[ds === 'added' ? 'added' : ds === 'renamed' ? 'renamed' : 'changed'], 0.16); ctx.fillRect(x0 + 1, y - rowH / 2, W - 2, rowH); }
       const as = !ds && t._auditCols && t._auditCols.get(c.name.toUpperCase());
       if (as) { ctx.fillStyle = rgba(AUDIT_COLOR[as], as === 'info' ? 0.1 : 0.16); ctx.fillRect(x0 + 1, y - rowH / 2, W - 2, rowH); }
+      const ps = !ds && !as && t._privCols && t._privCols.get(c.name.toUpperCase());
+      if (ps) { ctx.fillStyle = rgba(PRIV_COLOR[ps === 'special' ? 'special' : 'personal'], 0.16); ctx.fillRect(x0 + 1, y - rowH / 2, W - 2, rowH); }
       const tag = keyTag(t, c);
       ctx.textAlign = 'left';
       if (tag) {

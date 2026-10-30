@@ -7,6 +7,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ### Eklendi · Added
 
+- **KVKK haritası:** kişisel veri tutuyor gibi duran kolonlar (kimlik, iletişim, finans, konum / cihaz, özel nitelikli) ve FK / `@ref` zinciriyle kişiyle ilişkilendirilebilen tablolar; haritada renklendirme, panelde tablonun kişisel verisi, CSV ve Markdown envanter; `?privacy=1`. Bulgular tahmindir, hukuki görüş değildir.
+  Personal data map: columns that seem to hold personal data (identity, contact, financial, location / device, special category) and tables that relate to a person through FK / `@ref` chains; colouring on the map, the table's personal data in the panel, a CSV and Markdown inventory; `?privacy=1`. Findings are guesses, not legal advice.
 - **Dışa aktarma:** Markdown veri sözlüğü, Mermaid `erDiagram`, PlantUML (IE), DBML, CSV (Excel) ve haritanın yerleşimiyle SVG. Kapsam: bütün şema, tek şema, alt diyagram ya da seçili tablolar; kopyalama ve indirme; `?export=mermaid`.
   Export: a Markdown data dictionary, Mermaid `erDiagram`, PlantUML (IE), DBML, CSV (Excel) and an SVG with the map's layout. Scope: the whole schema, a single schema, the sub-diagram or the picked tables; copy and download; `?export=mermaid`.
 

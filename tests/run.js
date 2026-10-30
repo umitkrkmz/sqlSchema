@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'files', 'model', 'diff', 'layout', 'conventions', 'audit', 'fixes', 'export', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
+for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'files', 'model', 'diff', 'layout', 'conventions', 'audit', 'fixes', 'export', 'privacy', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
 require(path.join(ROOT, 'samples', 'catalog.js'));
 const NS = globalThis.sqlSchema;
 
@@ -340,8 +340,25 @@ const EXPECT = {
     const ad = NS.auditModel(all.eticaret.model);
     check('eticaret denetim: dökümde indeks yoksa FK indeksi denetlenmez', ad.skipped.some(x => x.rule === 'fk-no-index'));
   },
-  // Düzeltme SQL'i: üretilen betik dosyalara yeni bir sürüm olarak eklenip yeniden denetlenince düzeltilen bulgular
-  // kaybolur, yeni bulgu çıkmaz ve ayrıştırma hatası olmaz
+  // KVKK haritası: yol haritasının kabul ölçütleri ve düzeltilmiş yanlış alarmlar
+  privacy(all) {
+    const pm = id => NS.privacyMap(all[id].model);
+    const cols = (p, cat) => p.columns.filter(x => x.cat === cat && x.col).map(x => x.t.name + '.' + x.col);
+    const sg = pm('saglik');
+    const specialTables = sg.columns.filter(x => x.cat === 'special' && !x.col).map(x => x.t.name);
+    check('KVKK saglik: tanı ve reçete özel nitelikli', specialTables.includes('diagnosis') && specialTables.includes('prescription') && cols(sg, 'special').includes('diagnosis.icd10_code'), specialTables);
+    check('KVKK saglik: katalog tablolar ve bağlantı kimlikleri özel nitelikli değil', !specialTables.includes('medication') && !cols(sg, 'special').some(c => /_id$/.test(c) || c.startsWith('icd10.')), cols(sg, 'special'));
+    check('KVKK saglik: hastaya bağlı kayıtlar zincirle ilişkilendirilir', sg.linked.has(all.saglik.model.tables.find(t => t.name === 'invoice')) && [...sg.linked.values()].some(l => l.depth >= 2));
+    const bk = pm('banka');
+    check('KVKK banka: Iban, NationalId, CardToken', cols(bk, 'financial').includes('Account.Iban') && cols(bk, 'identity').includes('Person.NationalId') && cols(bk, 'financial').includes('Card.CardToken'), [cols(bk, 'financial'), cols(bk, 'identity')]);
+    check('KVKK banka: ATM konumu ve cihaz parmak izi kişisel değil', !cols(bk, 'location').some(c => c.startsWith('Atm.')) && !cols(bk, 'special').length, [cols(bk, 'location'), cols(bk, 'special')]);
+    const sr = pm('sigorta');
+    check('KVKK sigorta: TCKN, IBAN, ADRES', cols(sr, 'identity').includes('MUSTERI.TCKN') && cols(sr, 'financial').includes('MUSTERI_BANKA.IBAN') && cols(sr, 'contact').includes('MUSTERI.ADRES') && !cols(sr, 'financial').some(c => /VKN/.test(c)), [cols(sr, 'identity'), cols(sr, 'financial')]);
+    const tk = pm('telekom');
+    check('KVKK telekom: MSISDN iletişim, teknik adres ve altyapı konumu değil', cols(tk, 'contact').includes('SUBSCRIPTION.MSISDN') && !cols(tk, 'contact').some(c => /SMDP|ADDRESS_ID|ADDRESS_ROLE/.test(c)) && !cols(tk, 'location').some(c => /^(SITE|NETWORK_ELEMENT|IP_POOL)\\./.test(c)), [cols(tk, 'contact').filter(c => /ADDRESS/.test(c)), cols(tk, 'location')]);
+    check('KVKK: PK olan kişisel veri sayılır (e-posta ile anahtarlı tablo)', cols(pm('iot'), 'contact').includes('users_by_email.email'));
+    check('i18n: KVKK kategorilerinin iki dilde adı', ['tr', 'en'].every(l => NS.PRIVACY_CATS.every(c => (NS.i18nRaw(l, 'privCats') || {})[c])));
+  },
   // Dışa aktarma: biçimlerin söz dizimi kuralları ve kapsam (ilişki yalnızca iki ucu kümedeyse)
   exports(all) {
     const tr = (k, v) => { const x = NS.i18nRaw('tr', k); return typeof x === 'function' ? x(v || {}) : x; };
@@ -372,6 +389,8 @@ const EXPECT = {
     const sd = NS.exportSchema(all.sozluk.model, 'dbml', {});
     check('dışa aktarma: @ref FK sayılmaz', sm.includes('| `TIP_ID` | NUMBER(10,0) | hayır |  |') && sd.includes('// @ref CRM.ABONE.DURUM_ID > ORTAK.SOZLUK.ID TIP_ID = 1'), sm.split('\n').find(l => l.startsWith('| `TIP_ID`')));
   },
+  // Düzeltme SQL'i: üretilen betik dosyalara yeni bir sürüm olarak eklenip yeniden denetlenince düzeltilen bulgular
+  // kaybolur, yeni bulgu çıkmaz ve ayrıştırma hatası olmaz
   fixesRoundTrip(all) {
     const round = (id, extra) => {
       const s = NS.SAMPLES.find(x => x.id === id);
@@ -452,7 +471,7 @@ for (const s of NS.SAMPLES) {
   const before = failed;
   common(s, res);
   if (EXPECT[s.id]) EXPECT[s.id](res, all, s);
-  if (s.id === NS.SAMPLES[NS.SAMPLES.length - 1].id) { EXPECT.fixesRoundTrip(all); EXPECT.exports(all); }
+  if (s.id === NS.SAMPLES[NS.SAMPLES.length - 1].id) { EXPECT.fixesRoundTrip(all); EXPECT.exports(all); EXPECT.privacy(all); }
   const st = res.model.stats;
   console.log(`${failed === before ? '✓' : '✗'} ${s.id.padEnd(18)} ${String(st.tables).padStart(4)} tablo ${String(st.fk).padStart(4)} FK ${String(st.implicit).padStart(4)} tahmini ${String(st.embedded).padStart(3)} uydu  ${st.dialects.join('+').padEnd(26)} ${Date.now() - t0} ms`);
 }

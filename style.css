@@ -401,6 +401,13 @@ code, kbd { font-family: var(--mono); }
 .au-items li em { font-style: normal; font-size: 10px; color: var(--faint); border: 1px solid var(--line-2); border-radius: 4px; padding: 0 4px; }
 .au-chips i.debt { color: var(--faint); }
 .auditsec { border-bottom: 1px solid var(--line); }
+.pv-special { --sev: var(--rose); }
+.pv-identity, .pv-financial, .pv-contact, .pv-location { --sev: var(--accent); }
+.pv-linked { --sev: var(--cyan); }
+.priv-pop .au-items li em, .privsec li em { font-style: normal; font-size: 10px; color: var(--faint); }
+.pv-warn { margin-top: 10px; font-size: 11px; }
+.privsec .au-items li b { font: 600 12px var(--sans); }
+.privsec .au-items code { font: 11px var(--mono); color: var(--text); }
 .auditsec summary { cursor: pointer; list-style: none; }
 .auditsec summary::-webkit-details-marker { display: none; }
 .auditsec summary h3 { display: flex; align-items: center; gap: 8px; }
