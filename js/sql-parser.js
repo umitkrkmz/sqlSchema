@@ -11,7 +11,7 @@
  *   dropindex { name, t? }            DROP INDEX ad [ON tablo]; Oracle ve PostgreSQL'de tablo yazılmaz
  *   fk        { t, cols, ref, refCols, name, disabled, onDelete }
  *   addcol    { t, col }              dropcol   { t, col }
- *   null      { t, col, nullable }    type      { t, col, type }
+ *   null      { t, col, nullable }    type      { t, col, type }    default { t, col, value }   value null: DROP DEFAULT
  *   renamecol { t, col, to }          rename    { t, to }
  *   drop      { t }                   dropcon   { t, name }      droppk { t }
  *   state     { t, name, disabled }   tcomment  { t, text }      ccomment { t, col, text }
@@ -233,6 +233,18 @@ function parseConstraint(c, tparts, P) {
   }
 }
 
+// İfade belirteçlerinden metin: DEFAULT değerinin kaynaktaki yazımına yakın (şema farkı ve ALTER taslağı için)
+function exprText(toks) {
+  let out = '';
+  for (const t of toks) {
+    const v = t.t === 's' ? "'" + String(t.v).replace(/'/g, "''") + "'" : t.t === 'q' ? '"' + t.v + '"' : String(t.v);
+    // ( ) , . : bitişik (:: tip dönüşümü de); işaret eki (-1) sayıya yapışır
+    const tight = /^[(),.:]$/.test(v) || /[(.:]$/.test(out) || (v === '(' && /\w$/.test(out)) || /(^|[(,]\s*)[-+]$/.test(out);
+    out += out && !tight ? ' ' + v : v;
+  }
+  return out.replace(/ \)/g, ')').replace(/\( /g, '(');
+}
+
 function skipExpr(c) {
   const operand = () => {
     const t = c.peek();
@@ -316,7 +328,7 @@ function parseColumnDef(c, tparts, P) {
       pending = null;
       continue;
     }
-    if (c.acceptW('DEFAULT')) { c.acceptSeq('ON', 'NULL'); skipExpr(c); continue; }
+    if (c.acceptW('DEFAULT')) { c.acceptSeq('ON', 'NULL'); const s = c.i; skipExpr(c); col.default = exprText(c.toks.slice(s, c.i)) || null; continue; }
     if (c.acceptW('COMMENT')) { const t = c.peek(); if (t && t.t === 's') { col.comment = t.v; c.next(); } continue; }
     if (c.acceptW('IDENTITY', 'AUTO_INCREMENT', 'AUTOINCREMENT')) { col.identity = true; if (c.isP('(')) c.skipGroup(); continue; }
     if (c.acceptW('STATIC')) { col.static = true; continue; }
@@ -401,6 +413,12 @@ function parseColumnChange(it, tparts, P, renamed) {
     P.op({ op: 'type', t: tparts, col, type: readType(c) });
   } else if (c.peek() && (c.peek().t === 'w' || c.peek().t === 'q') && !COL_ATTR.has(c.peek().u) && !['SET', 'DROP'].includes(c.peek().u)) {
     P.op({ op: 'type', t: tparts, col, type: readType(c) });
+  }
+  // DEFAULT: ALTER COLUMN c SET DEFAULT x, DROP DEFAULT, Oracle MODIFY (c [tip] DEFAULT x)
+  const di = rest.findIndex(t => t.t === 'w' && t.u === 'DEFAULT');
+  if (di >= 0) {
+    if (di > 0 && rest[di - 1].u === 'DROP') P.op({ op: 'default', t: tparts, col, value: null });
+    else { const dc = new Cursor(rest.slice(di + 1)); skipExpr(dc); P.op({ op: 'default', t: tparts, col, value: exprText(dc.toks.slice(0, dc.i)) || null }); }
   }
   const words = rest.filter(t => t.t === 'w').map(t => t.u);
   const hasNotNull = words.some((w, k) => w === 'NOT' && words[k + 1] === 'NULL');

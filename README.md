@@ -289,12 +289,21 @@ Migration'lar baştan sona uygulanır ve harita şemanın **son hâlini** göste
 **Şema farkı.** Alt bilgi çubuğundaki **karşılaştır**, açık dosyaları (sonra) önceki bir sürümle (önce) karşılaştırır:
 - **Önceki sürüm:** migration klasöründe bir sürüm seçilir ("V7'ye kadarki hâliyle") ya da önceki sürümün dosyaları / klasörü ayrıca seçilir (ör. prod dökümü ile test dökümü).
 - **Haritada:** eklenen tablolar yeşil, silinenler kırmızı, değişenler sarı; adı değişenlerin çevresinde mavi halka var. Değişmeyenler geri planda kalır. Silinen tablolar da haritada yerinde görünür.
-- **Panelde:** seçili tablonun farkı: eklenen, silinen ve değişen kolonlar (tip, NULL, PK), adı değişen kolonlar, PK ve FK farkları. Kartta eklenen ve değişen kolon satırları renklenir.
+- **Panelde:** seçili tablonun farkı: eklenen, silinen ve değişen kolonlar (tip, NULL, varsayılan, PK), adı değişen kolonlar, PK, FK ve UNIQUE farkları. Kartta eklenen ve değişen kolon satırları renklenir.
 - **Ad değişikliği tahmini:** tablolar kolon kümesinin benzerliğiyle (`customer` → `customers`), kolonlar tip ve ad benzerliğiyle (`weight` → `weight_grams`) eşleştirilir; tahmin olduğu yazılır. Adı değişen kolonun FK'si değişmiş sayılmaz.
 - **Rapor:** **Markdown indir** değişiklik listesini sürüm notu ya da inceleme için dosyaya yazar.
 - **Bağlantı:** `?diff=V3` migration klasöründe o sürümle karşılaştırmayı açar.
 
 <img src="docs/images/tr/sema-farki.png" alt="Şema farkı: V3'ten bugüne eklenen, değişen ve adı değişen tablolar" width="900">
+
+**ALTER taslağı.** Karşılaştırma ya da zaman çizelgesi açıkken **karşılaştır** penceresindeki **ALTER taslağı**, önceki sürümü sonrakine getiren SQL betiğini lehçeye göre yazar:
+- **Bağımlılık sırası:** kaldırılan FK ve kısıtlar, ad değişiklikleri, yeni tablolar, eklenen ve değişen kolonlar (tip, NULL, varsayılan), birincil anahtarlar, kaldırılan kolonlar, yeni kısıt ve indeksler, kaldırılan tablolar.
+- **Notlar:** tahmin edilen ad değişikliği, dosyada adı olmayan kısıt, varsayılansız `NOT NULL`, veri dönüştürme gerektiren tip değişikliği adımın üstüne yorum olarak yazılır.
+- **Güvenli varsayılan:** veri kaybettiren adımlar (kolon ve tablo kaldırma) yorum satırıdır; kutu kaldırılınca açılır.
+- **Sınır:** taslaktır; veri taşıma yazılmaz. Çalıştırmadan önce okuyun ve test ortamında deneyin.
+- **Bağlantı:** `?diff=V3&alter=1` taslağı açar.
+
+<img src="docs/images/tr/gecis-taslagi.png" alt="ALTER taslağı: V3'ten bugüne lojistik şemasını getiren PostgreSQL betiği" width="900">
 
 **Zaman çizelgesi.** Migration klasöründe **karşılaştır** penceresindeki **Zaman çizelgesi**, sürümleri sırayla oynatır:
 - **Sabit harita:** yerleşim bütün sürümlerdeki tablolardan bir kez kurulur. Adım değişince tablolar yerinde kalır, kamera oynamaz; yalnızca o sürümde var olan tablolar çizilir.
@@ -651,11 +660,12 @@ js/                 tarayıcıda bu sırayla yüklenir; hepsi globalThis.sqlSche
   mongo.js          $jsonSchema, Mongoose ve JSON belgelerinden aynı işlem listesi
   files.js          dosya sıralama (Flyway, golang-migrate), ayrıştırıcı seçimi
   model.js          işlemleri uygular: tablolar, ilişkiler, kardinalite, ara tablo, tahmini ilişki
-  diff.js           iki modelin farkı: tablo, kolon, PK, FK; ad değişikliği tahmini; zaman çizelgesi
+  diff.js           iki modelin farkı: tablo, kolon, PK, FK, UNIQUE; ad değişikliği tahmini; zaman çizelgesi
   layout.js         veritabanı → şema → takımyıldız → yıldız, hiyerarşik kuvvet yerleşimi
   conventions.js    adlandırma profili: kalıplar, oranlar, baskın kalıba uymayanlar
   audit.js          tasarım denetimi: kurallar, bulgular (kod döner, metin arayüzde)
   fixes.js          düzeltme önerileri: lehçeye uygun SQL, risk düzeyi
+  migrate.js        farkı kapatan SQL taslağı: aşamalar, bağımlılık sırası, notlar
   export.js         dışa aktarma: Markdown veri sözlüğü, Mermaid, PlantUML, DBML, CSV
   privacy.js        KVKK haritası: kişisel veri kolonları, kişiyle ilişkilendirilebilen tablolar
   sample-small.js   gömülü küçük örnek
@@ -984,12 +994,21 @@ Migrations are applied from first to last, and the map shows the **final state**
 **Schema diff.** **compare** in the bottom bar compares the open files (after) with an earlier version (before):
 - **Earlier version:** in a migration folder, pick a version ("as of V7"), or choose the files / folder of the earlier version separately (for example a production dump and a test dump).
 - **On the map:** added tables are green, removed ones red, changed ones yellow; renamed tables have a blue ring. Unchanged tables stay in the background. Removed tables also appear in place on the map.
-- **In the panel:** the difference for the selected table: added, removed and changed columns (type, NULL, PK), renamed columns, PK and FK differences. Added and changed column rows are tinted on the card.
+- **In the panel:** the difference for the selected table: added, removed and changed columns (type, NULL, default, PK), renamed columns, PK, FK and UNIQUE differences. Added and changed column rows are tinted on the card.
 - **Rename guesses:** tables are matched by the similarity of their column sets (`customer` → `customers`), columns by type and name similarity (`weight` → `weight_grams`); guesses are labelled as such. The FK of a renamed column is not counted as changed.
 - **Report:** **Download Markdown** writes the change list to a file for release notes or reviews.
 - **Link:** `?diff=V3` opens the comparison with that version of a migration folder.
 
 <img src="docs/images/en/sema-farki.png" alt="Schema diff: tables added, changed and renamed since V3" width="900">
+
+**ALTER draft.** With a comparison or the timeline active, **ALTER draft** in the **compare** window writes the SQL script that takes the earlier version to the later one, in the right dialect:
+- **Dependency order:** dropped FKs and constraints, renames, new tables, added and changed columns (type, NULL, default), primary keys, dropped columns, new constraints and indexes, dropped tables.
+- **Notes:** a guessed rename, a constraint with no name in the files, `NOT NULL` without a default and a type change that needs data conversion are written as comments above the step.
+- **Safe default:** data-losing steps (dropping columns and tables) are comments; unticking the box turns them on.
+- **Limit:** it is a draft; data migration is not written. Read it and try it in a test environment before running it.
+- **Link:** `?diff=V3&alter=1` opens the draft.
+
+<img src="docs/images/en/gecis-taslagi.png" alt="ALTER draft: the PostgreSQL script that brings the logistics schema from V3 to today" width="900">
 
 **Timeline.** In a migration folder, **Timeline** in the **compare** window plays the versions in order:
 - **A stable map:** the layout is built once from the tables of every version. When the step changes, tables stay in place and the camera does not move; only the tables that exist in that version are drawn.
@@ -1346,11 +1365,12 @@ js/                 loaded in this order; each file adds to the globalThis.sqlSc
   mongo.js          the same operation list from $jsonSchema, Mongoose and JSON documents
   files.js          file ordering (Flyway, golang-migrate), parser selection
   model.js          applies operations: tables, relationships, cardinality, junctions, inference
-  diff.js           difference of two models: tables, columns, PK, FK; rename guesses; timeline
+  diff.js           difference of two models: tables, columns, PK, FK, UNIQUE; rename guesses; timeline
   layout.js         database → schema → constellation → star, hierarchical force layout
   conventions.js    naming profile: patterns, shares, names that depart from the dominant pattern
   audit.js          design audit: rules and findings (returns codes; text lives in the UI)
   fixes.js          fix suggestions: dialect-specific SQL, risk level
+  migrate.js        SQL draft that closes a diff: phases, dependency order, notes
   export.js         export: Markdown data dictionary, Mermaid, PlantUML, DBML, CSV
   privacy.js        personal data map: personal-data columns, tables relating to a person
   sample-small.js   embedded small sample

@@ -7,7 +7,8 @@
  *   diffModels(before, after) → {
  *     tables: [{ status, before, after, renamed, cols, pk, fks }]   status: added | removed | changed | same
  *       renamed: tablo adı değişti (tahmin); changed ile birlikte olabilir
- *       cols:  [{ status: added | removed | changed | renamed, name, from, before, after, changes: ['type', 'null', 'pk'] }]
+ *       cols:  [{ status: added | removed | changed | renamed, name, from, before, after, changes: ['type', 'null', 'pk', 'default'] }]
+ *       uq:    [{ status: added | removed, u }]   UNIQUE kısıt ya da benzersiz indeks
  *       pk:    { before: [...], after: [...] } ya da null
  *       fks:   [{ status: added | removed, rel }]
  *     byAfter, byBefore: tablo → kayıt · summary: { added, removed, changed, renamed, same }
@@ -20,6 +21,8 @@
 
 const U = s => String(s == null ? '' : s).toUpperCase();
 const norm = s => U(s).replace(/[^\p{L}\p{N}]/gu, '');
+// varsayılan değer: büyük-küçük harf ve boşluk farkı yok sayılır; tanımsız ile boş aynıdır
+const normDefault = s => (s == null ? '' : U(s).replace(/\s+/g, ''));
 const normType = s => U(s).replace(/\s+/g, ' ').replace(/\s*([(),])\s*/g, '$1').trim();
 
 // Ad benzerliği 0..1: biri öbürünü içeriyorsa yüksek, yoksa ortak önek oranı (weight → weight_grams, sender_id → sender_customer_id)
@@ -73,6 +76,7 @@ function diffColumns(tb, ta) {
     if (normType(b.type) !== normType(a.type)) ch.push('type');
     if (!!b.nullable !== !!a.nullable) ch.push('null');
     if (!!b.pk !== !!a.pk) ch.push('pk');
+    if (normDefault(b.default) !== normDefault(a.default)) ch.push('default');
     return ch;
   };
   for (const a of ta.columns) {
@@ -120,20 +124,24 @@ function diffModels(before, after) {
   const tables = [];
   for (const t of A) {
     const b = bByKey.get(t.key) || renamedFrom.get(t);
-    if (!b) { tables.push({ status: 'added', after: t, renamed: false, cols: [], pk: null, fks: declared(t).map(rel => ({ status: 'added', rel })) }); continue; }
+    if (!b) { tables.push({ status: 'added', after: t, renamed: false, cols: [], pk: null, fks: declared(t).map(rel => ({ status: 'added', rel })), uq: [] }); continue; }
     const { cols, colMap } = diffColumns(b, t);
     const pkB = b.pk.map(c => colMap.get(U(c)) || U(c)).join(','), pkA = t.pk.map(U).join(',');
     const pk = pkB !== pkA ? { before: b.pk.slice(), after: t.pk.slice() } : null;
+    // UNIQUE kısıt ve benzersiz indeksler: kolon kümesiyle (adı değişen kolonlar eşlenir)
+    const uqSig = (u, map) => u.cols.map(c => (map && map.get(U(c))) || U(c)).sort().join(',');
+    const ub = new Map(b.uniques.map(u => [uqSig(u, colMap), u])), ua = new Map(t.uniques.map(u => [uqSig(u), u]));
+    const uq = [...[...ua].filter(([k]) => !ub.has(k)).map(([, u]) => ({ status: 'added', u })), ...[...ub].filter(([k]) => !ua.has(k)).map(([, u]) => ({ status: 'removed', u }))];
     const bs = new Map(declared(b).map(r => [sig(r, colMap, 'before'), r]));
     const as = new Map(declared(t).map(r => [sig(r, null, 'after'), r]));
     const fks = [];
     for (const [k, rel] of as) if (!bs.has(k)) fks.push({ status: 'added', rel });
     for (const [k, rel] of bs) if (!as.has(k)) fks.push({ status: 'removed', rel });
     const renamed = renamedFrom.has(t);
-    const changed = cols.length > 0 || !!pk || fks.length > 0;
-    tables.push({ status: changed ? 'changed' : renamed ? 'changed' : 'same', before: b, after: t, renamed, cols, pk, fks });
+    const changed = cols.length > 0 || !!pk || fks.length > 0 || uq.length > 0;
+    tables.push({ status: changed ? 'changed' : renamed ? 'changed' : 'same', before: b, after: t, renamed, cols, pk, fks, uq });
   }
-  for (const t of removed) if (!renamedTo.has(t)) tables.push({ status: 'removed', before: t, renamed: false, cols: [], pk: null, fks: [] });
+  for (const t of removed) if (!renamedTo.has(t)) tables.push({ status: 'removed', before: t, renamed: false, cols: [], pk: null, fks: [], uq: [] });
 
   const summary = { added: 0, removed: 0, changed: 0, renamed: 0, same: 0 };
   for (const e of tables) { summary[e.status]++; if (e.renamed) summary.renamed++; }

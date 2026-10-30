@@ -819,7 +819,7 @@ body:not(.loaded) .legend, body:not(.loaded) .hud { display: none; }
   resize: vertical;
 }
 .paste .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
-#fixBody, #reviewBody, #stdBody, #docBody, #exportBody { padding: 18px; }
+#fixBody, #reviewBody, #stdBody, #docBody, #exportBody, #migBody { padding: 18px; }
 #exportPre { height: 38vh; }
 .ex-grid { display: grid; grid-template-columns: 1fr 260px; gap: 16px; margin: 0 0 10px; }
 .ex-formats { margin: 0; padding: 0; border: 0; display: grid; gap: 4px; }

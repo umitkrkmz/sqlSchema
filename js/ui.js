@@ -9,7 +9,7 @@
  *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)   ?impact=1 (select ile)
  *   ?diff=V3 (migration klasöründe bu sürümle karşılaştır)   ?time=V4 (zaman çizelgesi bu sürümde; ?time=1 baştan)
  *   ?privacy=1 (KVKK haritası)   ?style=pkStyle (stile göre boya)   ?audit=1 (tasarım denetimi haritada)   ?fix=1 (düzeltme önerileri penceresi)   ?std=1 (standart ve kurallar)   ?doc=1 (standart belgesi)
- *   ?review=1 (değişiklik incelemesi; diff ya da time ile)   ?export=md|mermaid|plantuml|dbml|csv|svg
+ *   ?review=1 (değişiklik incelemesi; diff ya da time ile)   ?alter=1 (farkı kapatan SQL taslağı; diff ya da time ile)   ?export=md|mermaid|plantuml|dbml|csv|svg
  */
 (function (NS) {
 'use strict';
@@ -1430,6 +1430,57 @@ function privacyMarkdown() {
   return out.join('\n');
 }
 
+/* ─── Farkı kapatan SQL taslağı ─── */
+
+// Karşılaştırma ya da zaman adımı açıkken "önce"yi "sonra"ya getiren betik (migrate.js). Aşama başlıkları ve notlar
+// burada çevrilir. Veri kaybettiren adımlar (kolon ve tablo kaldırma) varsayılan olarak yorum satırıdır.
+S.migSafe = true;
+
+function migrationScript() {
+  const steps = NS.migrationSteps(S.diffRes);
+  const [before, after] = diffSides();
+  const notes = t('migNotes'), phases = t('migPhases');
+  const out = ['-- ' + t('migHeader', { before, after, date: new Date().toISOString().slice(0, 10) }), '-- ' + t('migWarn'), '-- ' + t('migCount', { n: steps.length })];
+  if (!steps.length) return out.concat('', t('migNone')).join('\n') + '\n';
+  let phase = null;
+  for (const st of steps) {
+    if (st.phase !== phase) { phase = st.phase; out.push('', '-- ' + '\u{2500}'.repeat(4) + ' ' + phases[phase]); }
+    for (const n of [].concat(st.note || [])) out.push('-- ' + notes[n]);
+    const off = st.comment || (S.migSafe && st.risk === 'risky' && [].concat(st.note || []).includes('dataLoss'));
+    out.push(off ? st.sql.split('\n').map(l => '-- ' + l).join('\n') : st.sql);
+  }
+  return out.join('\n') + '\n';
+}
+
+function openMigration() {
+  if (!S.diffRes) return;
+  renderMigration();
+  const d = $('#migDlg');
+  if (!d.open) d.showModal();
+}
+function renderMigration() {
+  $('#migBody').innerHTML = `<h3>${esc(t('migTitle'))}</h3>
+    <p>${esc(t('migIntro'))}</p>
+    <div class="fx-opts"><label><input type="checkbox" data-mig="safe" ${S.migSafe ? 'checked' : ''}> ${esc(t('migSafeOnly'))}</label></div>
+    <pre id="migPre" tabindex="0">${esc(migrationScript())}</pre>
+    <div class="row">
+      <button class="btn ghost" data-mig-act="copy">${esc(t('fixCopy'))}</button>
+      <button class="btn" data-mig-act="download">${esc(t('exDownload'))}</button>
+      <button class="btn ghost" data-mig-act="close">${esc(t('fixClose'))}</button>
+    </div>`;
+}
+$('#migDlg').addEventListener('change', e => {
+  if (e.target.dataset && e.target.dataset.mig === 'safe') { S.migSafe = e.target.checked; renderMigration(); }
+});
+$('#migDlg').addEventListener('click', e => {
+  const b = e.target.closest('[data-mig-act]');
+  if (!b) return;
+  const act = b.dataset.migAct;
+  if (act === 'close') $('#migDlg').close();
+  else if (act === 'copy') copyPre($('#migPre'));
+  else if (act === 'download') downloadText($('#migPre').textContent, fileStem() + '-' + t('migFile') + '.sql', 'application/sql;charset=utf-8');
+});
+
 function downloadText(text, name, type) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type }));
@@ -1921,6 +1972,7 @@ function renderDiff() {
     ${group('added', by('added'))}${group('removed', by('removed'))}${group('changed', by('changed'))}
     <div class="df-row">
       <button class="btn sm ghost" data-act="diff-review" title="${esc(t('reviewIntro'))}">${esc(t('reviewBtn'))}</button>
+      ${s.added + s.removed + s.changed ? `<button class="btn sm ghost" data-act="diff-alter" title="${esc(t('migIntro'))}">${esc(t('migBtn'))}</button>` : ''}
       ${s.added + s.removed + s.changed ? `<button class="btn sm ghost" data-act="diff-md">${esc(t('namingMd'))}</button>` : ''}
       <button class="btn sm" data-act="diff-close">${esc(t(S.tl ? 'tlClose' : 'diffClose'))}</button>
     </div>`;
@@ -1935,12 +1987,14 @@ function diffPanelHtml(tb) {
   for (const c of e.cols) items.push(`<li class="d-${c.status}">${esc(diffColText(c))}</li>`);
   if (e.pk) items.push(`<li class="d-changed">PK: (${esc(e.pk.before.join(', '))}) → (${esc(e.pk.after.join(', '))})</li>`);
   for (const f of e.fks) items.push(`<li class="d-${f.status === 'added' ? 'added' : 'removed'}">${f.status === 'added' ? '+' : '\u{2212}'} FK ${esc(f.rel.cols.join(', '))} → ${esc(f.rel.parent.name)}</li>`);
+  for (const x of e.uq || []) items.push(`<li class="d-${x.status}">${x.status === 'added' ? '+' : '\u{2212}'} UNIQUE (${esc(x.u.cols.join(', '))})</li>`);
   return `<section class="diffsec"><h3>${esc(t('diffHead'))} <span class="tag d-${e.status}">${esc(t(DIFF_STATUS[e.status]))}</span></h3>
     ${items.length ? `<ul class="df-changes">${items.join('')}</ul>` : ''}</section>`;
 }
 
 function diffColText(c) {
-  const what = { type: () => t('diffType', { a: c.before.type, b: c.after.type }), null: () => t(c.after.nullable ? 'diffNowNull' : 'diffNowNotNull'), pk: () => t(c.after.pk ? 'diffNowPk' : 'diffNoLongerPk') };
+  const what = { type: () => t('diffType', { a: c.before.type, b: c.after.type }), null: () => t(c.after.nullable ? 'diffNowNull' : 'diffNowNotNull'), pk: () => t(c.after.pk ? 'diffNowPk' : 'diffNoLongerPk'),
+    default: () => t('diffDefault', { a: c.before.default == null ? '\u{2014}' : c.before.default, b: c.after.default == null ? '\u{2014}' : c.after.default }) };
   const ch = c.changes.map(k => what[k]()).join('; ');
   if (c.status === 'added') return `+ ${c.name} ${c.after.type || ''}`.trim();
   if (c.status === 'removed') return `\u{2212} ${c.name}`;
@@ -1964,6 +2018,7 @@ function diffMarkdown() {
       const items = e.cols.map(c => '- ' + diffColText(c));
       if (e.pk) items.push(`- PK: (${e.pk.before.join(', ')}) → (${e.pk.after.join(', ')})`);
       for (const f of e.fks) items.push(`- ${f.status === 'added' ? '+' : '\u{2212}'} FK ${f.rel.cols.join(', ')} → ${f.rel.parent.name}`);
+      for (const x of e.uq || []) items.push(`- ${x.status === 'added' ? '+' : '\u{2212}'} UNIQUE (${x.u.cols.join(', ')})`);
       if (items.length) out.push(...items, '');
     }
   }
@@ -1983,6 +2038,7 @@ $('#diffPop').addEventListener('click', e => {
   else if (a === 'diff-close') { if (S.tl) stopTimeline(); else stopDiff(); }
   else if (a === 'time-open') { $('#diffPop').hidden = true; startTimeline(0); }
   else if (a === 'diff-review') openReview();
+  else if (a === 'diff-alter') openMigration();
   else if (a === 'diff-md') downloadText(diffMarkdown(), fileStem() + '-' + t('diffFile') + '.md', 'text/markdown;charset=utf-8');
 });
 
@@ -2800,6 +2856,7 @@ NS.onLangChange(() => {
     if ($('#stdDlg').open) renderStd();
     if ($('#docDlg').open) openDoc();
     if ($('#exportDlg').open) renderExport();
+    if ($('#migDlg').open) renderMigration();
     resetHud();
   }
   if (S.title && S.files.length > 1 && /^\d+ /.test(S.title)) $('#fileName').textContent = t('nFiles', { n: S.files.filter(f => f.text != null).length });
@@ -2898,6 +2955,8 @@ if (params.get('sample')) {
     if (pop) { togglePop(pop); if (pop === '#auditPop') renderAudit(); if (pop === '#privPop') renderPrivacy(); }
     // ?fix=1: düzeltme önerileri penceresi
     if (params.get('fix') === '1') openFix();
+    // ?alter=1: karşılaştırmayla birlikte farkı kapatan SQL taslağı
+    if (params.get('alter') === '1' && S.diffRes) openMigration();
     // ?std=1: standart ve kurallar düzenleyicisi
     if (params.get('std') === '1') openStd();
     // ?doc=1: yazılı standart belgesi

@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'files', 'model', 'diff', 'layout', 'conventions', 'audit', 'fixes', 'export', 'privacy', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
+for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'files', 'model', 'diff', 'layout', 'conventions', 'audit', 'fixes', 'migrate', 'export', 'privacy', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
 require(path.join(ROOT, 'samples', 'catalog.js'));
 const NS = globalThis.sqlSchema;
 
@@ -340,6 +340,38 @@ const EXPECT = {
     const ad = NS.auditModel(all.eticaret.model);
     check('eticaret denetim: dökümde indeks yoksa FK indeksi denetlenmez', ad.skipped.some(x => x.rule === 'fk-no-index'));
   },
+  // Farkı kapatan SQL: "önce" + üretilen betik, "sonra" ile aynı modele çıkar (tablo, kolon, tip, NULL, DEFAULT, PK, FK,
+  // UNIQUE ve indeksler); PostgreSQL (lojistik) ve Oracle (hatali) migration klasörlerinde
+  migrations() {
+    const sigIx = m => m.tables.map(tb => tb.name.toUpperCase() + ':' + tb.indexes.map(x => x.cols.map(c => c.toUpperCase()).join(',')).sort().join('|')).sort().join(';');
+    const round = (id, a, b) => {
+      const s = NS.SAMPLES.find(x => x.id === id);
+      const files = s.files.map(p => ({ path: id + '/' + p, text: fs.readFileSync(path.join(ROOT, 'samples', id, p), 'utf8') }));
+      const upTo = n => files.filter(f => { const v = /\/V(\d+)__/.exec(f.path); return v && +v[1] <= n; });
+      const before = build(upTo(a)).model, after = build(b ? upTo(b) : files).model;
+      const steps = NS.migrationSteps(NS.diffModels(before, after));
+      const script = steps.filter(x => !x.comment).map(x => x.sql).join('\n');
+      const m2 = build(upTo(a).concat([{ path: upTo(a)[0].path.replace(/[^/]*$/, '') + 'V999__gecis.sql', text: script }])).model;
+      const sum = NS.diffModels(m2, after).summary;
+      return { steps, ok: !m2.stats.errors.length && !sum.added && !sum.removed && !sum.changed && sigIx(m2) === sigIx(after), sum, errors: m2.stats.errors.slice(0, 2) };
+    };
+    for (const [id, a, b] of [['lojistik', 1, 0], ['lojistik', 3, 0], ['lojistik', 6, 7], ['lojistik', 10, 11], ['hatali', 1, 0], ['hatali', 2, 3]]) {
+      const r = round(id, a, b);
+      check(`geçiş taslağı ${id} V${a}→${b || 'son'}: uygulanınca fark kalmıyor`, r.ok, [r.sum, r.errors]);
+    }
+    const lj = round('lojistik', 3, 0);
+    const phases = [...new Set(lj.steps.map(x => x.phase))];
+    check('geçiş taslağı: aşama sırası ve riskler', phases.join() === NS.MIGRATION_PHASES.filter(p => phases.includes(p)).join() && lj.steps.filter(x => x.phase === 'dropTable').every(x => x.risk === 'risky' && x.note === 'dataLoss') && lj.steps.some(x => x.phase === 'rename' && x.note === 'renameGuess'), phases);
+    // DEFAULT ve UNIQUE: ayrıştırma ve fark
+    const m1 = build([{ path: 'a.sql', text: "CREATE TABLE t (id int PRIMARY KEY, kod varchar(5) DEFAULT 'A' NOT NULL, n int DEFAULT -1, ad varchar(9));" }]).model;
+    const m2 = build([{ path: 'a.sql', text: "CREATE TABLE t (id int PRIMARY KEY, kod varchar(5) DEFAULT 'B' NOT NULL, n int, ad varchar(9) UNIQUE);" }]).model;
+    const tc = m1.tables[0].colIdx;
+    check('DEFAULT ayrıştırılır', tc.get('KOD').default === "'A'" && tc.get('N').default === '-1' && tc.get('AD').default == null);
+    const de = NS.diffModels(m1, m2).tables[0];
+    check('fark: DEFAULT ve UNIQUE', de.status === 'changed' && de.cols.find(c => c.name === 'kod').changes.includes('default') && de.cols.find(c => c.name === 'n').changes.includes('default') && de.uq.length === 1 && de.uq[0].status === 'added', de.cols.map(c => [c.name, c.changes]));
+    const noText = ['tr', 'en'].flatMap(l => [...NS.MIGRATION_NOTES.filter(n => !(NS.i18nRaw(l, 'migNotes') || {})[n]), ...NS.MIGRATION_PHASES.filter(p => !(NS.i18nRaw(l, 'migPhases') || {})[p])].map(n => l + ':' + n));
+    check('i18n: geçiş aşamaları ve notları iki dilde', !noText.length, noText);
+  },
   // KVKK haritası: yol haritasının kabul ölçütleri ve düzeltilmiş yanlış alarmlar
   privacy(all) {
     const pm = id => NS.privacyMap(all[id].model);
@@ -471,7 +503,7 @@ for (const s of NS.SAMPLES) {
   const before = failed;
   common(s, res);
   if (EXPECT[s.id]) EXPECT[s.id](res, all, s);
-  if (s.id === NS.SAMPLES[NS.SAMPLES.length - 1].id) { EXPECT.fixesRoundTrip(all); EXPECT.exports(all); EXPECT.privacy(all); }
+  if (s.id === NS.SAMPLES[NS.SAMPLES.length - 1].id) { EXPECT.fixesRoundTrip(all); EXPECT.exports(all); EXPECT.privacy(all); EXPECT.migrations(all); }
   const st = res.model.stats;
   console.log(`${failed === before ? '✓' : '✗'} ${s.id.padEnd(18)} ${String(st.tables).padStart(4)} tablo ${String(st.fk).padStart(4)} FK ${String(st.implicit).padStart(4)} tahmini ${String(st.embedded).padStart(3)} uydu  ${st.dialects.join('+').padEnd(26)} ${Date.now() - t0} ms`);
 }

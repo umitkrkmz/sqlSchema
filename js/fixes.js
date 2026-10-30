@@ -347,5 +347,6 @@ function fixAll(findings, opts = {}) {
   return out.filter(x => !late(x)).concat(out.filter(late));
 }
 
-Object.assign(NS, { fixFor, fixAll, FIX_NOTES, FIXABLE: Object.keys(RULES) });
+// migrate.js aynı ad ve tırnak kurallarını kullanır
+Object.assign(NS, { fixFor, fixAll, FIX_NOTES, FIXABLE: Object.keys(RULES), sqlTools: { qi, qt, qcols, lit, caseLike, makeName, renameTable, renameColumn, alterType } });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});

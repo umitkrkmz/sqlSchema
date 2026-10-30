@@ -359,6 +359,11 @@ function buildModel(inputs, opts = {}) {
         if (col && op.type) col.type = op.type;
         break;
       }
+      case 'default': {
+        const col = getCol(t, op.col);
+        if (col) col.default = op.value;
+        break;
+      }
       case 'tcomment':
         if (op.text) t.comment = op.text;
         break;

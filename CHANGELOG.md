@@ -9,6 +9,10 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 - **Stile göre boya:** adlandırma penceresinde her boyutun **haritada** düğmesi haritayı o boyuta göre boyar; baskın kalıba uymayan öğesi olan tablo o kalıbın rengini alır, kolon düzeyindeki boyutlarda kolon satırları da renklenir; haritanın üstünde açıklama çubuğu; `?style=pkStyle`.
   Colour by style: the **on map** button of each dimension in the naming window colours the map by that dimension; a table with an item outside the dominant pattern takes that pattern's colour, and for column-level dimensions the column rows are tinted too; a legend bar above the map; `?style=pkStyle`.
+- **ALTER taslağı:** karşılaştırma ya da zaman çizelgesi açıkken önceki sürümü sonrakine getiren SQL betiği; bağımlılık sırasıyla aşamalar, lehçeye uygun söz dizimi, adım başına notlar (tahmin edilen ad değişikliği, adsız kısıt, varsayılansız `NOT NULL`, veri dönüştürme). Veri kaybettiren adımlar varsayılan olarak yorum satırıdır; `?alter=1`.
+  ALTER draft: with a comparison or the timeline active, the SQL script that takes the earlier version to the later one; phases in dependency order, dialect-specific syntax, notes per step (guessed rename, unnamed constraint, `NOT NULL` without a default, data conversion). Data-losing steps are comments by default; `?alter=1`.
+- **Şema farkında varsayılan ve UNIQUE:** kolon varsayılanı (`DEFAULT`) ve UNIQUE kısıt farkları panelde ve Markdown raporda görünür.
+  Defaults and UNIQUE in the schema diff: column default (`DEFAULT`) and UNIQUE constraint differences appear in the panel and the Markdown report.
 
 ## [0.10.0] - 2026-10-30
 
