@@ -468,6 +468,28 @@ code, kbd { font-family: var(--mono); }
 .tag.act-setNull, .tag.act-setDefault { color: var(--cyan); border-color: rgba(108, 198, 220, 0.5); }
 .tag.act-unenforced { border-style: dashed; }
 .has-impact table.cols tr[data-col] { cursor: pointer; }
+
+/* Yol vurgulama */
+.path { border-bottom: 1px solid var(--line); }
+.path h3 { display: flex; align-items: center; gap: 4px; }
+.path .p-x { margin-left: auto; padding: 0 4px; border: 0; background: none; color: var(--dim); font-size: 15px; line-height: 1; cursor: pointer; }
+.path .p-x:hover { color: var(--text); }
+.path .imp-sum { margin: 0 0 4px; font-size: 12.5px; color: var(--text); }
+.path .imp-hint { margin: 4px 0 8px; font-size: 11px; color: var(--faint); }
+.path-opts { list-style: none; margin: 4px 0 8px; padding: 0; }
+.path-opts li { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 6px; padding: 2px 6px; margin: 0 -6px; border-radius: 4px; font-size: 11.5px; cursor: pointer; }
+.path-opts li b { font: 500 11px var(--mono); color: var(--dim); }
+.path-opts li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); }
+.path-opts li:hover span, .path-opts li.on span { color: var(--text); }
+.path-opts li.on { background: rgba(140, 160, 215, 0.12); }
+.path-steps { list-style: none; margin: 0 0 4px; padding: 0 0 0 10px; border-left: 1px solid var(--line-2); }
+.path-steps li { position: relative; padding: 3px 0; }
+.path-steps li::before { content: ''; position: absolute; left: -14px; top: 9px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.path-steps .pt { padding: 0; border: 0; background: none; font: 600 12.5px var(--sans); color: var(--text); cursor: pointer; }
+.path-steps .pt:hover { text-decoration: underline; }
+.path-steps .ph { display: block; font: 10.5px var(--mono); color: var(--dim); overflow-wrap: anywhere; }
+.path-steps .ph .tag { margin-left: 5px; }
+.pickbar .pb-n { font: 11px var(--mono); color: var(--dim); }
 table.dict { width: 100%; border-collapse: collapse; font-size: 12px; }
 table.dict td { padding: 5px 0; border-top: 1px solid var(--line); vertical-align: top; }
 table.dict tr:first-child td { border-top: 0; }

@@ -94,7 +94,7 @@ python -m http.server 8000
 | `↑` / `↓`, `Enter` | Paneldeki ilişkiler arasında dolaş, seçilen tabloya git |
 | `Alt` + `←` / `→` | Gezinme geçmişinde geri / ileri |
 | `,` / `.` | Zaman çizelgesinde önceki / sonraki sürüm |
-| `Esc` | Odak modunu kapat / seçimi bırak |
+| `Esc` | Yolu ya da odak modunu kapat / seçimi bırak |
 
 <a id="tr-haritayi-okumak"></a>
 
@@ -146,6 +146,15 @@ Ayrıntı panelinde kolonlar, açıklamalar, tanımın geçtiği dosya ve satır
 - **Paylaşım:** **Markdown indir** sonucu değişiklik öncesi ekiple paylaşmak için dosyaya yazar. Kip seçimi izler; başka bir tabloya geçince analiz onun için yenilenir. `Esc` kapatır.
 
 <img src="docs/images/tr/etki-analizi.png" alt="Etki analizi: CUSTOMER tablosuna bağlananlar ve silmedeki davranışları" width="900">
+
+**Yol bulma.** "Bu iki tablo nasıl bağlanıyor?" Paneldeki **Yol bul** düğmesine basıp hedef tabloya tıklayın (ya da arayın); iki tablo seçiliyken seçim çubuğundaki **Yolu göster** de olur:
+- **Haritada:** yalnızca yoldaki tablolar ve bağlantılar parlak kalır, kamera yolu ekrana sığdırır.
+- **Panelde:** yol adım adım yazılır: `TICKET_NOTE.TROUBLE_TICKET_ID → TROUBLE_TICKET.TROUBLE_TICKET_ID` (FK bu yönde), `CUSTOMER.CUSTOMER_ID ← CUSTOMER_ORDER.CUSTOMER_ID` (öbür tablo buna başvuruyor). Aynı iki tablo arasında birden fazla bağlantı varsa (fatura ve teslimat adresi) hepsi yazılır.
+- **Seçenekler:** en kısa yol her zaman aranan değildir (notu yazan kullanıcı üzerinden siparişe gitmek gibi). Kısadan uzuna beş yol listelenir; ‹ › ile ya da listeden seçilir.
+- **Neden geçilmez:** sözlük tabloları ve `CREATED_BY` gibi denetim kolonları her şeyi birbirine bağlar; yoldan sayılmaz, yalnızca uç olabilirler. Tanımlı ilişkiyle yol yoksa tahmini ilişkiler de kullanılır ve bu yazılır.
+- JOIN SQL'i üretilmez; yol yalnızca hangi tablo ve kolonlardan geçildiğini gösterir. `Esc` kapatır; `?path=PAYMENT_ALLOCATION,ADDRESS` bağlantısı yolu açar.
+
+<img src="docs/images/tr/yol-vurgulama.png" alt="Yol bulma: PAYMENT_ALLOCATION tablosundan ADDRESS tablosuna giden ilişki zinciri" width="900">
 
 <img src="docs/images/tr/yakin-plan.png" alt="Yakın plan: kolon satırlarına bağlanan çizgiler ve karga ayağı uçları" width="900">
 
@@ -816,7 +825,7 @@ python -m http.server 8000
 | `↑` / `↓`, `Enter` | Move through the panel's relationships, go to the chosen table |
 | `Alt` + `←` / `→` | Back / forward in the navigation history |
 | `,` / `.` | Previous / next version on the timeline |
-| `Esc` | Leave focus mode / clear the selection |
+| `Esc` | Close the path or leave focus mode / clear the selection |
 
 <a id="en-reading"></a>
 
@@ -870,6 +879,15 @@ The detail panel lists:
 - **Sharing:** **Download Markdown** writes the result to a file to share with the team before a change. The mode follows the selection; moving to another table recomputes it. `Esc` closes it.
 
 <img src="docs/images/en/etki-analizi.png" alt="Impact analysis: tables pointing to CUSTOMER and what happens to them on delete" width="900">
+
+**Finding a path.** "How are these two tables connected?" Press **Find path** in the panel and click the target table (or search for it); with two tables picked, **Show path** in the selection bar does the same:
+- **On the map:** only the tables and links on the path stay bright, and the camera fits the path on screen.
+- **In the panel:** the path is written step by step: `TICKET_NOTE.TROUBLE_TICKET_ID → TROUBLE_TICKET.TROUBLE_TICKET_ID` (the FK goes this way), `CUSTOMER.CUSTOMER_ID ← CUSTOMER_ORDER.CUSTOMER_ID` (the other table points to this one). When two tables are linked more than once (billing and delivery address), every link is listed.
+- **Options:** the shortest path is not always the one you want (reaching an order through the user who wrote a note, for example). Five paths are listed from shortest to longest; choose with ‹ › or from the list.
+- **What is not passed through:** lookup tables and audit columns such as `CREATED_BY` link everything to everything; they are not used along the way, only as ends. When there is no path through declared relationships, inferred ones are used as well and this is stated.
+- No JOIN SQL is generated; the path only shows which tables and columns it goes through. `Esc` closes it; the link `?path=PAYMENT_ALLOCATION,ADDRESS` opens it.
+
+<img src="docs/images/en/yol-vurgulama.png" alt="Finding a path: the chain of relationships from PAYMENT_ALLOCATION to ADDRESS" width="900">
 
 <img src="docs/images/en/yakin-plan.png" alt="Close-up: lines attached to column rows, with crow's foot ends" width="900">
 

@@ -5,6 +5,11 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Eklendi · Added
+
+- **Yol bulma:** paneldeki **Yol bul** ile iki tablo arasındaki ilişki zinciri; haritada yalnızca yol parlak, panelde adım adım kolonlar (`A.KOLON → B.KOLON`), kısadan uzuna beş seçenek. Sözlük tablolarından ve denetim kolonlarından geçilmez; tanımlı yol yoksa tahmini ilişkiler kullanılır. JOIN SQL'i üretilmez; `?path=A,B`.
+  Finding a path: **Find path** in the panel shows the chain of relationships between two tables; only the path stays bright on the map, the panel lists the columns step by step (`A.COL → B.COL`), with five options from shortest to longest. Lookup tables and audit columns are not passed through; inferred relationships are used when there is no declared path. No JOIN SQL is generated; `?path=A,B`.
+
 ## [0.11.0] - 2026-10-30
 
 ### Eklendi · Added

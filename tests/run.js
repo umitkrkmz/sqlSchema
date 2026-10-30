@@ -596,6 +596,38 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   check('denetim kolonu tanıma', !badAudit.length, badAudit);
 }
 
+// Yol vurgulama: iki tablo arasındaki ilişki zincirleri, kısadan uzuna
+{
+  const m = all.kucuk.model, tel = all.telekom.model;
+  const f = (mm, n) => mm.tables.find(t => t.name === n);
+  const names = p => p.tables.map(t => t.name).join('>');
+  const r = NS.pathsBetween(f(m, 'PAYMENT_ALLOCATION'), f(m, 'ADDRESS'));
+  check('yol: en kısa önce, beş seçenek, hepsi farklı ve döngüsüz',
+    r.paths.length === 5 && !r.inferred && r.paths.every((p, i) => !i || p.tables.length >= r.paths[i - 1].tables.length) &&
+    new Set(r.paths.map(names)).size === 5 && r.paths.every(p => new Set(p.tables).size === p.tables.length) &&
+    names(r.paths[0]) === 'PAYMENT_ALLOCATION>PAYMENT>BILLING_ACCOUNT>CUSTOMER>CUSTOMER_ADDRESS>ADDRESS', r.paths.map(names));
+  check('yol: deterministik', same(NS.pathsBetween(f(m, 'PAYMENT_ALLOCATION'), f(m, 'ADDRESS')).paths.map(names), r.paths.map(names)));
+  check('yol: her adımın ilişkisi o iki tabloyu bağlar', r.paths.every(p => p.hops.every(h => h.rels.length && h.rels.every(x => (x.child === h.a && x.parent === h.b) || (x.child === h.b && x.parent === h.a)))));
+  const cdr = NS.pathsBetween(f(m, 'VOICE_CDR'), f(m, 'TROUBLE_TICKET'));
+  check('yol: tanımlı yol yoksa tahmini ilişkilerle', cdr.inferred && cdr.paths[0].hops.some(h => h.rels.every(x => x.kind === 'implicit')), cdr.paths.map(names));
+  const note = NS.pathsBetween(f(tel, 'TICKET_NOTE'), f(tel, 'ORDER_ITEM'));
+  check('yol: en kısa kullanıcı üzerinden, müşteri yolu da seçenek', note.paths.map(names).includes('TICKET_NOTE>TROUBLE_TICKET>CUSTOMER>CUSTOMER_ORDER>ORDER_ITEM'), note.paths.map(names));
+  // sözlükten geçilmez, denetim kolonu (CREATED_BY) sayılmaz
+  const bad = [];
+  for (const id of ['sigorta', 'sozluk', 'karisik', 'telekom']) {
+    const mm = all[id].model, ts = mm.tables.filter(t => !t.external);
+    for (let i = 0; i < 12; i++) {
+      const res = NS.pathsBetween(ts[(i * 7) % ts.length], ts[(i * 13 + 5) % ts.length]);
+      for (const p of res.paths) {
+        if (p.tables.slice(1, -1).some(t => t.dictionary)) bad.push(id + ' sözlük: ' + names(p));
+        if (p.hops.some(h => h.rels.some(x => x.cols.length === 1 && NS.isAudit(x.cols[0])))) bad.push(id + ' denetim: ' + names(p));
+      }
+    }
+  }
+  check('yol: sözlükten ve denetim kolonundan geçmez', !bad.length, bad.slice(0, 3));
+  check('yol: aynı tablo ya da bağlantısız', !NS.pathsBetween(f(m, 'ADDRESS'), f(m, 'ADDRESS')).paths.length && !NS.pathsBetween(f(m, 'ADDRESS'), f(m, 'APP_USER'), { accept: () => false }).paths.length);
+}
+
 // Sürümü klasör adında olan migration'lar: Prisma (migration.sql) ve Diesel (up.sql / down.sql)
 {
   const prisma = build([

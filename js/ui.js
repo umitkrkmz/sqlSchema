@@ -6,7 +6,7 @@
  * URL parametreleri (paylaşılabilir bağlantılar ve belge görüntüleri için):
  *   ?lang=tr|en   ?sample=<örnek kimliği>   ?select=<tablo adı>   ?center=<tablo adı>   ?zoom=<1.6>   ?legend=0|1
  *   ?pop=naming|report|files|diff|audit|privacy   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
- *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)   ?impact=1 (select ile)
+ *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)   ?impact=1 (select ile)   ?path=A,B&pathn=2 (yol)
  *   ?diff=V3 (migration klasöründe bu sürümle karşılaştır)   ?time=V4 (zaman çizelgesi bu sürümde; ?time=1 baştan)
  *   ?privacy=1 (KVKK haritası)   ?style=pkStyle (stile göre boya)   ?audit=1 (tasarım denetimi haritada)   ?fix=1 (düzeltme önerileri penceresi)   ?std=1 (standart ve kurallar)   ?doc=1 (standart belgesi)
  *   ?review=1 (değişiklik incelemesi; diff ya da time ile)   ?alter=1 (farkı kapatan SQL taslağı; diff ya da time ile)   ?export=md|mermaid|plantuml|dbml|csv|svg
@@ -107,6 +107,7 @@ function rebuild() {
   S.parseMs = Math.round(performance.now() - t0);
   S.focus = 0;
   S.impactRes = S.impactDepth = null;
+  S.pathFrom = S.pathRes = null;
   S.history = [];
   S.histPos = -1;
   buildIndex();
@@ -1537,6 +1538,8 @@ function setHover(tb) {
 }
 
 function select(tb, opts = {}) {
+  // "Yol bul" hedef bekliyorsa seçilen tablo hedeftir
+  if (S.pathFrom && tb && tb !== S.pathFrom) { showPath(S.pathFrom, tb); return; }
   S.sel = tb;
   S.selCol = opts.col ? opts.col.toUpperCase() : null;
   if (!tb) S.focus = 0;
@@ -1651,6 +1654,22 @@ function afterLayout() {
 
 function renderPickBar(naming) {
   const el = $('#pickBar');
+  if (S.pathFrom) {
+    el.innerHTML = `<span class="pb-title">${esc(t('pathHead'))}</span><span>${esc(t('pathWait', { a: S.pathFrom.name }))}</span>
+      <button class="btn sm ghost" data-act="path-cancel">${esc(t('cancel'))}</button>`;
+    el.hidden = false;
+    return;
+  }
+  if (S.pathRes) {
+    const p = curPath();
+    const n = S.pathRes.paths.length;
+    el.innerHTML = `<span class="pb-title">${esc(t('pathHead'))}</span><b>${esc(S.pathRes.from.name)} \u{2192} ${esc(S.pathRes.to.name)}</b>
+      <span>${esc(p ? t('pathSteps', { n: p.hops.length }) : t('pathNone'))}</span>
+      ${n > 1 ? `<button class="btn sm ghost" data-act="path-prev" title="${esc(t('pathPrev'))}" aria-label="${esc(t('pathPrev'))}" ${S.pathIdx ? '' : 'disabled'}>\u{2039}</button><span class="pb-n">${S.pathIdx + 1} / ${n}</span><button class="btn sm ghost" data-act="path-next" title="${esc(t('pathNext'))}" aria-label="${esc(t('pathNext'))}" ${S.pathIdx < n - 1 ? '' : 'disabled'}>\u{203A}</button>` : ''}
+      <button class="p-close" data-act="path-cancel" title="${esc(t('pathClose'))}" aria-label="${esc(t('pathClose'))}">\u{00D7}</button>`;
+    el.hidden = false;
+    return;
+  }
   if (S.full && naming) {
     el.innerHTML = `<span class="pb-title">${esc(t('pbSub'))}</span>
       <input id="pbName" type="text" maxlength="80" spellcheck="false" value="${esc(defaultViewName())}" placeholder="${esc(t('pbNamePh'))}">
@@ -1667,6 +1686,7 @@ function renderPickBar(naming) {
     el.innerHTML = `<b>${esc(t('pbSelected', { n: S.pick.size }))}</b>
       <label class="toggle"><input type="checkbox" id="pbNeighbors" ${S.subNeighbors ? 'checked' : ''}><span>${esc(t('pbNeighbors'))}</span></label>
       <button class="btn sm" data-act="sub-open">${esc(t('pbOpen'))}</button>
+      ${S.pick.size === 2 ? `<button class="btn sm ghost" data-act="path-pick" title="${esc(t('pathTitle'))}">${esc(t('pathShow'))}</button>` : ''}
       <button class="btn sm ghost" data-act="pick-clear">${esc(t('pbClear'))}</button>`;
   }
   el.hidden = !S.full && !S.pick.size;
@@ -1680,6 +1700,10 @@ $('#pickBar').addEventListener('click', e => {
   if (b.dataset.act === 'sub-open') enterSubset([...S.pick], S.subNeighbors);
   else if (b.dataset.act === 'sub-exit') exitSubset();
   else if (b.dataset.act === 'pick-clear') { S.pick = new Set(); afterPick(); }
+  else if (b.dataset.act === 'path-cancel') clearPath();
+  else if (b.dataset.act === 'path-prev') setPathIdx(S.pathIdx - 1);
+  else if (b.dataset.act === 'path-next') setPathIdx(S.pathIdx + 1);
+  else if (b.dataset.act === 'path-pick') { const [x, y] = [...S.pick].map(k => S.byKey.get(k)); if (x && y) showPath(x, y); }
   else if (b.dataset.act === 'view-name') renderPickBar(true);
   else if (b.dataset.act === 'view-cancel') renderPickBar();
   else if (b.dataset.act === 'view-save') saveView($('#pbName').value);
@@ -2248,6 +2272,7 @@ function computeImpact() {
   S.impactDepth = S.impactRes ? new Map(S.impactRes.levels.flatMap((l, i) => l.map(x => [x.t, i + 1]))) : null;
 }
 function setImpact(on) {
+  if (on && (S.pathFrom || S.pathRes)) { S.pathFrom = S.pathRes = null; renderPickBar(); }
   S.impact = on;
   document.body.classList.toggle('has-impact', on);
   if (!on) S.selCol = null;
@@ -2291,6 +2316,85 @@ function impactMarkdown(res) {
     out.push('');
   });
   return out.join('\n');
+}
+
+/* ─── Yol vurgulama ─── */
+
+// İki tablo arasındaki ilişki zinciri (model.js pathsBetween). Paneldeki "Yol bul" başlangıcı alır, sonra seçilen
+// tablo hedef olur. Haritada yalnızca seçili yolun tabloları ve bağlantıları parlak kalır. JOIN SQL'i üretilmez.
+function startPath(from) {
+  if (S.impact) setImpact(false);
+  S.pathRes = null;
+  S.pathFrom = from;
+  renderPickBar();
+  refreshEmphasis();
+  renderPanel();
+  invalidate();
+}
+function showPath(a, b) {
+  if (S.impact) setImpact(false);
+  S.pathFrom = null;
+  S.pathRes = NS.pathsBetween(a, b, { accept: relVisible });
+  S.pathIdx = 0;
+  if (S.sel !== b) select(b);
+  afterPath(true);
+}
+function clearPath() {
+  if (!S.pathFrom && !S.pathRes) return;
+  S.pathFrom = S.pathRes = null;
+  afterPath(false);
+}
+function afterPath(fit) {
+  renderPickBar();
+  refreshEmphasis();
+  renderPanel();
+  invalidate();
+  if (fit && S.pathRes && S.pathRes.paths.length) fitTables(S.pathRes.paths[S.pathIdx].tables);
+}
+function setPathIdx(i) {
+  if (!S.pathRes || !S.pathRes.paths[i]) return;
+  S.pathIdx = i;
+  afterPath(true);
+}
+const curPath = () => S.pathRes && S.pathRes.paths[S.pathIdx];
+
+// Kamerayı tabloların hepsi görünecek biçimde ayarla (sağdaki panel ve üstteki çubuk hesaba katılır)
+function fitTables(tables) {
+  const xs = tables.map(tb => tb.x), ys = tables.map(tb => tb.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const right = !$('#panel').hidden && S.w > 820 ? 384 : 0;
+  const k = Math.max(0.05, Math.min(1.2, (S.w - right - 120) / (maxX - minX + CARD.w * 2), (S.h - 180) / (maxY - minY + CARD.w * 1.6)));
+  NS.flyTo({ x: (minX + maxX) / 2 + right / 2 / k, y: (minY + maxY) / 2, k });
+}
+
+// Bir adım: A.KOLON → B.KOLON (FK A'dan B'ye) ya da A.KOLON ← B.KOLON (B, A'ya başvuruyor)
+function hopText(h, r) {
+  const cols = (tb, cs) => cs.map(c => `${tb.name}.${c}`).join(', ');
+  if (r.kind === 'embed') return `${r.parent.name}.${r.cols[0]}${r.many ? '[]' : ''} \u{2283} ${r.child.name}`;
+  return r.child === h.a
+    ? `${cols(h.a, r.cols)} \u{2192} ${cols(h.b, r.refCols.length ? r.refCols : ['?'])}`
+    : `${cols(h.a, r.refCols.length ? r.refCols : ['?'])} \u{2190} ${cols(h.b, r.cols)}`;
+}
+const hopTag = r => r.kind === 'implicit' ? `<span class="tag t-imp">${esc(t('tagInferred'))}</span>`
+  : r.kind === 'ref' ? `<span class="tag t-ref">${esc(t('tagRef'))}</span>`
+  : r.disabled ? `<span class="tag t-off">${esc(t('tagDisabled'))}</span>` : '';
+
+function pathHtml() {
+  const res = S.pathRes;
+  const head = `<h3>${esc(t('pathHead'))} \u{00B7} ${esc(res.from.name)} \u{2192} ${esc(res.to.name)}<button class="p-x" data-act="path-close" title="${esc(t('pathClose'))}" aria-label="${esc(t('pathClose'))}">\u{00D7}</button></h3>`;
+  if (!res.paths.length) return `<section class="path">${head}<p class="imp-sum">${esc(t('pathNone'))}</p><p class="imp-hint">${esc(t('pathNoneHint'))}</p></section>`;
+  const p = curPath();
+  const via = q => q.tables.slice(1, -1).map(tb => tb.name).join(', ') || '\u{2014}';
+  const opts = res.paths.length > 1 ? `<ul class="path-opts">${res.paths.map((q, i) => `<li class="${i === S.pathIdx ? 'on' : ''}" data-path-i="${i}" tabindex="0"><b>${esc(t('pathSteps', { n: q.hops.length }))}</b><span title="${esc(via(q))}">${esc(via(q))}</span></li>`).join('')}</ul>` : '';
+  const steps = p.hops.map(h => `<li><button class="pt" data-go="${esc(h.b.key)}">${esc(h.b.name)}</button>
+    ${h.rels.map(r => `<span class="ph">${esc(hopText(h, r))}${hopTag(r)}</span>`).join('')}</li>`).join('');
+  return `<section class="path">${head}
+    <p class="imp-sum">${esc(t(res.paths.length > 1 ? 'pathSummaryMany' : 'pathSummary', { n: res.paths[0].hops.length, k: res.paths.length }))}</p>
+    ${res.inferred ? `<p class="imp-hint">${esc(t('pathInferred'))}</p>` : ''}
+    ${opts}
+    <ol class="path-steps"><li><button class="pt" data-go="${esc(res.from.key)}">${esc(res.from.name)}</button></li>${steps}</ol>
+    <p class="imp-hint">${esc(t('pathHint'))}</p>
+  </section>`;
 }
 
 /* ─── Gezinme geçmişi ─── */
@@ -2452,11 +2556,13 @@ function renderPanel() {
         <button class="btn sm ${S.focus ? '' : 'ghost'}" data-act="focus" title="${esc(t('focusTitle'))}">${esc(t('focus')[S.focus])}</button>
         <button class="btn sm ghost" data-act="zoom">${esc(t(mongo ? 'showFields' : 'showColumns'))}</button>
         <button class="btn sm ${S.impact ? '' : 'ghost'}" data-act="impact" title="${esc(t('impactTitle'))}">${esc(t('impactBtn'))}</button>
+        <button class="btn sm ${S.pathFrom === tb || S.pathRes ? '' : 'ghost'}" data-act="path" title="${esc(t('pathTitle'))}" aria-pressed="${!!(S.pathFrom === tb || S.pathRes)}">${esc(t('pathBtn'))}</button>
         <button class="btn sm ${S.pick.has(tb.key) ? '' : 'ghost'}" data-act="pick" title="${esc(t('pickTitle'))}">${esc(t(S.pick.has(tb.key) ? 'pickRemove' : 'pickAdd'))}</button>
         ${!dictCandidate(tb) ? '' : `<button class="btn sm ghost" data-act="dict" title="${esc(t('dictMarkTitle'))}">${esc(t(tb.dictionary ? 'dictUnmark' : 'dictMark'))}</button>`}
       </div>
     </div>
     <div class="p-body">
+      ${S.pathRes ? pathHtml() : ''}
       ${diffPanelHtml(tb)}
       ${timeHistoryHtml(tb)}
       ${auditPanelHtml(tb)}
@@ -2486,6 +2592,8 @@ $('#panel').addEventListener('click', e => {
   if (hist) { goHistory(Number(hist.dataset.hist)); return; }
   const step = e.target.closest('[data-step]');
   if (step) { stopPlay(); timeGo(Number(step.dataset.step)); return; }
+  const pi = e.target.closest('[data-path-i]');
+  if (pi) { setPathIdx(Number(pi.dataset.pathI)); return; }
   const act = e.target.closest('[data-act]');
   if (act) {
     const a = act.dataset.act;
@@ -2496,6 +2604,8 @@ $('#panel').addEventListener('click', e => {
     else if (a === 'dict' && S.sel) toggleDictionary(S.sel);
     else if (a === 'pick' && S.sel) togglePick(S.sel);
     else if (a === 'impact') setImpact(!S.impact);
+    else if (a === 'path') { if (S.pathFrom || S.pathRes) clearPath(); else if (S.sel) startPath(S.sel); }
+    else if (a === 'path-close') clearPath();
     else if (a === 'impact-md' && S.impactRes) downloadText(impactMarkdown(S.impactRes), fileStem() + '-' + t('impactFile') + '-' + S.impactRes.root.name + '.md', 'text/markdown;charset=utf-8');
     else if (a === 'zoom' && S.sel) {
       if (!S.columns) setColumns(true);   // düğme açıkça kolonları istiyor
@@ -2521,7 +2631,7 @@ $('#panel').addEventListener('click', e => {
   }
 });
 $('#panel').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.target.matches('li[data-go], li[data-step]')) e.target.click();
+  if (e.key === 'Enter' && e.target.matches('li[data-go], li[data-step], li[data-path-i]')) e.target.click();
 });
 
 /* ─── Arama ─── */
@@ -2688,7 +2798,8 @@ window.addEventListener('keydown', e => {
     return;
   }
   if (e.key === 'Escape') {
-    if (S.impact) setImpact(false);
+    if (S.pathFrom || S.pathRes) clearPath();
+    else if (S.impact) setImpact(false);
     else if (S.focus) { S.focus = 0; refreshEmphasis(); renderPanel(); invalidate(); }
     else if (S.sel) select(null);
     else if (S.full) exitSubset();
@@ -2956,6 +3067,18 @@ if (params.get('sample')) {
       S.cam = { x: tb.x + offset / k, y: tb.y, k };
     } else if (zoom > 0) {
       S.cam.k = zoom;
+    }
+    // ?path=A,B: iki tablo arasındaki yol (&pathn=2 ikinci seçenek)
+    const pathNames = (params.get('path') || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    if (pathNames.length === 2) {
+      const [pa, pb] = pathNames.map(n => S.model.tables.find(x => x.name.toUpperCase() === n));
+      if (pa && pb) {
+        showPath(pa, pb);
+        const pn = Number(params.get('pathn'));
+        if (pn > 1) setPathIdx(pn - 1);
+        // açılışta uçmadan doğrudan yola
+        if (S.anim) { S.cam = S.anim.to; S.anim = null; }
+      }
     }
     // ?audit=1: denetim haritada
     if (params.get('audit') === '1') setAuditMap(true);

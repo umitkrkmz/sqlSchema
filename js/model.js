@@ -765,5 +765,100 @@ function impactOf(root, opts = {}) {
   return { root, col, levels, cascade, total: depth.size - 1 };
 }
 
-Object.assign(NS, { buildModel, typeFamily, valuesFromComment, impactOf, deleteAction });
+/*
+ * Yol: iki tablo arasındaki ilişki zincirleri (yön gözetmeden), kısadan uzuna en fazla opts.max tane (Yen).
+ * JOIN yazmaz; yalnızca hangi tablolardan ve kolonlardan geçildiğini söyler. En kısa yol her zaman aranan değildir
+ * (notu yazan kullanıcı üzerinden siparişe gitmek gibi); bu yüzden farklı uzunluktaki seçenekler de döner.
+ * Önce tanımlı ilişkiler (FK, @ref, gömülü) denenir; yol yoksa tahmini ilişkiler de katılır, sonuç "tahmini" olur.
+ * Sözlük tabloları ve denetim kolonları (CREATED_BY → kullanıcı) her şeyi birbirine bağlar; sözlükten geçilmez
+ * (yalnızca uç olabilir), denetim kolonu sayılmaz.
+ *   pathsBetween(a, b, { accept, max }) → { from, to, paths: [{ tables, hops: [{ a, b, rels }] }], inferred }
+ * hops[i].rels: aynı iki tablo arasındaki bütün bağlantılar (ör. fatura ve teslimat adresi)
+ */
+function pathsBetween(a, b, opts = {}) {
+  const accept = opts.accept || (() => true);
+  const max = opts.max || 5;
+  const empty = { from: a, to: b, paths: [], inferred: false };
+  if (!a || !b || a === b) return empty;
+  const hub = r => r.cols.length === 1 && NS.isAudit && NS.isAudit(r.cols[0]);
+  const search = withImplicit => {
+    // komşuluk: tablo → Map(komşu → [ilişki]); ilişki sırası deterministik (id)
+    const adj = new Map();
+    const link = (x, y, r) => {
+      if (!adj.has(x)) adj.set(x, new Map());
+      const m = adj.get(x);
+      if (!m.has(y)) m.set(y, []);
+      m.get(y).push(r);
+    };
+    const rels = new Set();
+    for (const t of [a, b]) for (const r of t.out.concat(t.inc)) rels.add(r);
+    // bağlı bileşeni dolaşarak ilişkileri topla (modelin bütün ilişkileri yerine yalnızca ulaşılabilenler)
+    const seen = new Set([a]);
+    let fr = [a];
+    while (fr.length) {
+      const nx = [];
+      for (const t of fr) for (const r of t.out.concat(t.inc)) {
+        rels.add(r);
+        const o = r.child === t ? r.parent : r.child;
+        if (!seen.has(o)) { seen.add(o); nx.push(o); }
+      }
+      fr = nx;
+    }
+    for (const r of [...rels].sort((x, y) => x.id - y.id)) {
+      if (r.self || !accept(r) || hub(r) || (!withImplicit && r.kind === 'implicit')) continue;
+      link(r.child, r.parent, r);
+      link(r.parent, r.child, r);
+    }
+    const key = (x, y) => x.key + '\u{1}' + y.key;
+    // yasaklı düğüm ve kenarlarla en kısa yol (BFS); sözlükten geçilmez
+    const bfs = (src, bannedNodes, bannedEdges) => {
+      const prev = new Map([[src, null]]);
+      let q = [src];
+      while (q.length && !prev.has(b)) {
+        const nx = [];
+        for (const t of q) {
+          if (t !== src && t.dictionary) continue;
+          for (const o of (adj.get(t) || new Map()).keys()) {
+            if (prev.has(o) || bannedNodes.has(o) || bannedEdges.has(key(t, o))) continue;
+            prev.set(o, t);
+            nx.push(o);
+          }
+        }
+        q = nx;
+      }
+      if (!prev.has(b)) return null;
+      const out = [];
+      for (let t = b; t; t = prev.get(t)) out.unshift(t);
+      return out;
+    };
+    const first = bfs(a, new Set(), new Set());
+    if (!first) return null;
+    const found = [first];
+    const idOf = p => p.map(t => t.key).join('\u{1}');
+    const known = new Set([idOf(first)]);
+    const cand = [];
+    while (found.length < max) {
+      const last = found[found.length - 1];
+      for (let i = 0; i < last.length - 1; i++) {
+        const root = last.slice(0, i + 1);
+        const bannedEdges = new Set();
+        for (const p of found) if (p.length > i + 1 && idOf(p.slice(0, i + 1)) === idOf(root)) { bannedEdges.add(key(p[i], p[i + 1])); bannedEdges.add(key(p[i + 1], p[i])); }
+        const spur = bfs(last[i], new Set(root.slice(0, -1)), bannedEdges);
+        if (!spur) continue;
+        const p = root.slice(0, -1).concat(spur);
+        const id = idOf(p);
+        if (!known.has(id)) { known.add(id); cand.push(p); }
+      }
+      if (!cand.length) break;
+      // kısa olan önce; eşitse ad sırası (deterministik)
+      cand.sort((x, y) => x.length - y.length || (idOf(x) < idOf(y) ? -1 : 1));
+      found.push(cand.shift());
+    }
+    const paths = found.map(tables => ({ tables, hops: tables.slice(1).map((t, i) => ({ a: tables[i], b: t, rels: adj.get(tables[i]).get(t) })) }));
+    return { from: a, to: b, paths, inferred: withImplicit && paths[0].hops.some(h => h.rels.every(r => r.kind === 'implicit')) };
+  };
+  return search(false) || search(true) || empty;
+}
+
+Object.assign(NS, { buildModel, typeFamily, valuesFromComment, impactOf, deleteAction, pathsBetween });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});

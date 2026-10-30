@@ -39,6 +39,7 @@ const S = {
   implicit: true, grid: true, columns: true, dictLines: false,
   pick: new Set(), relSet: null,   // çoklu seçim (tablo anahtarları) · alt diyagramda görünen ilişkiler
   impact: false, impactRes: null, impactDepth: null,   // etki analizi kipi, sonucu, tablo → derece
+  pathFrom: null, pathRes: null, pathIdx: 0,   // yol: hedef bekleyen başlangıç, sonuç, seçili seçenek
   em: { active: null, near: null, hiRels: null, focus: null },
   anim: null, frame: 0, title: '', parseMs: 0,
 };
@@ -249,6 +250,15 @@ function refreshEmphasis() {
       em.near.add(r.child);
       em.near.add(r.parent);
     }
+  }
+  // yol açıkken yalnızca seçili yolun tabloları ve bağlantıları parlak
+  const path = S.pathRes && S.pathRes.paths[S.pathIdx];
+  if (path) {
+    em.focus = new Set(path.tables);
+    em.near = em.focus;
+    em.hiRels = new Set(path.hops.flatMap(h => h.rels));
+    S.em = em;
+    return;
   }
   // etki analizi açıkken yalnızca kök ve etkilenenler parlak, aradaki bağlantılar vurgulu
   if (S.impactRes) {
