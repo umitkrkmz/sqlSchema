@@ -382,6 +382,7 @@ Ekipte yazılı bir adlandırma standardı yoksa ilk adım, şemada fiilen ne ku
 - En çok kullanılan kalıbın payı %60'ın altındaysa "baskın" denmez; pencere **belirgin baskın kalıp yok** uyarısı gösterir. %51'e %49 gibi bir dağılım, şemada iki ayrı alışkanlık olduğunu söyler.
 - **Kapsam** seçimiyle profil tek bir şema için hesaplanır. Böylece hangi modülün hangi alışkanlıkla yazıldığı ayrılır.
 - **Tutarlılık** puanı, her boyutta baskın kalıba uyan adların ortalama oranıdır.
+- **Haritada:** her boyutun başlığındaki **haritada** düğmesi haritayı o boyuta göre boyar; her kalıp penceredeki rengini alır. Baskın kalıba uymayan bir öğesi olan tablo o kalıbın rengiyle öne çıkar. Kolon düzeyindeki boyutlarda (harf düzeni, FK, karakter) kartta ilgili kolon satırları da renklenir. Böylece hangi ekibin şemanın neresini yazdığı bir bakışta görünür. `?style=pkStyle` bu görünümü açar.
 - **Markdown indir** profili ekiple paylaşmak için bir dosyaya yazar.
 
 Araç bir kural dayatmaz: `ID` mi `<TABLO>_ID` mi doğru, buna ekip karar verir.
@@ -1076,6 +1077,7 @@ When a team has no written naming standard, the first step is to see what the sc
 - If the most used pattern has less than 60%, it is not called dominant; the window shows **no clear dominant pattern**. A 51% to 49% split means the schema has two separate habits.
 - **Scope** computes the profile for a single schema, which separates the habits of different modules.
 - The **consistency** score is the average share of names that follow the dominant pattern in each dimension.
+- **On the map:** the **on map** button in each dimension's heading colours the map by that dimension; each pattern takes its colour from the window. A table with an item outside the dominant pattern stands out in that pattern's colour. For column-level dimensions (case, FK, characters) the matching column rows on the card are tinted too. You see at a glance which team wrote which part of the schema. `?style=pkStyle` opens this view.
 - **Download Markdown** writes the profile to a file to share with the team.
 
 The tool imposes no rule: whether `ID` or `<TABLE>_ID` is right is the team's decision.

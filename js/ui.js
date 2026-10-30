@@ -8,7 +8,7 @@
  *   ?pop=naming|report|files|diff|audit|privacy   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
  *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)   ?impact=1 (select ile)
  *   ?diff=V3 (migration klasöründe bu sürümle karşılaştır)   ?time=V4 (zaman çizelgesi bu sürümde; ?time=1 baştan)
- *   ?privacy=1 (KVKK haritası)   ?audit=1 (tasarım denetimi haritada)   ?fix=1 (düzeltme önerileri penceresi)   ?std=1 (standart ve kurallar)   ?doc=1 (standart belgesi)
+ *   ?privacy=1 (KVKK haritası)   ?style=pkStyle (stile göre boya)   ?audit=1 (tasarım denetimi haritada)   ?fix=1 (düzeltme önerileri penceresi)   ?std=1 (standart ve kurallar)   ?doc=1 (standart belgesi)
  *   ?review=1 (değişiklik incelemesi; diff ya da time ile)   ?export=md|mermaid|plantuml|dbml|csv|svg
  */
 (function (NS) {
@@ -127,6 +127,7 @@ function rebuild() {
   renderTimeBar();
   refreshAudit();
   refreshPrivacy();
+  refreshStyle();
   S.pick = new Set([...S.pick].filter(k => S.byKey.has(k)));
   renderPickBar();
   return true;
@@ -405,7 +406,8 @@ function renderNaming() {
     const MAX = 60;
     const mixed = d.clear ? '' : `<p class="nn mixed">${esc(noClearNote(d, p))}</p>`;
     const outs = d.outliers.length ? `<details><summary>${esc(outliersTitle(d))}</summary><ul class="no">${d.outliers.slice(0, MAX).map(it => `<li data-go="${esc(it.t.key)}" data-col="${esc(it.c || '')}" tabindex="0">${esc(itemName(it))}</li>`).join('')}${d.outliers.length > MAX ? `<li class="more">${esc(t('namingMore', { n: d.outliers.length - MAX }))}</li>` : ''}</ul></details>` : '';
-    return `<section class="nd"><h5>${esc(t('nd_' + d.id))}</h5><div class="nbar">${bar}</div><ul class="nb">${rows}</ul>${mixed}${extra}${outs}</section>`;
+    const mapBtn = `<button class="nd-map${S.styleDim === d.id ? ' on' : ''}" data-style-dim="${d.id}" title="${esc(t('styleMapTitle'))}" aria-pressed="${S.styleDim === d.id}">${esc(t('styleMapBtn'))}</button>`;
+    return `<section class="nd"><h5>${esc(t('nd_' + d.id))}${mapBtn}</h5><div class="nbar">${bar}</div><ul class="nb">${rows}</ul>${mixed}${extra}${outs}</section>`;
   }).join('');
   el.innerHTML = `
     <h4>${esc(t('namingTitle'))}</h4>
@@ -417,12 +419,84 @@ function renderNaming() {
     <button class="btn sm ghost" data-act="std-open">${esc(t('stdBtn'))}</button></div>`;
 }
 
+/* ─── Stile göre boya ─── */
+
+// Adlandırma profilinin bir boyutuna göre harita: her kova adlandırma penceresindeki rengini alır. Tablonun rengi,
+// baskın kalıba uymayan bir öğesi varsa o kovanın rengidir (amaç kalıp dışını göstermek), yoksa baskın kalıbınki.
+// Kolon düzeyindeki boyutlarda (harf düzeni, FK, karakter) kartta ilgili kolon satırları da renklenir.
+S.styleDim = null;
+S.styleColor = null;   // tablo → renk (render.js)
+S.styleCols = null;    // tablo → Map(KOLON → renk)
+const STYLE_HEX = ['#f2b45a', '#6cc6dc', '#a58cf2', '#7fd49a', '#ef7b86', '#d8a3d0'];
+const styleHex = (d, key) => { const i = d.buckets.filter(b => !b.neutral).findIndex(b => b.key === key); return STYLE_HEX[i % STYLE_HEX.length]; };
+
+function applyStyleMap() {
+  S.styleColor = S.styleCols = null;
+  const d = S.styleDim && S.model ? currentProfile().profile.dims.find(x => x.id === S.styleDim) : null;
+  if (d && d.total) {
+    S.styleColor = new Map();
+    S.styleCols = new Map();
+    const votes = new Map();
+    for (const b of d.buckets) {
+      if (b.neutral) continue;
+      for (const it of b.items) {
+        if (it.c) { if (!S.styleCols.has(it.t)) S.styleCols.set(it.t, new Map()); S.styleCols.get(it.t).set(String(it.c).toUpperCase(), styleHex(d, b.key)); }
+        if (!votes.has(it.t)) votes.set(it.t, new Map());
+        votes.get(it.t).set(b.key, (votes.get(it.t).get(b.key) || 0) + 1);
+      }
+    }
+    for (const [tb, v] of votes) {
+      const keys = [...v.keys()];
+      const odd = keys.filter(k => k !== d.dominant).sort((a, b) => v.get(b) - v.get(a));
+      S.styleColor.set(tb, styleHex(d, odd.length ? odd[0] : keys[0]));
+    }
+  } else S.styleDim = null;
+  for (const tb of (S.model ? S.model.tables : [])) tb._rows = null;
+  renderStyleBar();
+}
+
+function setStyleDim(dim) {
+  S.styleDim = S.styleDim === dim ? null : dim;
+  if (S.styleDim) {
+    if (S.auditMap) { S.auditMap = false; applyAuditMap(); renderAudit(); }
+    if (S.privMap) { S.privMap = false; applyPrivMap(); renderPrivacy(); }
+  }
+  applyStyleMap();
+  renderNaming();
+  renderPanel();
+  invalidate();
+}
+// görüntülenen model ya da kapsam değişince kovalar yeniden sayılır
+function refreshStyle() {
+  if (S.styleDim) applyStyleMap();
+  else renderStyleBar();
+}
+
+// Haritanın üstünde küçük açıklama: boyut, kovalar ve renkleri
+function renderStyleBar() {
+  const el = $('#styleBar');
+  const d = S.styleDim && S.model ? currentProfile().profile.dims.find(x => x.id === S.styleDim) : null;
+  if (!d) { el.hidden = true; el.innerHTML = ''; return; }
+  const p = currentProfile().profile;
+  const items = d.buckets.filter(b => !b.neutral && b.n).map(b => `<span><i style="background:${styleHex(d, b.key)}"></i>${esc(bucketLabel(d, b, p.nameLimit))} <b>${b.n}</b></span>`).join('');
+  el.innerHTML = `<span class="pb-title">${esc(t('nd_' + d.id))}</span>${items}<button class="p-close" data-act="style-off" title="${esc(t('styleOff'))}" aria-label="${esc(t('styleOff'))}">×</button>`;
+  el.hidden = false;
+  el.classList.toggle('low', !$('#pickBar').hidden);
+}
+$('#styleBar').addEventListener('click', e => {
+  if (e.target.closest('[data-act="style-off"]')) { e.stopPropagation(); setStyleDim(S.styleDim); }
+});
+
 $('#namingPop').addEventListener('change', e => {
   if (e.target.id !== 'namingScope') return;
   S.namingScope = e.target.value;
+  applyStyleMap();
   renderNaming();
+  invalidate();
 });
 $('#namingPop').addEventListener('click', e => {
+  const sb = e.target.closest('[data-style-dim]');
+  if (sb) { e.stopPropagation(); setStyleDim(sb.dataset.styleDim); return; }
   const li = e.target.closest('li[data-go]');
   if (!li) return;
   const tb = S.model.tables.find(x => x.key === li.dataset.go);
@@ -513,6 +587,7 @@ function refreshAudit() {
 
 function setAuditMap(on) {
   if (on && S.privMap) { S.privMap = false; applyPrivMap(); renderPrivacy(); }
+  if (on && S.styleDim) { S.styleDim = null; applyStyleMap(); renderNaming(); }
   S.auditMap = on;
   getAudit();
   applyAuditMap();
@@ -1259,6 +1334,7 @@ function refreshPrivacy() {
 }
 function setPrivMap(on) {
   if (on && S.auditMap) { S.auditMap = false; applyAuditMap(); renderAudit(); }
+  if (on && S.styleDim) { S.styleDim = null; applyStyleMap(); renderNaming(); }
   S.privMap = on;
   getPrivacy();
   applyPrivMap();
@@ -1505,6 +1581,7 @@ function afterLayout() {
   renderPickBar();
   refreshAudit();
   refreshPrivacy();
+  refreshStyle();
   resetHud();
   fitView(true);
 }
@@ -2003,6 +2080,7 @@ function timeGo(i) {
   renderTimeBar();
   refreshAudit();
   refreshPrivacy();
+  refreshStyle();
   resetHud();
   invalidate();
 }
@@ -2716,6 +2794,7 @@ NS.onLangChange(() => {
     renderTimeBar();
     renderAudit();
     renderPrivacy();
+    renderStyleBar();
     if ($('#fixDlg').open) renderFix();
     if ($('#reviewDlg').open) renderReview();
     if ($('#stdDlg').open) renderStd();
@@ -2813,6 +2892,8 @@ if (params.get('sample')) {
     if (params.get('audit') === '1') setAuditMap(true);
     // ?privacy=1: KVKK haritası
     if (params.get('privacy') === '1') setPrivMap(true);
+    // ?style=pkStyle: haritayı adlandırma profilinin bu boyutuna göre boya
+    if (params.get('style')) setStyleDim(params.get('style'));
     const pop = { naming: '#namingPop', report: '#report', files: '#filesPop', diff: '#diffPop', audit: '#auditPop', privacy: '#privPop' }[params.get('pop')];
     if (pop) { togglePop(pop); if (pop === '#auditPop') renderAudit(); if (pop === '#privPop') renderPrivacy(); }
     // ?fix=1: düzeltme önerileri penceresi

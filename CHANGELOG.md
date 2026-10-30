@@ -5,6 +5,11 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Eklendi · Added
+
+- **Stile göre boya:** adlandırma penceresinde her boyutun **haritada** düğmesi haritayı o boyuta göre boyar; baskın kalıba uymayan öğesi olan tablo o kalıbın rengini alır, kolon düzeyindeki boyutlarda kolon satırları da renklenir; haritanın üstünde açıklama çubuğu; `?style=pkStyle`.
+  Colour by style: the **on map** button of each dimension in the naming window colours the map by that dimension; a table with an item outside the dominant pattern takes that pattern's colour, and for column-level dimensions the column rows are tinted too; a legend bar above the map; `?style=pkStyle`.
+
 ## [0.10.0] - 2026-10-30
 
 ### Eklendi · Added

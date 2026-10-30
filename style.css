@@ -733,6 +733,15 @@ body:not(.loaded) .legend, body:not(.loaded) .hud { display: none; }
 .report ul.nb li { display: grid; grid-template-columns: 8px minmax(0, auto) minmax(0, 1fr) 46px 34px; align-items: center; gap: 7px; padding: 2px 0; font-family: var(--sans); cursor: pointer; }
 .nb li:hover .ex { color: var(--text); }
 .nb .sw { width: 8px; height: 8px; border-radius: 2px; }
+.nd h5 { display: flex; align-items: center; }
+.nd-map { margin-left: auto; padding: 0 6px; border: 1px solid var(--line-2); border-radius: 4px; background: none; color: var(--dim); font: 10px var(--sans); letter-spacing: 0; text-transform: none; cursor: pointer; }
+.nd-map:hover, .nd-map.on { border-color: var(--accent); color: var(--accent); }
+.style-bar { flex-wrap: wrap; max-width: calc(100% - 24px); font-size: 12px; border-color: var(--line-2); }
+.style-bar.low { top: 58px; }
+.style-bar span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.style-bar span i { width: 9px; height: 9px; border-radius: 2px; }
+.style-bar span b { font: 500 11px var(--mono); color: var(--dim); }
+.style-bar .p-close { position: static; flex: none; }
 .nb .nl { white-space: nowrap; color: var(--text); }
 .nb .nl em { font: normal 9.5px var(--mono); color: var(--accent); margin-left: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
 .nb .nl em.weak { color: var(--dim); }
