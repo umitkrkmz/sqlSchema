@@ -636,6 +636,21 @@ SELECT DBMS_METADATA.GET_DEPENDENT_DDL('COMMENT', table_name, owner) FROM all_ta
 SPOOL OFF
 ```
 
+**Şema kodda tanımlıysa (ORM, "code first").** sqlSchema ORM kodunu okumaz (Mongoose hariç); ama her ORM şemayı SQL olarak verebilir ve sonunda veritabanı aynıdır:
+
+| Araç | SQL'i almak |
+|---|---|
+| EF Core | `dotnet ef migrations script -o sema.sql` (bütün migration'lar) ya da `dotnet ef dbcontext script -o sema.sql` (modelin bugünkü hâli) |
+| Hibernate / JPA | `jakarta.persistence.schema-generation.scripts.action=create` ve `...scripts.create-target=sema.sql` ayarları DDL dosyası yazar. Flyway kullanılıyorsa `db/migration` klasörü doğrudan açılır; Liquibase'te `liquibase update-sql` |
+| Django | Her migration için `python manage.py sqlmigrate <uygulama> <numara>`; ya da migration'ları bir test veritabanına uygulayıp yukarıdaki dökümü alın |
+| Rails | `config.active_record.schema_format = :sql` ile `bin/rails db:schema:dump` → `db/structure.sql` |
+| Prisma | `prisma/migrations` klasörü doğrudan açılır (zaman çizelgesi de çalışır); tek dosya için `prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script` |
+| Alembic | `alembic upgrade head --sql > sema.sql` (çevrimdışı kip) |
+| Diesel | `migrations` klasörü doğrudan açılır |
+| Diğerleri | Migration'ları bir test veritabanına uygulayıp yukarıdaki tablodaki gibi döküm alın |
+
+Tabloların bir kısmı ORM'den, bir kısmı DBA betiklerinden geliyorsa iki çıktıyı birlikte açın. Karşılaştırma (**karşılaştır**) ORM'in ürettiği şema ile veritabanı dökümü arasındaki farkı da gösterir.
+
 <a id="tr-dil"></a>
 
 ### Dil
@@ -1344,6 +1359,21 @@ SELECT DBMS_METADATA.GET_DEPENDENT_DDL('COMMENT', table_name, owner) FROM all_ta
      OR EXISTS (SELECT 1 FROM all_col_comments c WHERE c.owner = t.owner AND c.table_name = t.table_name AND c.comments IS NOT NULL));
 SPOOL OFF
 ```
+
+**If the schema is defined in code (ORM, "code first").** sqlSchema does not read ORM code (except Mongoose), but every ORM can give the schema as SQL, and in the end the database is the same:
+
+| Tool | Getting the SQL |
+|---|---|
+| EF Core | `dotnet ef migrations script -o schema.sql` (all migrations) or `dotnet ef dbcontext script -o schema.sql` (the model as it is today) |
+| Hibernate / JPA | The `jakarta.persistence.schema-generation.scripts.action=create` and `...scripts.create-target=schema.sql` settings write a DDL file. With Flyway, open the `db/migration` folder directly; with Liquibase, `liquibase update-sql` |
+| Django | `python manage.py sqlmigrate <app> <number>` for each migration; or apply the migrations to a test database and take a dump as above |
+| Rails | `config.active_record.schema_format = :sql`, then `bin/rails db:schema:dump` → `db/structure.sql` |
+| Prisma | Open the `prisma/migrations` folder directly (the timeline works too); for a single file, `prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script` |
+| Alembic | `alembic upgrade head --sql > schema.sql` (offline mode) |
+| Diesel | Open the `migrations` folder directly |
+| Others | Apply the migrations to a test database and take a dump as in the table above |
+
+If some tables come from the ORM and others from DBA scripts, open both outputs together. **compare** also shows the difference between the schema the ORM generates and a database dump.
 
 <a id="en-language"></a>
 

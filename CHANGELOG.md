@@ -15,6 +15,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
   Type profile: a **Data types** section in the naming window: date columns (date type, text, number), amount columns (decimal, integer, `FLOAT`, text) and the encoding of yes / no columns, with their shares; the same classification as the design audit, colouring on the map and Markdown; `?style=dateType`.
 - **Prisma ve Diesel migration klasörleri:** sürümün dosya adında değil klasör adında olduğu düzen (`20240115093000_init/migration.sql`, `2024-01-15-093000_init/up.sql`) migration olarak tanınır; zaman çizelgesi, karşılaştırma ve `--since` klasör adını sürüm adı olarak kullanır; Diesel'in `down.sql` dosyaları atlanır.
   Prisma and Diesel migration folders: layouts where the version is in the folder name rather than the file name (`20240115093000_init/migration.sql`, `2024-01-15-093000_init/up.sql`) are recognised as migrations; the timeline, comparison and `--since` use the folder name as the version name; Diesel's `down.sql` files are skipped.
+- **ORM'den SQL almak:** README'de EF Core, Hibernate / JPA, Django, Rails, Prisma, Alembic ve Diesel için şemayı SQL olarak alma rehberi.
+  Getting SQL from an ORM: a README guide to getting the schema as SQL from EF Core, Hibernate / JPA, Django, Rails, Prisma, Alembic and Diesel.
 - **Şema farkında varsayılan ve UNIQUE:** kolon varsayılanı (`DEFAULT`) ve UNIQUE kısıt farkları panelde ve Markdown raporda görünür.
   Defaults and UNIQUE in the schema diff: column default (`DEFAULT`) and UNIQUE constraint differences appear in the panel and the Markdown report.
 
