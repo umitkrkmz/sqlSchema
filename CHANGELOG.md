@@ -5,6 +5,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+## [0.12.0] - 2026-10-30
+
 ### Eklendi · Added
 
 - **EF Core model özeti:** .NET projelerinde `Migrations/*ModelSnapshot.cs` SQL'e çevirmeden okunur: şema, kolon, tip, NULL, varsayılan, açıklama, PK, UNIQUE, indeks, CHECK, FK ve silme davranışı, owned tipler, TPH / TPT / TPC kalıtım, çoka çok ara tablolar; sağlayıcı (SQL Server, PostgreSQL, Oracle, MySQL, SQLite) tahmin edilir. Proje klasörü olduğu gibi açılabilir; entity sınıfları, migration kodu, `appsettings.json`, `bin/` ve `obj/` atlanır. Panelde snapshot'tan gelen tablolara **EF Core** etiketi. Yeni örnek: **Bayi portalı (EF Core)**, DBA betikleriyle karma proje.
@@ -197,7 +199,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 - **Geliştirme araçları:** test seti, ekran görüntüsü üreticisi.
   Test suite and screenshot generator.
 
-[Yayımlanmamış · Unreleased]: ../../compare/v0.11.0...HEAD
+[Yayımlanmamış · Unreleased]: ../../compare/v0.12.0...HEAD
+[0.12.0]: ../../compare/v0.11.0...v0.12.0
 [0.11.0]: ../../compare/v0.10.0...v0.11.0
 [0.10.0]: ../../compare/v0.9.0...v0.10.0
 [0.9.0]: ../../compare/v0.8.0...v0.9.0
