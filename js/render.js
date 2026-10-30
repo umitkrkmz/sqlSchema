@@ -966,7 +966,71 @@ function flyToTable(t, k) {
   flyTo({ x: t.x + offset / kk, y: t.y, k: kk });
 }
 
+/* ─── SVG dışa aktarma ─── */
+
+// Haritanın yerleşimiyle vektörel çizim: yakın plandaki kartlar, kolon satırlarına bağlanan eğriler, karga ayağı.
+// Kolon ayrıntıları kapalıysa kartlar yalnızca başlıktır (haritadaki gibi). Sözlük bağlantıları ayarı izler.
+function exportSvg(tables) {
+  const set = new Set(tables);
+  const rels = S.model.rels.filter(r => set.has(r.child) && set.has(r.parent) && relVisible(r) && (!r.dict || S.dictLines));
+  const x = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const cut = (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + '\u{2026}' : String(s));
+  const f = n => Math.round(n * 10) / 10;
+  const font = s => s.replace(/"/g, "'");
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const t of tables) {
+    cardRows(t);
+    x0 = Math.min(x0, t.x - CARD.w / 2); x1 = Math.max(x1, t.x + CARD.w / 2);
+    y0 = Math.min(y0, t.y - t._h / 2); y1 = Math.max(y1, t.y + t._h / 2);
+  }
+  const m = 48;
+  const out = [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${f(x0 - m)} ${f(y0 - m)} ${f(x1 - x0 + 2 * m)} ${f(y1 - y0 + 2 * m)}" width="${f(x1 - x0 + 2 * m)}" height="${f(y1 - y0 + 2 * m)}">`,
+    `<rect x="${f(x0 - m)}" y="${f(y0 - m)}" width="${f(x1 - x0 + 2 * m)}" height="${f(y1 - y0 + 2 * m)}" fill="${C.bg}"/>`];
+  // karga ayağı: drawEnd ile aynı geometri, yol ve daire olarak
+  const end = (px, py, ux, kind, s) => {
+    const nx = 0, ny = ux, parts = [];
+    const bar = d => parts.push(`M${f(px + ux * d + nx * s * 0.6)} ${f(py + ny * s * 0.6)}L${f(px + ux * d - nx * s * 0.6)} ${f(py - ny * s * 0.6)}`);
+    const many = kind === 'zeroMany' || kind === 'oneMany';
+    if (many) {
+      const tx = px + ux * s * 1.15;
+      parts.push(`M${f(px)} ${f(py + ny * s * 0.7)}L${f(tx)} ${f(py)}L${f(px)} ${f(py - ny * s * 0.7)}M${f(px)} ${f(py)}L${f(tx)} ${f(py)}`);
+    } else bar(s * 0.55);
+    if (kind === 'one') bar(s * 1.05);
+    let svg = `<path d="${parts.join('')}" fill="none"/>`;
+    if (kind === 'zeroOne' || kind === 'zeroMany') svg += `<circle cx="${f(px + ux * (many ? s * 1.75 : s * 1.4))}" cy="${f(py)}" r="${f(s * 0.4)}" fill="${C.bg}"/>`;
+    return svg;
+  };
+  out.push(`<g fill="none" stroke="rgb(${C.edge})" stroke-opacity="0.6" stroke-width="1.1">`);
+  for (const r of rels) {
+    const g = cardGeom(r);
+    const c = Math.max(42, Math.abs(g.x2 - g.x1) * 0.45);
+    const dash = DASH[relStyle(r)].length ? ` stroke-dasharray="${DASH[relStyle(r)].join(' ')}"` : '';
+    out.push(`<path d="M${f(g.x1)} ${f(g.y1)}C${f(g.x1 + g.d1 * c)} ${f(g.y1)} ${f(g.x2 + g.d2 * c)} ${f(g.y2)} ${f(g.x2)} ${f(g.y2)}"${dash}/>`);
+    out.push(`<g stroke-opacity="0.9">${end(g.x1, g.y1, g.d1, r.childEnd, 6)}${end(g.x2, g.y2, g.d2, r.parentEnd, 6)}</g>`);
+  }
+  out.push('</g>');
+  for (const t of tables) {
+    const col = schemaColor(t), top = t.y - t._h / 2, left = t.x - CARD.w / 2;
+    out.push(`<g>`,
+      `<rect x="${f(left)}" y="${f(top)}" width="${CARD.w}" height="${f(t._h)}" rx="6" fill="${C.card}" stroke="${col}" stroke-opacity="0.55"/>`,
+      `<circle cx="${f(left + 9)}" cy="${f(top + CARD.head / 2)}" r="3" fill="${col}"/>`,
+      `<text x="${f(left + 17)}" y="${f(top + CARD.head / 2 + 4)}" font-family="${font(FONT_SANS)}" font-size="11" font-weight="600" fill="${C.text}">${x(cut(t.name, 24))}</text>`);
+    t._rows.forEach((c, i) => {
+      const y = top + CARD.head + i * CARD.row + CARD.row / 2 + 3;
+      const tag = keyTag(t, c);
+      if (tag) out.push(`<text x="${f(left + 6)}" y="${f(y)}" font-family="${font(FONT_MONO)}" font-size="7" fill="${c.pk ? '#f2b45a' : '#6cc6dc'}">${tag}</text>`);
+      out.push(`<text x="${f(left + 22)}" y="${f(y)}" font-family="${font(FONT_SANS)}" font-size="8.5" fill="${C.text}">${x(cut(c.name, 22))}</text>`);
+      if (c.type) out.push(`<text x="${f(left + CARD.w - 6)}" y="${f(y)}" text-anchor="end" font-family="${font(FONT_MONO)}" font-size="7" fill="${C.dim}">${x(cut(String(c.type).toLowerCase(), 14))}</text>`);
+    });
+    if (t._more > 0) out.push(`<text x="${f(left + 22)}" y="${f(top + CARD.head + t._rows.length * CARD.row + CARD.row / 2 + 3)}" font-family="${font(FONT_SANS)}" font-size="8" fill="${C.dim}">${x(tr('moreCols', { n: t._more }))}</text>`);
+    out.push('</g>');
+  }
+  out.push('</svg>');
+  return out.join('\n') + '\n';
+}
+
 Object.assign(NS, {
+  exportSvg,
   S, $, canvas, C, CARD, PALETTE, DASH, schemaLabel, groupLabel,
   levelOf, wx, wy, starR, cardRows, keyTag, schemaColor, relStyle, relVisible, clamp,
   drawGlyph, refreshEmphasis, invalidate, draw, resetHud,

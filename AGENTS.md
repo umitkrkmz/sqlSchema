@@ -32,6 +32,7 @@ Betikler `index.html`'de şu sırayla yüklenir ve her biri `globalThis.sqlSchem
 | `js/model.js` | işlemleri dosya sırasıyla uygular; FK çözümleme, kardinalite, ara tablo, tahmini ilişki | yok |
 | `js/diff.js` | iki modelin farkı (tablo, kolon, PK, FK), ad değişikliği tahmini; zaman çizelgesi (sürüm adımları, tablo soyu, geçmiş) | yok |
 | `js/fixes.js` | bulgu başına lehçeye uygun düzeltme SQL'i, risk düzeyi; notlar kod (`FIX_NOTES`), metinleri `fixNotes` | yok |
+| `js/export.js` | dışa aktarma: Markdown veri sözlüğü, Mermaid, PlantUML, DBML, CSV (başlıklar için çeviri işlevi dışarıdan); SVG `render.js`'te | yok |
 | `js/layout.js` | veritabanı → şema → takımyıldız (dosyaya ya da ada göre) → yıldız, deterministik kuvvet yerleşimi | yok |
 | `js/conventions.js` | adlandırma profili: boyutlar, kovalar, oranlar, baskın kalıba uymayanlar; profilden standart önerisi (`proposeStandard`) (kod döndürür, metin değil) | yok |
 | `js/audit.js` | tasarım denetimi: kurallar (`AUDIT_RULES`), bulgular kod olarak; metinleri `i18n.js`'teki `auditRules`. Bulgu anahtarı (`findingKey`), borç kaydı, değişiklik incelemesi (`reviewChange`); `opts.standard` ve `opts.severity` ile ekibin standardı ve kural önemleri | yok |
@@ -48,7 +49,7 @@ Bunları bozan bir değişiklik yapmayın; gerekirse önce bir issue açın.
 
 1. **Bağımlılık ve derleme yok.** npm paketi, paketleyici, TypeScript derlemesi ya da CDN betiği eklenmez. Yalnızca Google Fonts bağlantısı vardır ve olmadan da çalışır.
 2. **Klasik betikler, ES modülü değil.** `type="module"` ve `import` kullanılmaz; sayfa `file://` ile açıldığında da çalışmalıdır. Her dosya `(function (NS) { ... })(globalThis.sqlSchema = globalThis.sqlSchema || {})` kalıbını izler ve dışa açtıklarını `Object.assign(NS, {...})` ile verir.
-3. **Çekirdek DOM'a dokunmaz.** `lexer`, `sql-parser`, `mongo`, `files`, `model`, `diff`, `layout`, `conventions`, `audit`, `fixes` Node'da `require` edilebilmelidir; testler buna dayanır.
+3. **Çekirdek DOM'a dokunmaz.** `lexer`, `sql-parser`, `mongo`, `files`, `model`, `diff`, `layout`, `conventions`, `audit`, `fixes`, `export` Node'da `require` edilebilmelidir; testler buna dayanır.
 4. **Yerleşim deterministiktir.** `Math.random` yoktur; aynı girdi her zaman aynı haritayı verir.
 5. **Kart boyutu ile yerleşim yarıçapı bağlıdır.** `render.js`'teki `CARD` (164 × en fazla 127) ile `layout.js`'teki `L.nodeR` (105) birlikte değişir; testler kart çakışmasını denetler.
 6. **Her arayüz metni iki dilde.** Kullanıcıya görünen her metin `js/i18n.js`'te hem `tr` hem `en` sözlüğünde bulunur ve `t('anahtar')` ile kullanılır. HTML'de `data-i18n`, `data-i18n-html`, `data-i18n-attr` kullanılır. Testler eksik anahtarı yakalar. Çekirdek modüller metin değil kod döndürür (ör. `skip: 'config'`, `warnings: [{ kind: 'dup', ... }]`); çeviri arayüzde yapılır.

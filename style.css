@@ -803,7 +803,15 @@ body:not(.loaded) .legend, body:not(.loaded) .hud { display: none; }
   resize: vertical;
 }
 .paste .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
-#fixBody, #reviewBody, #stdBody, #docBody { padding: 18px; }
+#fixBody, #reviewBody, #stdBody, #docBody, #exportBody { padding: 18px; }
+#exportPre { height: 38vh; }
+.ex-grid { display: grid; grid-template-columns: 1fr 260px; gap: 16px; margin: 0 0 10px; }
+.ex-formats { margin: 0; padding: 0; border: 0; display: grid; gap: 4px; }
+.ex-formats legend, .ex-side .std-row span { font: 600 10.5px var(--cond); letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); margin-bottom: 4px; }
+.ex-formats label { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; align-items: baseline; cursor: pointer; font-size: 12.5px; }
+.ex-formats small { grid-column: 2; color: var(--faint); font-size: 11px; }
+.ex-side .std-row { grid-template-columns: 1fr; }
+@media (max-width: 720px) { .ex-grid { grid-template-columns: 1fr; } }
 .std-dlg { width: min(720px, calc(100% - 32px)); }
 .std-grid { max-height: 58vh; overflow: auto; padding-right: 6px; }
 .std-grid h5 { margin: 12px 0 6px; font: 600 10.5px var(--cond); letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }

@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'files', 'model', 'diff', 'layout', 'conventions', 'audit', 'fixes', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
+for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'files', 'model', 'diff', 'layout', 'conventions', 'audit', 'fixes', 'export', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
 require(path.join(ROOT, 'samples', 'catalog.js'));
 const NS = globalThis.sqlSchema;
 
@@ -342,6 +342,36 @@ const EXPECT = {
   },
   // Düzeltme SQL'i: üretilen betik dosyalara yeni bir sürüm olarak eklenip yeniden denetlenince düzeltilen bulgular
   // kaybolur, yeni bulgu çıkmaz ve ayrıştırma hatası olmaz
+  // Dışa aktarma: biçimlerin söz dizimi kuralları ve kapsam (ilişki yalnızca iki ucu kümedeyse)
+  exports(all) {
+    const tr = (k, v) => { const x = NS.i18nRaw('tr', k); return typeof x === 'function' ? x(v || {}) : x; };
+    const m = all.kucuk.model;
+    const tables = m.tables.filter(t => !t.external), set = new Set(tables);
+    const rels = m.rels.filter(r => set.has(r.child) && set.has(r.parent));
+    const mm = NS.exportSchema(m, 'mermaid', {}).split('\n');
+    const entities = mm.filter(l => /^ {2}\S+ \{$/.test(l)).map(l => l.trim().slice(0, -2));
+    const relLines = mm.filter(l => /^ {2}\S+ (\|\||\|o|\}o)(--|\.\.)(o\||o\{) \S+ : ".*"$/.test(l));
+    const attrs = mm.filter(l => /^ {4}\S/.test(l));
+    check('dışa aktarma Mermaid: varlıklar, ilişkiler, öznitelik söz dizimi', mm[0] === 'erDiagram' && entities.length === tables.length && new Set(entities).size === entities.length && entities.every(e => /^[A-Za-z_][A-Za-z0-9_]*$/.test(e)) && relLines.length === rels.length && attrs.every(l => /^ {4}[A-Za-z][A-Za-z0-9_()[\]-]* [A-Za-z_][A-Za-z0-9_()[\]-]*( (PK|FK|UK)(, (PK|FK|UK))*)?( "[^"]*")?$/.test(l)), [entities.length, relLines.length, rels.length, attrs.find(l => !/^ {4}[A-Za-z]/.test(l))]);
+    check('dışa aktarma Mermaid: tanımlayıcı ilişki düz, öbürü kesik çizgi', mm.includes('  BILLING_INVOICE ||--o{ BILLING_INVOICE_LINE : "INVOICE_ID"') && mm.some(l => l.includes('BILLING_BILL_CYCLE |o..o{ BILLING_INVOICE')));
+    const pu = NS.exportSchema(m, 'plantuml', {}).split('\n');
+    check('dışa aktarma PlantUML', pu[0] === '@startuml' && pu.includes('@enduml') && pu.filter(l => l.startsWith('entity ')).length === tables.length && pu.filter(l => / (\|\||\|o|\}o)(--|\.\.)(o\||o\{) /.test(l)).length === rels.length);
+    const db = NS.exportSchema(m, 'dbml', {}).split('\n');
+    const fks = rels.filter(r => r.kind === 'fk' && r.refCols.length);
+    check('dışa aktarma DBML: tablo ve Ref sayısı', db.filter(l => l.startsWith('Table ')).length === tables.length && db.filter(l => l.startsWith('Ref: ')).length === fks.length && db.some(l => l === 'Ref: BILLING.INVOICE_LINE.INVOICE_ID > BILLING.INVOICE.INVOICE_ID'), db.filter(l => l.startsWith('Ref: ')).length);
+    const md = NS.exportSchema(m, 'md', { tr, title: 'T', date: 'D' });
+    check('dışa aktarma Markdown: içindekiler bağlantıları başlıklara gider', tables.every(t => md.includes(`](#${(t.schema + '.' + t.name).toLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu, '')})`) && md.includes(`\n## ${t.schema}.${t.name}\n`)) && md.startsWith('# T · veri sözlüğü'));
+    const csv = NS.exportSchema(m, 'csv', { tr, sep: ';' }).split('\r\n').filter(Boolean);
+    check('dışa aktarma CSV: başlık ve her kolon bir satır', csv[0] === 'Şema;Tablo;Kolon;Tip;Boş olabilir;PK;Bağlı olduğu;Açıklama;Değerler' && csv.length === 1 + tables.reduce((n, t) => n + t.columns.length, 0), csv.length);
+    // kapsam: tek şema; ilişkinin öbür ucu dışarıdaysa yazılmaz
+    const billing = tables.filter(t => t.schema === 'BILLING');
+    const sub = NS.exportSchema(m, 'mermaid', { tables: billing });
+    check('dışa aktarma: kapsam dışındaki tabloya ilişki yazılmaz', !sub.includes('CRM_') && sub.includes('BILLING_INVOICE ||--o{ BILLING_INVOICE_LINE'));
+    // @ref tanımlı FK değildir: anahtar sütununda FK yazmaz, DBML'de yorum olur
+    const sm = NS.exportSchema(all.sozluk.model, 'md', { tr, title: '', date: '' });
+    const sd = NS.exportSchema(all.sozluk.model, 'dbml', {});
+    check('dışa aktarma: @ref FK sayılmaz', sm.includes('| `TIP_ID` | NUMBER(10,0) | hayır |  |') && sd.includes('// @ref CRM.ABONE.DURUM_ID > ORTAK.SOZLUK.ID TIP_ID = 1'), sm.split('\n').find(l => l.startsWith('| `TIP_ID`')));
+  },
   fixesRoundTrip(all) {
     const round = (id, extra) => {
       const s = NS.SAMPLES.find(x => x.id === id);
@@ -422,7 +452,7 @@ for (const s of NS.SAMPLES) {
   const before = failed;
   common(s, res);
   if (EXPECT[s.id]) EXPECT[s.id](res, all, s);
-  if (s.id === NS.SAMPLES[NS.SAMPLES.length - 1].id) EXPECT.fixesRoundTrip(all);
+  if (s.id === NS.SAMPLES[NS.SAMPLES.length - 1].id) { EXPECT.fixesRoundTrip(all); EXPECT.exports(all); }
   const st = res.model.stats;
   console.log(`${failed === before ? '✓' : '✗'} ${s.id.padEnd(18)} ${String(st.tables).padStart(4)} tablo ${String(st.fk).padStart(4)} FK ${String(st.implicit).padStart(4)} tahmini ${String(st.embedded).padStart(3)} uydu  ${st.dialects.join('+').padEnd(26)} ${Date.now() - t0} ms`);
 }

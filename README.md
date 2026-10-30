@@ -40,12 +40,13 @@ draw.io kadar elle uğraştırmaz, veri modelleme aracı kadar ağır değildir.
 6. [MongoDB](#tr-mongodb)
 7. [Adlandırma profili](#tr-adlandirma)
 8. [Tasarım denetimi](#tr-denetim)
-9. [Örnekler](#tr-ornekler)
-10. [Şemayı dışa aktarmak](#tr-disa-aktarma)
-11. [Dil](#tr-dil)
-12. [Proje yapısı ve geliştirme](#tr-gelistirme)
-13. [Sınırlar](#tr-sinirlar)
-14. [Katkı, güvenlik, lisans](#tr-katki)
+9. [Belge ve diyagram olarak dışa aktarmak](#tr-belge)
+10. [Örnekler](#tr-ornekler)
+11. [Şemayı dışa aktarmak](#tr-disa-aktarma)
+12. [Dil](#tr-dil)
+13. [Proje yapısı ve geliştirme](#tr-gelistirme)
+14. [Sınırlar](#tr-sinirlar)
+15. [Katkı, güvenlik, lisans](#tr-katki)
 
 <a id="tr-one-cikanlar"></a>
 
@@ -519,6 +520,26 @@ jobs:
 
 **Hatalı tasarım (DBA incelemesi)** örneği bu özellik için hazırlanmıştır: düzgün bir başlangıç şemasına üç geliştiricinin özensiz eklediği migration'lar. Her kural en az bir kez tetiklenir.
 
+<a id="tr-belge"></a>
+
+### Belge ve diyagram olarak dışa aktarmak
+
+Araç çubuğundaki **Dışa aktar** şemayı bir belge ya da başka bir aracın biçiminde verir. Dosyalar tarayıcıda üretilir; şema hiçbir yere gönderilmez.
+
+| Biçim | İçerik | Kullanım |
+|---|---|---|
+| Markdown veri sözlüğü | İçindekiler; tablo başına açıklama, kolon tablosu (tip, boşluk, anahtar, açıklama, kod değerleri) ve ilişkiler (zorunlu / isteğe bağlı, `@ref` koşulu, tahmini) | Wiki, Git, Confluence |
+| Mermaid `erDiagram` | Karga ayağı birebir; tanımlayıcı ilişki düz, öbürü kesik çizgi | GitHub / GitLab Markdown'ında doğrudan çizilir |
+| PlantUML | IE notasyonu; PK kolonları çizginin üstünde, `*` zorunlu | Kurumsal belge araçları |
+| DBML | Tablolar, notlar, bileşik PK; tanımlı FK'ler `Ref`, `@ref` ve tahmini ilişkiler yorum | dbdiagram.io |
+| CSV | Şema, tablo, kolon, tip, boşluk, PK, bağlantı, açıklama, değerler | Excel (Türkçe'de `;` ayırıcı, UTF-8) |
+| SVG | Haritanın yerleşimiyle kartlar, kolon satırlarına bağlanan çizgiler, karga ayağı | Sunum, baskı, poster |
+
+- **Kapsam:** bütün şema, tek bir şema, alt diyagram ya da seçili tablolar. İlişki yalnızca iki ucu kapsamdaysa yazılır.
+- Önizleme uzun çıktıları kısaltır; kopyalanan ve indirilen metin tamdır. `?export=mermaid` pencereyi o biçimle açar.
+
+<img src="docs/images/tr/disa-aktarma.png" alt="Dışa aktarma: biçim ve kapsam seçimi, Mermaid önizlemesi" width="900">
+
 <a id="tr-ornekler"></a>
 
 ### Örnekler
@@ -607,6 +628,7 @@ js/                 tarayıcıda bu sırayla yüklenir; hepsi globalThis.sqlSche
   conventions.js    adlandırma profili: kalıplar, oranlar, baskın kalıba uymayanlar
   audit.js          tasarım denetimi: kurallar, bulgular (kod döner, metin arayüzde)
   fixes.js          düzeltme önerileri: lehçeye uygun SQL, risk düzeyi
+  export.js         dışa aktarma: Markdown veri sözlüğü, Mermaid, PlantUML, DBML, CSV
   sample-small.js   gömülü küçük örnek
   render.js         canvas çizimi, kamera, karga ayağı
   ui.js             yükleme, dosya listesi, arama, panel, rapor, URL parametreleri
@@ -682,12 +704,13 @@ It is less manual than draw.io and lighter than a data-modelling tool. The goal 
 6. [MongoDB](#en-mongodb)
 7. [Naming profile](#en-naming)
 8. [Design audit](#en-audit)
-9. [Samples](#en-samples)
-10. [Exporting a schema](#en-export)
-11. [Language](#en-language)
-12. [Project layout and development](#en-development)
-13. [Limitations](#en-limitations)
-14. [Contributing, security, license](#en-contributing)
+9. [Exporting documents and diagrams](#en-docs)
+10. [Samples](#en-samples)
+11. [Exporting a schema](#en-export)
+12. [Language](#en-language)
+13. [Project layout and development](#en-development)
+14. [Limitations](#en-limitations)
+15. [Contributing, security, license](#en-contributing)
 
 <a id="en-highlights"></a>
 
@@ -1163,6 +1186,26 @@ jobs:
 
 The **Flawed design (DBA review)** sample was made for this feature: migrations three developers carelessly added to a clean baseline. Every rule fires at least once.
 
+<a id="en-docs"></a>
+
+### Exporting documents and diagrams
+
+**Export** in the toolbar gives the schema as a document or in another tool's format. Files are generated in the browser; the schema is not sent anywhere.
+
+| Format | Content | Use |
+|---|---|---|
+| Markdown data dictionary | Contents; per table a comment, a column table (type, nullability, key, comment, code values) and relationships (mandatory / optional, `@ref` condition, inferred) | Wiki, Git, Confluence |
+| Mermaid `erDiagram` | Crow's foot as is; identifying relationships solid, others dashed | Rendered directly in GitHub / GitLab Markdown |
+| PlantUML | IE notation; PK columns above the line, `*` mandatory | Corporate documentation tools |
+| DBML | Tables, notes, composite PKs; declared FKs as `Ref`, `@ref` and inferred relationships as comments | dbdiagram.io |
+| CSV | Schema, table, column, type, nullability, PK, reference, comment, values | Excel (`;` separator in Turkish, UTF-8) |
+| SVG | Cards with the map's layout, lines attached to column rows, crow's foot | Slides, print, posters |
+
+- **Scope:** the whole schema, a single schema, the sub-diagram or the picked tables. A relationship is written only when both ends are in scope.
+- The preview shortens long output; the copied and downloaded text is complete. `?export=mermaid` opens the window with that format.
+
+<img src="docs/images/en/disa-aktarma.png" alt="Export: format and scope selection, Mermaid preview" width="900">
+
 <a id="en-samples"></a>
 
 ### Samples
@@ -1251,6 +1294,7 @@ js/                 loaded in this order; each file adds to the globalThis.sqlSc
   conventions.js    naming profile: patterns, shares, names that depart from the dominant pattern
   audit.js          design audit: rules and findings (returns codes; text lives in the UI)
   fixes.js          fix suggestions: dialect-specific SQL, risk level
+  export.js         export: Markdown data dictionary, Mermaid, PlantUML, DBML, CSV
   sample-small.js   embedded small sample
   render.js         canvas drawing, camera, crow's feet
   ui.js             loading, file list, search, panel, report, URL parameters

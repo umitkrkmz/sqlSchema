@@ -9,7 +9,7 @@
  *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)   ?impact=1 (select ile)
  *   ?diff=V3 (migration klasöründe bu sürümle karşılaştır)   ?time=V4 (zaman çizelgesi bu sürümde; ?time=1 baştan)
  *   ?audit=1 (tasarım denetimi haritada)   ?fix=1 (düzeltme önerileri penceresi)   ?std=1 (standart ve kurallar)   ?doc=1 (standart belgesi)
- *   ?review=1 (değişiklik incelemesi; diff ya da time ile)
+ *   ?review=1 (değişiklik incelemesi; diff ya da time ile)   ?export=md|mermaid|plantuml|dbml|csv|svg
  */
 (function (NS) {
 'use strict';
@@ -1126,6 +1126,96 @@ function reviewBoxHtml() {
     <p class="au-chips">${sevCounts(r.counts) || `<span class="nn">${esc(t('reviewNone'))}</span>`}${r.fixed.length ? `<i class="paid">${esc(t('reviewFixedN', { n: r.fixed.length }))}</i>` : ''}</p>
     <div class="df-row"><button class="btn sm ghost" data-act="review-open">${esc(t('reviewBtn'))}</button></div></div>`;
 }
+
+/* ─── Dışa aktarma ─── */
+
+// Şema belge ya da başka bir aracın biçiminde: metin biçimleri export.js'te, SVG render.js'te (haritanın yerleşimiyle).
+// Kapsam: bütün şema, alt diyagram, seçili tablolar ya da tek bir şema. Önizleme kısaltılır, dosya tamdır.
+S.exportOpts = { format: 'md', scope: 'all' };
+S.exportText = '';
+const EXPORT_IDS = NS.EXPORT_FORMATS.map(x => x.id).concat('svg');
+const PREVIEW_LINES = 400;
+
+function exportTables(scope) {
+  const full = S.full ? S.full.model : S.model;
+  const live = tb => !tb.external && (!S.diffRes || S.diffRes.byAfter.has(tb));
+  if (scope === 'sub' && S.full) return S.model.tables.filter(live);
+  if (scope === 'pick') return full.tables.filter(tb => S.pick.has(tb.key) && live(tb));
+  if (scope.startsWith('schema:')) { const s = S.lay.schemas.find(x => 'schema:' + schemaKey(x) === scope); if (s) return s.tables.filter(live); }
+  // alt diyagramdayken haritadaki konumlar alt diyagramındır; SVG yalnızca onu çizebilir
+  return (S.full && S.exportOpts.format === 'svg' ? S.model : full).tables.filter(live);
+}
+
+function exportText() {
+  const o = S.exportOpts, tables = exportTables(o.scope);
+  if (o.format === 'svg') return NS.exportSvg(tables);
+  return NS.exportSchema(S.full ? S.full.model : S.model, o.format, {
+    tables, tr: t, title: S.title || '', date: new Date().toISOString().slice(0, 10), sep: NS.getLang() === 'tr' ? ';' : ',',
+  });
+}
+
+function openExport(format) {
+  if (!S.model) return;
+  if (format && EXPORT_IDS.includes(format)) S.exportOpts.format = format;
+  renderExport();
+  const d = $('#exportDlg');
+  if (!d.open) d.showModal();
+}
+
+function renderExport() {
+  const o = S.exportOpts;
+  const scopes = [['all', t('exScopeAll')]];
+  if (S.full) scopes.push(['sub', t('exScopeSub')]);
+  if (S.pick.size) scopes.push(['pick', t('exScopePick', { n: S.pick.size })]);
+  if (S.lay.schemas.length > 1) for (const s of S.lay.schemas.filter(x => x.tables.some(tb => !tb.external))) scopes.push(['schema:' + schemaKey(s), t('exScopeSchema', { name: (S.lay.dbs.length > 1 ? s.db.label + ' / ' : '') + schemaLabel(s) })]);
+  if (!scopes.some(([v]) => v === o.scope)) o.scope = 'all';
+  const tables = exportTables(o.scope), set = new Set(tables);
+  const rels = (S.full ? S.full.model : S.model).rels.filter(r => set.has(r.child) && set.has(r.parent)).length;
+  S.exportText = tables.length ? exportText() : '';
+  const lines = S.exportText.split('\n');
+  const preview = lines.length > PREVIEW_LINES ? lines.slice(0, PREVIEW_LINES).join('\n') + '\n\n' + t('exPreviewCut', { n: PREVIEW_LINES }) : S.exportText;
+  $('#exportBody').innerHTML = `<h3>${esc(t('exTitle'))}</h3>
+    <p>${esc(t('exIntro'))}</p>
+    <div class="ex-grid">
+      <fieldset class="ex-formats"><legend>${esc(t('exFormat'))}</legend>
+        ${EXPORT_IDS.map(id => `<label title="${esc(t('exHints')[id])}"><input type="radio" name="exFormat" value="${id}" ${o.format === id ? 'checked' : ''}> <span>${esc(t('exFormats')[id])}</span><small>${esc(t('exHints')[id])}</small></label>`).join('')}
+      </fieldset>
+      <div class="ex-side">
+        <label class="std-row"><span>${esc(t('exScope'))}</span><select id="exScope">${scopes.map(([v, l]) => `<option value="${esc(v)}" ${o.scope === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
+        <p class="fx-note">${esc(t('exCount', { tables: tables.length, rels }))}</p>
+      </div>
+    </div>
+    <pre id="exportPre" tabindex="0">${esc(preview)}</pre>
+    <div class="row">
+      <button class="btn ghost" data-ex-act="copy" ${tables.length ? '' : 'disabled'}>${esc(t('fixCopy'))}</button>
+      <button class="btn" data-ex-act="download" ${tables.length ? '' : 'disabled'}>${esc(t('exDownload'))}</button>
+      <button class="btn ghost" data-ex-act="close">${esc(t('fixClose'))}</button>
+    </div>`;
+}
+
+$('#exportDlg').addEventListener('change', e => {
+  if (e.target.name === 'exFormat') S.exportOpts.format = e.target.value;
+  else if (e.target.id === 'exScope') S.exportOpts.scope = e.target.value;
+  else return;
+  renderExport();
+});
+$('#exportDlg').addEventListener('click', e => {
+  const b = e.target.closest('[data-ex-act]');
+  if (!b) return;
+  const act = b.dataset.exAct, o = S.exportOpts;
+  if (act === 'close') $('#exportDlg').close();
+  else if (act === 'copy') {
+    // önizleme kısaltılmış olabilir: panoya her zaman tam metin
+    const text = S.exportText;
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => toast(t('fixCopied'), 2500), () => copyPre($('#exportPre')));
+    else copyPre($('#exportPre'));
+  } else if (act === 'download') {
+    const f = NS.EXPORT_FORMATS.find(x => x.id === o.format) || { ext: 'svg', mime: 'image/svg+xml' };
+    // Excel UTF-8'i ancak BOM ile tanır; Türkçe Excel ayırıcı olarak ; bekler (exportText bunu seçer)
+    const text = o.format === 'csv' ? '\u{FEFF}' + S.exportText : S.exportText;
+    downloadText(text, fileStem() + '.' + f.ext, f.mime + ';charset=utf-8');
+  }
+});
 
 function downloadText(text, name, type) {
   const a = document.createElement('a');
@@ -2357,6 +2447,7 @@ document.addEventListener('click', e => {
     case 'sample-first': loadSample((NS.SAMPLES || [])[0].id); break;
     case 'fit': fitView(true); break;
     case 'png': exportPng(); break;
+    case 'export': openExport(); break;
     case 'report': togglePop('#report'); break;
     case 'files': togglePop('#filesPop'); break;
     case 'naming': togglePop('#namingPop'); break;
@@ -2487,6 +2578,7 @@ NS.onLangChange(() => {
     if ($('#reviewDlg').open) renderReview();
     if ($('#stdDlg').open) renderStd();
     if ($('#docDlg').open) openDoc();
+    if ($('#exportDlg').open) renderExport();
     resetHud();
   }
   if (S.title && S.files.length > 1 && /^\d+ /.test(S.title)) $('#fileName').textContent = t('nFiles', { n: S.files.filter(f => f.text != null).length });
@@ -2585,6 +2677,8 @@ if (params.get('sample')) {
     if (params.get('std') === '1') openStd();
     // ?doc=1: yazılı standart belgesi
     if (params.get('doc') === '1') openDoc();
+    // ?export=md|mermaid|plantuml|dbml|csv|svg: dışa aktarma penceresi bu biçimle
+    if (params.get('export')) openExport(params.get('export'));
     // ?review=1: karşılaştırma ya da zaman çizelgesiyle birlikte değişiklik incelemesi
     if (params.get('review') === '1' && getReview()) openReview();
     invalidate();

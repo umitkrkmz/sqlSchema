@@ -5,6 +5,11 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Eklendi · Added
+
+- **Dışa aktarma:** Markdown veri sözlüğü, Mermaid `erDiagram`, PlantUML (IE), DBML, CSV (Excel) ve haritanın yerleşimiyle SVG. Kapsam: bütün şema, tek şema, alt diyagram ya da seçili tablolar; kopyalama ve indirme; `?export=mermaid`.
+  Export: a Markdown data dictionary, Mermaid `erDiagram`, PlantUML (IE), DBML, CSV (Excel) and an SVG with the map's layout. Scope: the whole schema, a single schema, the sub-diagram or the picked tables; copy and download; `?export=mermaid`.
+
 ## [0.9.0] - 2026-10-29
 
 ### Eklendi · Added

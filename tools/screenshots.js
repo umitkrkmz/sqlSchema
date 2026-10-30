@@ -31,6 +31,7 @@ const SCENES = {
   'tasarim-denetimi': 'sample=hatali&audit=1&select=KAMPANYA&zoom=1.1&legend=0',
   'duzeltme-onerileri': 'sample=hatali&fix=1&legend=0',
   'standart-ve-kurallar': 'sample=karisik&std=1&legend=0',
+  'disa-aktarma': 'sample=kucuk&export=mermaid&legend=0',
   'inceleme-raporu': 'sample=hatali&diff=V1&review=1&legend=0',
 };
 
