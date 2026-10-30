@@ -5,6 +5,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+## [0.11.0] - 2026-10-30
+
 ### Eklendi · Added
 
 - **Stile göre boya:** adlandırma penceresinde her boyutun **haritada** düğmesi haritayı o boyuta göre boyar; baskın kalıba uymayan öğesi olan tablo o kalıbın rengini alır, kolon düzeyindeki boyutlarda kolon satırları da renklenir; haritanın üstünde açıklama çubuğu; `?style=pkStyle`.
@@ -181,7 +183,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 - **Geliştirme araçları:** test seti, ekran görüntüsü üreticisi.
   Test suite and screenshot generator.
 
-[Yayımlanmamış · Unreleased]: ../../compare/v0.10.0...HEAD
+[Yayımlanmamış · Unreleased]: ../../compare/v0.11.0...HEAD
+[0.11.0]: ../../compare/v0.10.0...v0.11.0
 [0.10.0]: ../../compare/v0.9.0...v0.10.0
 [0.9.0]: ../../compare/v0.8.0...v0.9.0
 [0.8.0]: ../../compare/v0.7.0...v0.8.0
