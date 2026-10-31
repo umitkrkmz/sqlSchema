@@ -101,7 +101,12 @@ function read(paths) {
 function build(files, separate) {
   const { files: ordered, migration } = NS.orderFiles(files);
   const parsed = [];
-  for (const f of ordered) { const r = NS.parseFile(f.path, f.text); if (r) parsed.push({ f, r }); }
+  for (const f of ordered) {
+    // bir dosyadaki ayrıştırıcı hatası denetimi durdurmaz; dosya atlanır ve yazılır
+    let r = null;
+    try { r = NS.parseFile(f.path, f.text); } catch (err) { process.stderr.write(`sqlschema-lint: ${f.path}: ${err && err.message || err}\n`); }
+    if (r) parsed.push({ f, r });
+  }
   NS.harmonizeDialects(parsed.map(x => x.r));
   const fam = d => (d === 'mariadb' ? 'mysql' : d);
   const sep = separate || new Set(parsed.map(x => fam(x.r.dialect)).filter(d => d !== 'sql')).size > 1;

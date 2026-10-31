@@ -64,7 +64,7 @@ draw.io kadar elle uğraştırmaz, veri modelleme aracı kadar ağır değildir.
 - **Adlandırma profili:** şemada hangi adlandırma kalıplarının ne oranda kullanıldığını ve baskın kalıba uymayan tabloları gösterir.
 - **Tasarım denetimi:** PK'siz tablo, metin tarih, indekssiz FK gibi hataları neden ve öneriyle listeler.
 - **Şema farkı ve zaman çizelgesi:** iki sürümü karşılaştırır, migration'ları sırayla oynatır.
-- **Ölçek:** 2 862 tabloluk 4,7 MB'lık bir döküm yaklaşık 0,6 saniyede açılır, bir karenin çizimi 10 ms'nin altında kalır.
+- **Ölçek:** 2 900 tablo ve 4 300 FK içeren bir Oracle dökümü, ayrıştırma, yerleşim ve arayüz dahil yaklaşık 0,8 saniyede açılır; bir karenin çizimi 10 ms'nin altında kalır.
 - **Türkçe ve İngilizce arayüz.**
 
 <a id="tr-hizli-baslangic"></a>
@@ -713,8 +713,9 @@ js/                 tarayıcıda bu sırayla yüklenir; hepsi globalThis.sqlSche
   lexer.js          tokenizer, ifade ayırıcı, lehçe tahmini
   sql-parser.js     DDL → sıralı işlem listesi (create, fk, rename, drop ...)
   mongo.js          $jsonSchema, Mongoose ve JSON belgelerinden aynı işlem listesi
-  files.js          dosya sıralama (Flyway, golang-migrate), ayrıştırıcı seçimi
-  model.js          işlemleri uygular: tablolar, ilişkiler, kardinalite, ara tablo, tahmini ilişki
+  efcore.js         EF Core model özeti ve migration dosyalarından aynı işlem listesi
+  files.js          dosya sıralama (Flyway, golang-migrate, Prisma, Diesel, EF Core), ayrıştırıcı seçimi
+  model.js          işlemleri uygular: tablolar, ilişkiler, kardinalite, ara tablo, tahmini ilişki; etki analizi, yol bulma
   diff.js           iki modelin farkı: tablo, kolon, PK, FK, UNIQUE; ad değişikliği tahmini; zaman çizelgesi
   layout.js         veritabanı → şema → takımyıldız → yıldız, hiyerarşik kuvvet yerleşimi
   conventions.js    adlandırma profili: kalıplar, oranlar, baskın kalıba uymayanlar
@@ -727,7 +728,7 @@ js/                 tarayıcıda bu sırayla yüklenir; hepsi globalThis.sqlSche
   render.js         canvas çizimi, kamera, karga ayağı
   ui.js             yükleme, dosya listesi, arama, panel, rapor, URL parametreleri
 samples/            sentetik örnekler ve catalog.js (üretilir)
-tools/              örnek ve ekran görüntüsü üreticileri, sektör tanımları
+tools/              komut satırı denetimi (sqlschema-lint.js), örnek ve ekran görüntüsü üreticileri, sektör tanımları
 tests/run.js        bütün örnekleri, ayrıştırıcı kenar durumlarını ve çevirileri denetler
 docs/images/        README görüntüleri (tr/ ve en/)
 ```
@@ -756,6 +757,8 @@ sqlSchema.loadText('CREATE TABLE a (id int PRIMARY KEY);', 'deneme.sql')
 - `CREATE TABLE … AS SELECT` tabloları kolonsuz görünür.
 - MongoDB şeması örnek belgelerden çıkarılıyorsa yalnızca o belgelerde görülen alanlar listelenir.
 - Değişkenle kurulan dinamik Mongoose şemaları (`new Schema(buildFields())`) okunmaz.
+- EF Core'da yalnızca model özeti (`ModelSnapshot.cs`) ve migration dosyaları okunur; entity sınıfları ve `OnModelCreating` içindeki fluent API okunmaz. Başka ORM'lerin (Hibernate, Django, Rails …) model kodu okunmaz; SQL çıktısı kullanılabilir (bkz. [Şemayı dışa aktarmak](#tr-disa-aktarma)).
+- Bir dosya okunamazsa (bozuk ya da yarım) öbür dosyalar yine çizilir; okunamayan dosya **dosyalar** listesinde hatasıyla görünür.
 
 <a id="tr-katki"></a>
 
@@ -822,7 +825,7 @@ It is less manual than draw.io and lighter than a data-modelling tool. The goal 
 - **Naming profile:** shows which naming patterns the schema uses, in what proportion, and which tables depart from the dominant pattern.
 - **Design audit:** lists mistakes such as tables without a PK, text dates and unindexed FKs, with reasons and suggestions.
 - **Schema diff and timeline:** compares two versions and plays migrations in order.
-- **Scale:** a 4.7 MB dump with 2,862 tables opens in about 0.6 s, and a frame draws in under 10 ms.
+- **Scale:** an Oracle dump with 2,900 tables and 4,300 FKs opens in about 0.8 s including parsing, layout and the interface; a frame draws in under 10 ms.
 - **Turkish and English interface.**
 
 <a id="en-quick-start"></a>
@@ -1473,8 +1476,9 @@ js/                 loaded in this order; each file adds to the globalThis.sqlSc
   lexer.js          tokenizer, statement splitter, dialect detection
   sql-parser.js     DDL → ordered operation list (create, fk, rename, drop ...)
   mongo.js          the same operation list from $jsonSchema, Mongoose and JSON documents
-  files.js          file ordering (Flyway, golang-migrate), parser selection
-  model.js          applies operations: tables, relationships, cardinality, junctions, inference
+  efcore.js         the same operation list from the EF Core model snapshot and migration files
+  files.js          file ordering (Flyway, golang-migrate, Prisma, Diesel, EF Core), parser selection
+  model.js          applies operations: tables, relationships, cardinality, junctions, inference; impact analysis, paths
   diff.js           difference of two models: tables, columns, PK, FK, UNIQUE; rename guesses; timeline
   layout.js         database → schema → constellation → star, hierarchical force layout
   conventions.js    naming profile: patterns, shares, names that depart from the dominant pattern
@@ -1487,7 +1491,7 @@ js/                 loaded in this order; each file adds to the globalThis.sqlSc
   render.js         canvas drawing, camera, crow's feet
   ui.js             loading, file list, search, panel, report, URL parameters
 samples/            synthetic samples and catalog.js (generated)
-tools/              sample and screenshot generators, sector definitions
+tools/              command-line audit (sqlschema-lint.js), sample and screenshot generators, sector definitions
 tests/run.js        checks every sample, parser edge cases and translations
 docs/images/        README images (tr/ and en/)
 ```
@@ -1516,6 +1520,8 @@ sqlSchema.loadText('CREATE TABLE a (id int PRIMARY KEY);', 'test.sql')
 - `CREATE TABLE … AS SELECT` tables appear without columns.
 - When a MongoDB schema comes from sample documents, only fields seen in those documents are listed.
 - Dynamic Mongoose schemas built from variables (`new Schema(buildFields())`) are not read.
+- For EF Core only the model snapshot (`ModelSnapshot.cs`) and migration files are read; entity classes and the fluent API in `OnModelCreating` are not. Model code of other ORMs (Hibernate, Django, Rails …) is not read; their SQL output can be used (see [Exporting a schema](#en-export)).
+- If a file cannot be read (broken or truncated), the other files are still drawn; the unreadable file is listed with its error under **files**.
 
 <a id="en-contributing"></a>
 

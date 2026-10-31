@@ -158,7 +158,7 @@ function setFiles(files, title, opts = {}) {
   toast(t('parsing'), 0);
   return new Promise(resolve => setTimeout(() => {
     try {
-      for (const f of files) if (f.text != null && !f.skipReason && f.result === undefined && !classify(f.path).skip) f.result = parseFile(f.path, f.text);
+      for (const f of files) if (f.text != null && !f.skipReason && f.result === undefined && !classify(f.path).skip) f.result = safeParse(f.path, f.text);
       harmonizeDialects(files.filter(f => f.result).map(f => f.result));
       S.separate = opts.separate !== undefined ? opts.separate : guessSeparate(files);
       if (!rebuild()) {
@@ -175,6 +175,14 @@ function setFiles(files, title, opts = {}) {
       resolve(false);
     }
   }, 30));
+}
+
+// Bir dosyada ayrıştırıcı hatası öbür dosyaları düşürmesin: dosya hatasıyla listede görünür, harita geri kalanla çizilir
+function safeParse(path, text) {
+  try { return parseFile(path, text); } catch (err) {
+    console.error(path, err);
+    return { file: path, dialect: 'sql', ops: [], stats: { statements: 0, tables: 0, indexes: 0, comments: 0, skipped: new Map(), errors: [{ file: path, line: 0, message: String(err && err.message || err) }] } };
+  }
 }
 
 function loadText(text, name) {
@@ -389,6 +397,8 @@ function currentProfile() {
 
 function renderNaming() {
   const el = $('#namingPop');
+  // profil büyük şemada pahalı (2 900 tabloda ~200 ms): pencere kapalıyken hesaplanmaz, açılınca çizilir
+  if (el.hidden) return;
   const { profile: p } = currentProfile();
   const scopes = S.lay.schemas.filter(s => s.tables.some(tb => !tb.external && !tb.embedded));
   const scopeSel = scopes.length > 1 ? `<label class="scope">${esc(t('namingScope'))}
@@ -2851,7 +2861,7 @@ document.addEventListener('click', e => {
     case 'export': openExport(); break;
     case 'report': togglePop('#report'); break;
     case 'files': togglePop('#filesPop'); break;
-    case 'naming': togglePop('#namingPop'); break;
+    case 'naming': togglePop('#namingPop'); renderNaming(); break;
     case 'audit': togglePop('#auditPop'); renderAudit(); break;
     case 'privacy': togglePop('#privPop'); renderPrivacy(); break;
     case 'diff': togglePop('#diffPop'); break;
@@ -3092,7 +3102,7 @@ if (params.get('sample')) {
     // ?style=pkStyle: haritayı adlandırma profilinin bu boyutuna göre boya
     if (params.get('style')) setStyleDim(params.get('style'));
     const pop = { naming: '#namingPop', report: '#report', files: '#filesPop', diff: '#diffPop', audit: '#auditPop', privacy: '#privPop' }[params.get('pop')];
-    if (pop) { togglePop(pop); if (pop === '#auditPop') renderAudit(); if (pop === '#privPop') renderPrivacy(); }
+    if (pop) { togglePop(pop); if (pop === '#auditPop') renderAudit(); if (pop === '#privPop') renderPrivacy(); if (pop === '#namingPop') renderNaming(); }
     // ?fix=1: düzeltme önerileri penceresi
     if (params.get('fix') === '1') openFix();
     // ?alter=1: karşılaştırmayla birlikte farkı kapatan SQL taslağı

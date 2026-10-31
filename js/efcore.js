@@ -591,7 +591,15 @@ function parseEfMigration(src, opts = {}) {
         default: str(g('defaultValueSql')) || literal(g('defaultValue')),
       };
     };
-    const emit = (o, line) => { o.file = file; o.line = line || 0; pending.push(o); };
+    // yarım ya da bozuk çağrı (dosya kesilmiş, ad yok) işlem üretmez
+    const emit = (o, line) => {
+      if (!o.t && o.op !== 'dropindex') return;
+      if ((o.op === 'pk' || o.op === 'uq' || o.op === 'index' || o.op === 'fk') && !(o.cols && o.cols.length)) return;
+      if (o.op === 'fk' && !o.ref) return;
+      if ((o.op === 'addcol' || o.op === 'dropcol' || o.op === 'renamecol' || o.op === 'type' || o.op === 'null' || o.op === 'default' || o.op === 'ccomment') && !(o.col && (o.col.name || typeof o.col === 'string'))) return;
+      if ((o.op === 'rename' || o.op === 'renamecol') && !o.to) return;
+      o.file = file; o.line = line || 0; pending.push(o);
+    };
 
     for (const st of body) {
       if (!st || !st.chain || st.chain[0].name !== 'migrationBuilder' || !st.chain[1]) continue;

@@ -434,7 +434,9 @@ function buildModel(inputs, opts = {}) {
   }
 
   const pending = [];
-  for (const input of inputs) for (const op of input.ops) if (!apply(op, input, false)) pending.push([op, input]);
+  // tablo adı ya da FK hedefi olmayan işlem (bozuk dosyadan) bütün haritayı düşürmesin
+  const usable = op => (op.op === 'dropindex' || (Array.isArray(op.t) && op.t.length)) && (op.op !== 'fk' || (Array.isArray(op.ref) && op.ref.length));
+  for (const input of inputs) for (const op of input.ops) if (usable(op) && !apply(op, input, false)) pending.push([op, input]);
   // ALTER / COMMENT / FK dosya sırasında tablodan önce gelmiş olabilir: bir tur daha
   for (const [op, input] of pending) {
     if (!apply(op, input, true)) orphans.push({ where: where(op), text: `${op.op.toUpperCase()} ${op.t.join('.')}` });

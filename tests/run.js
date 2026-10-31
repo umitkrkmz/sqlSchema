@@ -657,6 +657,33 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   check('EF Core: snapshot olmayan .cs okunmaz', NS.classify('src/Models/Dealer.cs').skip === 'ext' && NS.parseFile('x/YModelSnapshot.cs', 'class Y {}') === null);
 }
 
+// Bozuk ve yarım dosyalar: her örnek dosyası kesilip bozulunca ayrıştırıcı, model ve çözümlemeler çökmez
+{
+  const fails = [];
+  let n = 0;
+  for (const s of NS.SAMPLES) {
+    if (!s.files) continue;
+    for (const p of s.files) {
+      const text = decode(fs.readFileSync(path.join(ROOT, 'samples', s.id, p)));
+      const variants = [0.13, 0.5, 0.87].map(f => text.slice(0, Math.floor(text.length * f))).concat([text.slice(Math.floor(text.length / 3)), text.replace(/\)/g, ''), text.replace(/['"]/g, ''), '\u{0}\u{1}ikili\u{FF}'.repeat(50)]);
+      for (const v of variants) {
+        n++;
+        try {
+          const r = NS.parseFile(s.id + '/' + p, v);
+          if (!r) continue;
+          const m = NS.buildModel([{ ...r, db: 'main' }]);
+          NS.layoutModel(m, { grouping: 'auto' });
+          NS.auditModel(m);
+          NS.privacyMap(m);
+          NS.typeProfile(m);
+          if (m.tables.length > 1) NS.pathsBetween(m.tables[0], m.tables[m.tables.length - 1]);
+        } catch (err) { fails.push(`${s.id}/${p} (${v.length}): ${err && err.message}`); }
+      }
+    }
+  }
+  check(`bozuk dosyalar: ${n} kesilmiş ya da bozulmuş dosyada çökme yok`, !fails.length, fails.slice(0, 3));
+}
+
 // Yol vurgulama: iki tablo arasındaki ilişki zincirleri, kısadan uzuna
 {
   const m = all.kucuk.model, tel = all.telekom.model;

@@ -10,6 +10,13 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 - **EF Core migration geçmişi:** `20240115093000_Initial.cs` gibi migration dosyaları sürüm olarak okunur (`Up()` içindeki `CreateTable`, `AddColumn`, `AlterColumn`, `RenameColumn`, `RenameTable`, `CreateIndex`, `AddForeignKey`, `DropTable` …; `Sql("...")` içindeki ham SQL). Zaman çizelgesi, şema farkı, değişiklik incelemesi ve `--since` EF projelerinde SQL'siz çalışır. Migration'lar varken model özeti (son hâlin kopyası) atlanır; `.Designer.cs` ve `Down()` okunmaz. **Bayi portalı** örneğine üç sürümlük geçmiş eklendi; test, geçmişin sonunun model özetiyle aynı şemayı verdiğini denetler.
   EF Core migration history: migration files such as `20240115093000_Initial.cs` are read as versions (`CreateTable`, `AddColumn`, `AlterColumn`, `RenameColumn`, `RenameTable`, `CreateIndex`, `AddForeignKey`, `DropTable` … in `Up()`; raw SQL in `Sql("...")`). The timeline, schema diff, change review and `--since` work for EF projects without SQL. When migrations are present the model snapshot (a copy of the final state) is skipped; `.Designer.cs` and `Down()` are not read. The **Dealer portal** sample gains a three-version history; a test checks that its end gives the same schema as the model snapshot.
 
+### Değişti · Changed
+
+- **Bozuk dosyaya dayanıklılık:** bir dosyada ayrıştırıcı hatası öbür dosyaları düşürmez; harita geri kalanla çizilir, dosya **dosyalar** listesinde hatasıyla görünür. Komut satırı denetimi de hatalı dosyayı yazıp devam eder. Test seti her örnek dosyasını kesip bozarak (616 varyant) çökme olmadığını denetler.
+  Resilience to broken files: a parser error in one file no longer brings down the others; the map is drawn from the rest and the file is listed with its error under **files**. The command-line audit also reports the file and carries on. The test suite cuts and corrupts every sample file (616 variants) and checks nothing crashes.
+- **Büyük şemada açılış:** adlandırma profili pencere kapalıyken hesaplanmaz; 2 900 tabloluk dökümde açılış yaklaşık 1,0 saniyeden 0,8 saniyeye indi.
+  Opening large schemas: the naming profile is not computed while its window is closed; a 2,900-table dump now opens in about 0.8 s instead of 1.0 s.
+
 ## [0.12.0] - 2026-10-30
 
 ### Eklendi · Added
