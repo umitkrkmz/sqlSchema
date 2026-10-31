@@ -226,10 +226,21 @@ const EXPECT = {
     check('iot: keyspace\'ler arası tahmin', rel(m, 'rollup_daily_by_site', 'site_id', 'sites', 'implicit'));
   },
   // EF Core model özeti + DBA betikleri (karma proje)
-  bayi({ model: m, skipped }) {
+  bayi({ model: m, skipped, migration, order }, all, s) {
     const fk = m.rels.filter(r => r.kind === 'fk').length, imp = m.rels.filter(r => r.kind === 'implicit').length;
     check('bayi: 18 tablo, 21 FK, 3 tahmini; yalnızca SQL Server', m.stats.tables === 18 && fk === 21 && imp === 3 && same(m.stats.dialects, ['tsql']), [m.stats.tables, fk, imp, m.stats.dialects]);
-    check('bayi: yalnızca ModelSnapshot.cs okunur; entity, migration ve appsettings atlanır', same(skipped.map(x => x.reason).sort(), ['config', 'ext', 'ext', 'ext']), skipped.map(x => x.file.path));
+    check('bayi: migration\'lar okunur, ModelSnapshot.cs atlanır; entity, Designer.cs ve appsettings atlanır', same(skipped.map(x => x.reason).sort(), ['config', 'efSnapshot', 'ext', 'ext', 'ext']), skipped.map(x => x.file.path));
+    check('bayi: EF Core migration sırası, DBA betikleri sonda', migration === 'EF Core' && same(order.map(NS.fileLabel), ['20240115093000_Initial', '20240402110000_Payments', '20240610150000_DealerStatusAndVkn', '01_raporlama', '02_arsiv']), order.map(NS.fileLabel));
+    // migration geçmişinin sonu model özetiyle aynı şema: yalnızca snapshot (+ DBA betikleri) ile karşılaştırma farksız
+    const files = s.files.map(p => ({ path: 'bayi/' + p, text: fs.readFileSync(path.join(ROOT, 'samples', 'bayi', p), 'utf8') }));
+    const snapOnly = build(files.filter(f => !/\/\d{14}_\w+\.cs$/.test(f.path))).model;
+    const sd = NS.diffModels(snapOnly, m);
+    check('bayi: migration\'ların sonu = ModelSnapshot.cs (fark yok)', snapOnly.stats.tables === 18 && sd.summary.same === 18 && !sd.summary.added && !sd.summary.removed && !sd.summary.changed, [sd.summary, sd.tables.filter(e => e.status !== 'same').map(e => (e.after || e.before).name + ':' + JSON.stringify(e.cols.filter(c => c.status !== 'same').map(c => c.name + ' ' + (c.changes || []).join('/'))))]);
+    // sürüm adımları: ad değişikliği, genişleyen tip, yeni tablolar
+    const step = n => build(files.filter(f => /\/\d{14}_\w+\.cs$/.test(f.path)).slice(0, n)).model;
+    const s2 = NS.diffModels(step(2), step(3)), dealers = s2.tables.find(e => e.after && e.after.name === 'Dealers');
+    check('bayi: 3. sürüm farkı (TaxNumber → VKN, ürün adı 200)', dealers && dealers.cols.some(c => c.status === 'renamed' && c.from === 'TaxNumber' && c.name === 'VKN') && s2.tables.some(e => e.after && e.after.name === 'Products' && e.cols.some(c => c.name === 'Name' && (c.changes || []).includes('type'))), dealers && dealers.cols.map(c => c.status + ':' + c.name));
+    check('bayi: 2. sürümde ödeme tabloları', NS.diffModels(step(1), step(2)).summary.added === 3);
     check('bayi: görünüm varlığı tablo olmaz', !find(m, 'vw_DealerSalesSummary') && !find(m, 'DealerSalesSummary'));
     const d = find(m, 'Dealers'), col = n => d.colIdx.get(n.toUpperCase());
     check('bayi: şema, PK, HasColumnName, varsayılan', d.schema === 'sales' && same(d.pk, ['Id']) && !!col('VKN') && !col('TaxNumber') && col('CreatedAt').default === 'getutcdate()' && !col('CreatedAt').nullable);
@@ -712,7 +723,7 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   }
   // 'skip_' + kod biçimindeki dinamik anahtarlar: files.js ve ui.js'teki bütün atlama kodları
   used.delete('skip_');
-  for (const code of ['config', 'ext', 'down', 'undo', 'project', 'tooBig', 'total']) used.add('skip_' + code);
+  for (const code of ['config', 'ext', 'down', 'undo', 'project', 'efSnapshot', 'tooBig', 'total']) used.add('skip_' + code);
   // adlandırma profilinin boyut ('nd_' + boyut) ve kova ('nk_' + boyut + '_' + kova) anahtarları
   used.delete('nd_');
   used.delete('nk_');

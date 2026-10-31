@@ -9,19 +9,22 @@
  *   Numaralı      01_tables.sql, 02_fks.sql
  *   Prisma        20240115093000_init/migration.sql      sürüm klasör adında
  *   Diesel        2024-01-15-093000_init/up.sql          down.sql atlanır
+ *   EF Core       20240115093000_Initial.cs              Up() okunur; varsa ModelSnapshot.cs atlanır
  *   Diğerleri     doğal ad sırası (a2.sql < a10.sql)
  * Sıra yanlış olsa da sorun çıkmaz: model.js, tablosu henüz tanımlanmamış ALTER'ları sona saklar.
  */
 (function (NS) {
 'use strict';
 
-const { parseSQL, parseMongo, looksLikeMongo, parseEfCore, looksLikeEfSnapshot, detectDialect } = NS;
+const { parseSQL, parseMongo, looksLikeMongo, parseEfCore, looksLikeEfSnapshot, parseEfMigration, looksLikeEfMigration, detectDialect } = NS;
 
 const SQL_EXT = /\.(sql|ddl|pls|pks|pkb|plb|tab|cql|psql|txt)$/i;
 const MONGO_EXT = /\.(json|jsonl|ndjson|js|mjs|cjs|ts)$/i;
 const IGNORED = /(^|\/)(node_modules|\.git|dist|build|coverage|bin|obj)\/|(^|\/)(package(-lock)?|tsconfig|jsconfig|composer|bower|manifest|\.?eslintrc|\.?prettierrc|angular|vercel|firebase|appsettings|launchSettings)(\.[\w-]+)?\.json$|\.(config|conf|min)\.(js|json)$/i;
 // .NET projesinde yalnızca EF Core model özeti okunur; entity sınıfları ve migration kodu atlanır
 const EF_SNAPSHOT = /ModelSnapshot\.cs$/i;
+// EF Core migration: 20240115093000_Initial.cs (Designer.cs özettir, okunmaz)
+const EF_MIGRATION = /^(\d{14})_\w+\.cs$/i;
 
 const natural = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 const baseName = p => String(p).split('/').pop();
@@ -41,19 +44,20 @@ function folderVersion(path) {
 // Sürümün görünen adı: V3__pricing, Prisma'da 20240115093000_init
 const fileLabel = p => { const fv = folderVersion(p); return fv ? fv.folder : baseName(p).replace(/\.[^.]+$/, ''); };
 
-// skip: atlanma nedeni kodu (arayüz çevirir: config, ext, down, undo, project)
+// skip: atlanma nedeni kodu (arayüz çevirir: config, ext, down, undo, project; orderFiles: efSnapshot)
 // *.sqlschema.json sqlSchema'nın proje dosyasıdır (borç kaydı, görünümler): şema değil, arayüz ayrıca okur
 function classify(path) {
   const name = baseName(path);
+  let m;
   if (/.sqlschema.json$/i.test(name)) return { path, name, skip: 'project' };
   if (IGNORED.test(path)) return { path, name, skip: 'config' };
-  if (EF_SNAPSHOT.test(name)) return { path, name, kind: 'plain' };
+  if (EF_SNAPSHOT.test(name)) return { path, name, kind: 'plain', ef: 'snapshot' };
+  if ((m = EF_MIGRATION.exec(name))) return { path, name, kind: 'migration', tool: 'EF Core', version: [Number(m[1])] };
   if (!SQL_EXT.test(name) && !MONGO_EXT.test(name)) return { path, name, skip: 'ext' };
   if (/\.down\.sql$/i.test(name)) return { path, name, skip: 'down' };
   const fv = folderVersion(path);
   if (fv) return /^down\./i.test(name) ? { path, name, skip: 'down' } : { path, name, kind: 'migration', tool: fv.tool, version: fv.version };
   if (/^U\d[\w.]*__/i.test(name)) return { path, name, skip: 'undo' };
-  let m;
   if ((m = /^V(\d+(?:[._]\d+)*)__/i.exec(name))) return { path, name, kind: 'migration', tool: 'Flyway', version: m[1].split(/[._]/).map(Number) };
   if (/^R__/i.test(name)) return { path, name, kind: 'repeatable', tool: 'Flyway' };
   if ((m = /^(\d+)_.+\.up\.sql$/i.exec(name))) return { path, name, kind: 'migration', tool: 'migrate', version: [Number(m[1])] };
@@ -80,6 +84,10 @@ function orderFiles(files) {
     if (c.skip) { skipped.push({ file: f, reason: c.skip }); continue; }
     keep.push({ f, c });
   }
+  // EF Core migration'ları varsa model özeti son hâlin kopyasıdır: ikisi birlikte okunursa tablolar iki kez oluşur
+  if (keep.some(k => k.c.tool === 'EF Core')) {
+    for (let i = keep.length - 1; i >= 0; i--) if (keep[i].c.ef === 'snapshot') { skipped.push({ file: keep[i].f, reason: 'efSnapshot' }); keep.splice(i, 1); }
+  }
   keep.sort((x, y) => {
     const d = natural(dirName(x.f.path), dirName(y.f.path));
     if (d) return d;
@@ -104,6 +112,8 @@ function parseFile(path, text) {
     const r = parseEfCore(text, { file: path });
     return r.ops.length ? r : null;
   }
+  // işlemsiz migration (yalnızca veri güncelleyen) de zaman çizelgesinde bir sürümdür
+  if (EF_MIGRATION.test(name)) return looksLikeEfMigration(text) ? parseEfMigration(text, { file: path }) : null;
   if (MONGO_EXT.test(name)) {
     if (!looksLikeMongo(text, name)) return null;
     const r = parseMongo(text, { file: path });

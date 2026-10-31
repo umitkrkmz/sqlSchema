@@ -57,7 +57,7 @@ draw.io kadar elle uğraştırmaz, veri modelleme aracı kadar ağır değildir.
 - **Saf HTML, CSS ve JavaScript.** Bağımlılık yok, derleme adımı yok; klasörü açmanız yeterli.
 - **Gizlilik:** dosyalar tarayıcıdan çıkmaz, hiçbir sunucuya gönderilmez.
 - **Sekiz veritabanı:** Oracle, SQL Server, MySQL, MariaDB, PostgreSQL, SQLite, Cassandra ve MongoDB.
-- **Kod öncelikli projeler:** EF Core model özeti (`ModelSnapshot.cs`) SQL'e çevirmeden okunur; DBA betikleriyle birlikte açılabilir.
+- **Kod öncelikli projeler:** EF Core model özeti (`ModelSnapshot.cs`) ve migration geçmişi SQL'e çevirmeden okunur; DBA betikleriyle birlikte açılabilir.
 - **Tek dosya, birden fazla dosya ya da bütün bir klasör:** bölünmüş dökümler, migration klasörleri (Flyway, golang-migrate, Prisma, Diesel), çok veritabanlı projeler.
 - **Karga ayağı notasyonu:** kardinalite `NOT NULL`, `UNIQUE` ve PK bilgisinden çıkarılır.
 - **Tahmini ilişkiler:** FK tanımlı olmayan eski sistemlerde, Cassandra'da ve MongoDB'de bağlantılar kolon adlarından bulunur.
@@ -291,6 +291,7 @@ Migration klasörlerinde dosya bir modülü değil bir sürümü gösterir; orad
 | Zaman damgalı | `20240115093000_x.sql` | Zaman sırasına göre. |
 | Prisma | `20240115093000_init/migration.sql` | Sürüm klasör adındadır; klasör sırasına göre. Zaman çizelgesinde sürüm adı klasör adıdır. |
 | Diesel | `2024-01-15-093000_init/up.sql` | Klasör sırasına göre; `down.sql` atlanır. |
+| EF Core | `20240115093000_Initial.cs` | Zaman sırasına göre; `Up()` okunur, `.Designer.cs` ve model özeti atlanır (bkz. [EF Core](#tr-efcore)). |
 | Numaralı / diğer | `01_tables.sql`, `a2.sql < a10.sql` | Doğal ad sırası. |
 
 Migration'lar baştan sona uygulanır ve harita şemanın **son hâlini** gösterir. Bunun için şu ifadeler işlenir:
@@ -390,7 +391,7 @@ Gömülü nesneler ve nesne dizileri, sahibinin yanında duran **uydu** tablolar
 
 ### EF Core (kod öncelikli)
 
-Şeması .NET kodunda tanımlı projelerde (Entity Framework Core) SQL dosyası gerekmez: EF'in ürettiği model özeti **`Migrations/<Bağlam>ModelSnapshot.cs`** doğrudan okunur. Dosya araç tarafından üretildiği için düzenlidir ve modelin tamamını tek yerde tutar; kod çalıştırılmaz. Projenin klasörünü olduğu gibi açabilirsiniz: entity sınıfları, migration kodu, `appsettings.json`, `bin/` ve `obj/` atlanır.
+Şeması .NET kodunda tanımlı projelerde (Entity Framework Core) SQL dosyası gerekmez: EF'in ürettiği model özeti **`Migrations/<Bağlam>ModelSnapshot.cs`** doğrudan okunur. Dosya araç tarafından üretildiği için düzenlidir ve modelin tamamını tek yerde tutar; kod çalıştırılmaz. Projenin klasörünü olduğu gibi açabilirsiniz: entity sınıfları, `.Designer.cs` dosyaları, `appsettings.json`, `bin/` ve `obj/` atlanır.
 
 | Snapshot'ta | Haritada |
 |---|---|
@@ -403,8 +404,9 @@ Gömülü nesneler ve nesne dizileri, sahibinin yanında duran **uydu** tablolar
 | Çoka çok | EF'in ürettiği ara tablo (`DealerRegion`) |
 
 - **Sağlayıcı:** SQL Server, PostgreSQL (Npgsql), Oracle, MySQL ve SQLite snapshot'taki ek sınıf adlarından, olmazsa kolon tiplerinden anlaşılır.
-- **Karma projeler:** DBA betikleri (`.sql`) aynı klasörde ya da birlikte açılabilir; betikteki FK'ler EF tablolarına bağlanır. Panelde snapshot'tan gelen tabloların **EF Core** etiketi vardır; hangi tablonun kodda, hangisinin yalnızca DBA betiğinde tanımlı olduğu bir bakışta anlaşılır.
-- **Okunmayanlar:** `ToView` ile görünüme bağlanan varlıklar ve `HasData` tohum verisi. Migration geçmişi için `dotnet ef migrations script` çıktısı kullanılabilir (bkz. [Şemayı dışa aktarmak](#tr-disa-aktarma)).
+- **Karma projeler:** DBA betikleri (`.sql`) aynı klasörde ya da birlikte açılabilir; betikteki FK'ler EF tablolarına bağlanır. Panelde EF'ten gelen tabloların **EF Core** etiketi vardır; hangi tablonun kodda, hangisinin yalnızca DBA betiğinde tanımlı olduğu bir bakışta anlaşılır.
+- **Migration geçmişi:** klasörde `20240115093000_Initial.cs` gibi migration dosyaları varsa her biri bir sürümdür ve `Up()` içindeki `migrationBuilder` çağrıları okunur (`CreateTable`, `AddColumn`, `AlterColumn`, `RenameColumn`, `RenameTable`, `CreateIndex`, `AddForeignKey`, `DropTable` …; `Sql("...")` içindeki ham SQL de). Zaman çizelgesi, şema farkı, değişiklik incelemesi ve komut satırındaki `--since 20240610150000_DealerStatusAndVkn` EF projesinde SQL'siz çalışır. Bu durumda model özeti son hâlin kopyası olduğu için atlanır.
+- **Okunmayanlar:** `ToView` ile görünüme bağlanan varlıklar, `HasData` tohum verisi ve migration'ların `Down()` yöntemi.
 
 <img src="docs/images/tr/ef-core.png" alt="EF Core: bayi portalının model özeti ve DBA'nın raporlama tabloları birlikte" width="900">
 
@@ -637,7 +639,7 @@ Bulgular adlardan ve açıklamalardan tahmindir, hukuki görüş değildir; enva
 | Karışık adlandırma | Oracle | İki ekip, iki alışkanlık: PK `ID` ve `<TABLO>_ID`, kuralsız FK'ler, ORM tabloları |
 | Sözlük ağırlıklı | Oracle | Bütün kodlar tek bir `SOZLUK` tablosunda; 30'dan fazla kolon ona `@ref` ile bağlı |
 | Hatalı tasarım (DBA incelemesi) | Oracle | Düzgün bir şemaya özensiz eklenmiş migration'lar; her denetim kuralı tetiklenir |
-| Bayi portalı (EF Core) | SQL Server | .NET uygulamasının `ModelSnapshot.cs`'i ile DBA'nın raporlama ve arşiv betikleri birlikte: owned tip, TPH / TPT, çoka çok |
+| Bayi portalı (EF Core) | SQL Server | .NET uygulamasının üç sürümlük migration geçmişi ve `ModelSnapshot.cs`'i ile DBA'nın raporlama ve arşiv betikleri birlikte: owned tip, TPH / TPT, çoka çok |
 
 <a id="tr-disa-aktarma"></a>
 
@@ -813,7 +815,7 @@ It is less manual than draw.io and lighter than a data-modelling tool. The goal 
 - **Plain HTML, CSS and JavaScript.** No dependencies, no build step; just open the folder.
 - **Privacy:** files never leave the browser and are not sent to any server.
 - **Eight databases:** Oracle, SQL Server, MySQL, MariaDB, PostgreSQL, SQLite, Cassandra and MongoDB.
-- **Code-first projects:** the EF Core model snapshot (`ModelSnapshot.cs`) is read without converting it to SQL; it can be opened together with DBA scripts.
+- **Code-first projects:** the EF Core model snapshot (`ModelSnapshot.cs`) and migration history are read without converting them to SQL; it can be opened together with DBA scripts.
 - **One file, many files or a whole folder:** split dumps, migration folders (Flyway, golang-migrate, Prisma, Diesel), multi-database projects.
 - **Crow's foot notation:** cardinality is derived from `NOT NULL`, `UNIQUE` and primary keys.
 - **Inferred relationships:** links are found from column names in legacy systems without FKs, in Cassandra and in MongoDB.
@@ -1049,6 +1051,7 @@ In a migration folder a file is a version, not a module; there, and for MongoDB,
 | Timestamped | `20240115093000_x.sql` | By time. |
 | Prisma | `20240115093000_init/migration.sql` | The version is in the folder name; by folder order. On the timeline the version name is the folder name. |
 | Diesel | `2024-01-15-093000_init/up.sql` | By folder order; `down.sql` skipped. |
+| EF Core | `20240115093000_Initial.cs` | By time; `Up()` is read, `.Designer.cs` and the model snapshot are skipped (see [EF Core](#en-efcore)). |
 | Numbered / other | `01_tables.sql`, `a2.sql < a10.sql` | Natural name order. |
 
 Migrations are applied from first to last, and the map shows the **final state** of the schema. These statements are applied:
@@ -1148,7 +1151,7 @@ Embedded objects and arrays of objects become **satellite** tables (`users.profi
 
 ### EF Core (code first)
 
-Projects whose schema is defined in .NET code (Entity Framework Core) need no SQL file: the model snapshot EF generates, **`Migrations/<Context>ModelSnapshot.cs`**, is read directly. Because the tool generates it, the file is regular and holds the whole model in one place; no code is run. You can open the project folder as it is: entity classes, migration code, `appsettings.json`, `bin/` and `obj/` are skipped.
+Projects whose schema is defined in .NET code (Entity Framework Core) need no SQL file: the model snapshot EF generates, **`Migrations/<Context>ModelSnapshot.cs`**, is read directly. Because the tool generates it, the file is regular and holds the whole model in one place; no code is run. You can open the project folder as it is: entity classes, `.Designer.cs` files, `appsettings.json`, `bin/` and `obj/` are skipped.
 
 | In the snapshot | On the map |
 |---|---|
@@ -1161,8 +1164,9 @@ Projects whose schema is defined in .NET code (Entity Framework Core) need no SQ
 | Many-to-many | The join table EF generates (`DealerRegion`) |
 
 - **Provider:** SQL Server, PostgreSQL (Npgsql), Oracle, MySQL and SQLite are recognised from the extension class names in the snapshot, or else from the column types.
-- **Mixed projects:** DBA scripts (`.sql`) can sit in the same folder or be opened together; their FKs connect to the EF tables. In the panel, tables from the snapshot carry an **EF Core** tag, so you see at a glance which tables the code defines and which exist only in DBA scripts.
-- **Not read:** entities mapped to a view with `ToView`, and `HasData` seed data. For the migration history, use the output of `dotnet ef migrations script` (see [Exporting a schema](#en-export)).
+- **Mixed projects:** DBA scripts (`.sql`) can sit in the same folder or be opened together; their FKs connect to the EF tables. In the panel, tables from EF carry an **EF Core** tag, so you see at a glance which tables the code defines and which exist only in DBA scripts.
+- **Migration history:** when the folder holds migration files such as `20240115093000_Initial.cs`, each is a version and the `migrationBuilder` calls in `Up()` are read (`CreateTable`, `AddColumn`, `AlterColumn`, `RenameColumn`, `RenameTable`, `CreateIndex`, `AddForeignKey`, `DropTable` …; raw SQL in `Sql("...")` too). The timeline, schema diff, change review and `--since 20240610150000_DealerStatusAndVkn` on the command line work for EF projects without SQL. The model snapshot is then skipped, since it is a copy of the final state.
+- **Not read:** entities mapped to a view with `ToView`, `HasData` seed data and the `Down()` method of migrations.
 
 <img src="docs/images/en/ef-core.png" alt="EF Core: the dealer portal's model snapshot together with the DBA's reporting tables" width="900">
 
@@ -1395,7 +1399,7 @@ The samples under `samples/` are **synthetic**: they do not belong to any real o
 | Mixed naming | Oracle | Two teams, two habits: PK `ID` and `<TABLE>_ID`, irregular FKs, ORM tables |
 | Lookup-heavy | Oracle | Every code lives in a single `SOZLUK` table; more than 30 columns point to it with `@ref` |
 | Flawed design (DBA review) | Oracle | Careless migrations added to a clean schema; every audit rule fires |
-| Dealer portal (EF Core) | SQL Server | A .NET application's `ModelSnapshot.cs` together with the DBA's reporting and archive scripts: owned types, TPH / TPT, many-to-many |
+| Dealer portal (EF Core) | SQL Server | A .NET application's three-version migration history and `ModelSnapshot.cs` together with the DBA's reporting and archive scripts: owned types, TPH / TPT, many-to-many |
 
 <a id="en-export"></a>
 

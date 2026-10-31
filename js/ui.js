@@ -28,7 +28,8 @@ function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
 const dialectName = d => DIALECTS[d] || d || '?';
-const isEfSnapshot = p => /ModelSnapshot\.cs$/i.test(String(p || ''));
+// EF Core model özeti ya da migration dosyası (20240115093000_Initial.cs)
+const isEfFile = p => /ModelSnapshot\.cs$|(^|\/)\d{14}_\w+\.cs$/i.test(String(p || ''));
 const baseName = p => String(p).split('/').pop();
 const params = new URLSearchParams(location.search);
 
@@ -2534,7 +2535,7 @@ function renderPanel() {
     tb.noColumns ? '<span class="tag">AS SELECT</span>' : '',
     tb.dialect ? `<span class="tag">${esc(dialectName(tb.dialect))}</span>` : '',
     // karma projede tablonun ORM'den mi DBA betiğinden mi geldiği
-    tb.files.some(isEfSnapshot) ? `<span class="tag t-ref" title="${esc(t('tagEfTitle'))}">EF Core</span>` : '',
+    tb.files.some(isEfFile) ? `<span class="tag t-ref" title="${esc(t('tagEfTitle'))}">EF Core</span>` : '',
   ].join('');
   const rows = tb.columns.map(c => {
     const k = keyTag(tb, c);

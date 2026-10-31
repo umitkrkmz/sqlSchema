@@ -5,6 +5,11 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Eklendi · Added
+
+- **EF Core migration geçmişi:** `20240115093000_Initial.cs` gibi migration dosyaları sürüm olarak okunur (`Up()` içindeki `CreateTable`, `AddColumn`, `AlterColumn`, `RenameColumn`, `RenameTable`, `CreateIndex`, `AddForeignKey`, `DropTable` …; `Sql("...")` içindeki ham SQL). Zaman çizelgesi, şema farkı, değişiklik incelemesi ve `--since` EF projelerinde SQL'siz çalışır. Migration'lar varken model özeti (son hâlin kopyası) atlanır; `.Designer.cs` ve `Down()` okunmaz. **Bayi portalı** örneğine üç sürümlük geçmiş eklendi; test, geçmişin sonunun model özetiyle aynı şemayı verdiğini denetler.
+  EF Core migration history: migration files such as `20240115093000_Initial.cs` are read as versions (`CreateTable`, `AddColumn`, `AlterColumn`, `RenameColumn`, `RenameTable`, `CreateIndex`, `AddForeignKey`, `DropTable` … in `Up()`; raw SQL in `Sql("...")`). The timeline, schema diff, change review and `--since` work for EF projects without SQL. When migrations are present the model snapshot (a copy of the final state) is skipped; `.Designer.cs` and `Down()` are not read. The **Dealer portal** sample gains a three-version history; a test checks that its end gives the same schema as the model snapshot.
+
 ## [0.12.0] - 2026-10-30
 
 ### Eklendi · Added

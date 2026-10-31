@@ -302,20 +302,23 @@
     "title": "Bayi portalı (EF Core)",
     "sector": "Telekom",
     "dialect": "SQL Server",
-    "scenario": ".NET uygulamasının EF Core model özeti (ModelSnapshot.cs) ile DBA'nın elle yazdığı raporlama ve arşiv betikleri birlikte: owned tip, TPH / TPT kalıtım, çoka çok ara tablo.",
+    "scenario": ".NET uygulamasının EF Core migration geçmişi (üç sürüm, zaman çizelgesiyle) ve model özeti ile DBA'nın elle yazdığı raporlama ve arşiv betikleri birlikte: owned tip, TPH / TPT kalıtım, çoka çok ara tablo.",
     "files": [
-      "db/dba/01_raporlama.sql",
-      "db/dba/02_arsiv.sql",
       "src/Portal.Data/Migrations/20240115093000_Initial.cs",
+      "src/Portal.Data/Migrations/20240402110000_Payments.cs",
+      "src/Portal.Data/Migrations/20240610150000_DealerStatusAndVkn.cs",
+      "src/Portal.Data/Migrations/20240610150000_DealerStatusAndVkn.Designer.cs",
       "src/Portal.Data/Migrations/PortalDbContextModelSnapshot.cs",
       "src/Portal.Data/PortalDbContext.cs",
+      "src/Portal.Database/dba/01_raporlama.sql",
+      "src/Portal.Database/dba/02_arsiv.sql",
       "src/Portal.Domain/Sales/Dealer.cs",
       "src/Portal.Web/appsettings.json"
     ],
     "en": {
       "title": "Dealer portal (EF Core)",
       "sector": "Telecom",
-      "scenario": "The EF Core model snapshot (ModelSnapshot.cs) of a .NET application together with the reporting and archive scripts the DBA wrote by hand: owned types, TPH / TPT inheritance, a many-to-many join table."
+      "scenario": "The EF Core migration history (three versions, with the timeline) and model snapshot of a .NET application together with the reporting and archive scripts the DBA wrote by hand: owned types, TPH / TPT inheritance, a many-to-many join table."
     }
   }
 ];

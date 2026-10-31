@@ -1,10 +1,12 @@
 /*
  * Bayi portalı — .NET / EF Core + SQL Server, karma proje:
  *   src/Portal.Data/Migrations/PortalDbContextModelSnapshot.cs   EF Core'un ürettiği model özeti (tabloların çoğu)
- *   db/dba/*.sql                                                 DBA'nın elle yazdığı raporlama ve arşiv tabloları
+ *   src/Portal.Data/Migrations/<zaman>_<Ad>.cs                   EF migration geçmişi (bayi-migrations.js): zaman çizelgesi
+ *   src/Portal.Database/dba/*.sql                                DBA'nın elle yazdığı raporlama ve arşiv tabloları
+ * Migration'lar okunduğu için ModelSnapshot.cs atlanır (son hâlin kopyası); test ikisinin aynı şemayı verdiğini denetler.
  * Snapshot'ta EF'in bütün eşleme biçimleri var: şemalar, owned tip (aynı tabloda ve kendi tablosunda), TPH ve TPT
  * kalıtım, bire bir, çoka çok ara tablo, kendine başvuran FK, bileşik anahtar, CHECK, varsayılanlar, görünüm varlığı.
- * Entity sınıfları, migration dosyaları ve ayar dosyaları da klasörde durur; okunmazlar, atlananlarda görünürler.
+ * Entity sınıfları, Designer.cs ve ayar dosyaları da klasörde durur; okunmazlar, atlananlarda görünürler.
  */
 'use strict';
 
@@ -826,59 +828,22 @@ public class PortalDbContext(DbContextOptions<PortalDbContext> options) : DbCont
 }
 `;
 
-const MIGRATION_CS = `using Microsoft.EntityFrameworkCore.Migrations;
-
-#nullable disable
-
-namespace Portal.Data.Migrations
-{
-    /// <inheritdoc />
-    public partial class Initial : Migration
-    {
-        /// <inheritdoc />
-        protected override void Up(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.EnsureSchema(name: "sales");
-
-            migrationBuilder.CreateTable(
-                name: "Regions",
-                schema: "sales",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    Code = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Regions", x => x.Id);
-                });
-        }
-
-        /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.DropTable(name: "Regions", schema: "sales");
-        }
-    }
-}
-`;
+const MIGRATIONS = require('./bayi-migrations');
 
 module.exports = {
   id: 'bayi',
   title: 'Bayi portalı (EF Core)',
   sector: 'Telekom',
   dialect: 'SQL Server',
-  scenario: '.NET uygulamasının EF Core model özeti (ModelSnapshot.cs) ile DBA\'nın elle yazdığı raporlama ve arşiv betikleri birlikte: owned tip, TPH / TPT kalıtım, çoka çok ara tablo.',
-  en: { title: 'Dealer portal (EF Core)', sector: 'Telecom', scenario: 'The EF Core model snapshot (ModelSnapshot.cs) of a .NET application together with the reporting and archive scripts the DBA wrote by hand: owned types, TPH / TPT inheritance, a many-to-many join table.' },
+  scenario: '.NET uygulamasının EF Core migration geçmişi (üç sürüm, zaman çizelgesiyle) ve model özeti ile DBA\'nın elle yazdığı raporlama ve arşiv betikleri birlikte: owned tip, TPH / TPT kalıtım, çoka çok ara tablo.',
+  en: { title: 'Dealer portal (EF Core)', sector: 'Telecom', scenario: 'The EF Core migration history (three versions, with the timeline) and model snapshot of a .NET application together with the reporting and archive scripts the DBA wrote by hand: owned types, TPH / TPT inheritance, a many-to-many join table.' },
   build: () => ({
     'src/Portal.Data/Migrations/PortalDbContextModelSnapshot.cs': SNAPSHOT,
-    'src/Portal.Data/Migrations/20240115093000_Initial.cs': MIGRATION_CS,
+    ...Object.fromEntries(Object.entries(MIGRATIONS).map(([n, t]) => ['src/Portal.Data/Migrations/' + n, t])),
     'src/Portal.Data/PortalDbContext.cs': CONTEXT_CS,
     'src/Portal.Domain/Sales/Dealer.cs': DEALER_CS,
     'src/Portal.Web/appsettings.json': JSON.stringify({ ConnectionStrings: { Portal: 'Server=localhost;Database=Portal;Trusted_Connection=True;TrustServerCertificate=True' }, Logging: { LogLevel: { Default: 'Information' } } }, null, 2) + '\n',
-    'db/dba/01_raporlama.sql': DBA_REPORT,
-    'db/dba/02_arsiv.sql': DBA_ARCHIVE,
+    'src/Portal.Database/dba/01_raporlama.sql': DBA_REPORT,
+    'src/Portal.Database/dba/02_arsiv.sql': DBA_ARCHIVE,
   }),
 };

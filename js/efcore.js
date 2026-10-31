@@ -91,17 +91,34 @@ class Reader {
     }
     return out;
   }
+  // konumlu argümanlar dizide, adlandırılanlar (name: "x", migration dosyalarında) out.named'de
   args() {
     const out = [];
+    out.named = {};
     this.eatP('(');
     while (this.i < this.k.length && !this.isP(')')) {
-      // adlandırılmış argüman (name: "x") snapshot'ta yok ama zararsız
-      if (this.peek().t === 'w' && this.isP(':', 1)) this.i += 2;
-      out.push(this.expr());
+      if (this.peek().t === 'w' && this.isP(':', 1)) { const n = this.peek().v; this.i += 2; out.named[n] = this.expr(); }
+      else out.push(this.expr());
       if (!this.eatP(',')) break;
     }
     this.eatP(')');
     return out;
+  }
+  // { A = ifade, x.B } → { obj: [[ad, ifade]] } · { "a", "b" } → { arr: [ifade] }
+  initializer(array) {
+    const items = [];
+    this.eatP('{');
+    while (this.i < this.k.length && !this.isP('}')) {
+      if (!array && this.peek().t === 'w' && this.isP('=', 1) && !this.isP('=>', 1)) { const n = this.peek().v; this.i += 2; items.push([n, this.expr()]); }
+      else {
+        const e = this.expr();
+        if (array) items.push(e);
+        else if (e && e.chain) items.push([e.chain[e.chain.length - 1].name, e]);
+      }
+      if (!this.eatP(',')) break;
+    }
+    this.eatP('}');
+    return array ? { arr: items } : { obj: items };
   }
   expr() {
     const t = this.peek();
@@ -120,8 +137,11 @@ class Reader {
     if (t.t === 'w') {
       if (t.v === 'new') {
         this.i++;
-        while (this.peek() && !this.isP('{') && !this.isP('(') && !this.isP(';') && !this.isP(',') && !this.isP(')')) this.i++;
-        if (this.isP('{') || this.isP('(')) this.skipBalanced();
+        // new { ... } anonim nesne · new[] / new string[] { ... } dizi · new Tip(...) atlanır
+        let array = false;
+        while (this.peek() && !this.isP('{') && !this.isP('(') && !this.isP(';') && !this.isP(',') && !this.isP(')')) { if (this.isP('[')) array = true; this.i++; }
+        if (this.isP('{')) return this.initializer(array);
+        if (this.isP('(')) this.skipBalanced();
         if (this.isP('{')) this.skipBalanced();
         return { id: 'new' };
       }
@@ -172,6 +192,8 @@ const str = e => (e && e.s != null ? e.s : null);
 const strs = args => (args || []).map(str).filter(x => x != null);
 const call = (chain, name) => chain.find(c => c.name === name);
 const shortName = s => String(s).split('.').pop();
+// HasDefaultValue / defaultValue: SQL'deki gibi yazılır ('A', 0, 1); enum ve sabitler adıyla
+const literal = a => (!a ? null : a.s != null ? `'${a.s.replace(/'/g, "''")}'` : a.n != null ? String(a.n) : a.id === 'true' ? '1' : a.id === 'false' ? '0' : a.chain ? a.chain.map(x => x.name).join('.') : null);
 
 /* ─── Anlam: varlıklar, özellikler, ilişkiler ─── */
 
@@ -203,7 +225,7 @@ function readProperty(st, ent) {
     else if (c.name === 'HasPrecision') p.precision = a.map(x => x && x.n).filter(x => x != null);
     else if (c.name === 'HasComment') p.comment = str(a[0]);
     else if (c.name === 'HasDefaultValueSql') p.default = str(a[0]);
-    else if (c.name === 'HasDefaultValue') p.default = a[0] ? (a[0].s != null ? `'${a[0].s.replace(/'/g, "''")}'` : a[0].n != null ? String(a[0].n) : a[0].id === 'true' ? '1' : a[0].id === 'false' ? '0' : a[0].chain ? a[0].chain.map(x => x.name).join('.') : null) : null;
+    else if (c.name === 'HasDefaultValue') p.default = literal(a[0]);
     else if (c.name === 'HasConversion' && c.gen) p.clr = c.gen.replace(/\s/g, '');
     else if (c.name === 'UseIdentityColumn' || c.name === 'UseIdentityByDefaultColumn' || c.name === 'UseIdentityAlwaysColumn') p.identity = true;
   }
@@ -504,5 +526,169 @@ function emit(entities, ctx, op, stats) {
   }
 }
 
-Object.assign(NS, { parseEfCore, looksLikeEfSnapshot });
+/* ─── Migration dosyaları: <zaman>_<Ad>.cs içindeki Up() ───
+ * Her migration bir sürümdür; zaman çizelgesi, şema farkı ve değişiklik incelemesi EF projesinde SQL'siz çalışır.
+ * migrationBuilder çağrıları zaten tablo düzeyindedir (owned ve kalıtım düzleştirilmiş), doğrudan işlemlere çevrilir.
+ * Down() okunmaz. Sql("...") içindeki ham SQL, SQL ayrıştırıcısından geçer.
+ */
+function looksLikeEfMigration(src) {
+  return /\bMigrationBuilder\b/.test(src) && /\bUp\s*\(/.test(src);
+}
+
+function findUp(toks) {
+  for (let i = 1; i < toks.length; i++) {
+    if (toks[i].t === 'w' && toks[i].v === 'Up' && toks[i - 1].t === 'w' && toks[i - 1].v === 'void') {
+      let j = i;
+      while (j < toks.length && !(toks[j].t === 'p' && toks[j].v === '{')) j++;
+      return new Reader(toks, j).block();
+    }
+  }
+  return null;
+}
+
+function parseEfMigration(src, opts = {}) {
+  const file = opts.file || '';
+  const stats = { statements: 0, tables: 0, indexes: 0, comments: 0, skipped: new Map(), errors: [] };
+  const ops = [];
+  const hints = [], types = [];
+  const skip = label => stats.skipped.set(label, (stats.skipped.get(label) || 0) + 1);
+  let dialect = 'tsql';
+  try {
+    const body = findUp(tokenize(src)) || [];
+    const raw = [];   // Sql("...") sonra, lehçe belli olunca ayrıştırılır
+    const pending = [];
+    // argüman: adlandırılmış ya da konumlu
+    const arg = (c, i, name) => (c.args && c.args.named && c.args.named[name] !== undefined ? c.args.named[name] : c.args && c.args[i]);
+    const tparts = (name, schema) => { const n = str(name), s = str(schema); return n ? (s ? [s, n] : [n]) : null; };
+    const colList = e => (!e ? [] : e.s != null ? [e.s] : e.arr ? e.arr.map(str).filter(Boolean) : []);
+    // x => x.Id · x => new { x.A, x.B }
+    const lamCols = (e, map) => {
+      const b = e && e.lambda && e.lambda.body[0];
+      const names = !b ? [] : b.chain ? [b.chain[b.chain.length - 1].name] : b.obj ? b.obj.map(([n]) => n) : [];
+      return names.map(n => map.get(n) || n);
+    };
+    const onDel = e => { const n = e && e.chain ? e.chain[e.chain.length - 1].name : null; return n === 'Cascade' ? 'CASCADE' : n === 'SetNull' ? 'SET NULL' : n === 'SetDefault' ? 'SET DEFAULT' : null; };
+    // table.Column<T>(type:, maxLength:, nullable:, defaultValue(Sql):, comment:, name:) ya da AddColumn<T>(...)
+    const column = (c, gen, prop, chain) => {
+      const g = k => (c.args && c.args.named ? c.args.named[k] : undefined);
+      const clr = String(gen || '').replace(/\s/g, '').replace(/\?$/, '');
+      const ml = g('maxLength') && g('maxLength').n;
+      let type = str(g('type'));
+      if (!type) {
+        const base = CLR[clr] || clr || '?';
+        type = base === 'nvarchar' ? (ml ? `nvarchar(${ml})` : 'nvarchar(max)') : base;
+      }
+      types.push(type);
+      const ann = (chain || []).filter(x => x.name === 'Annotation').map(x => str(x.args[0]) || '');
+      hints.push(...ann);
+      return {
+        name: str(g('name')) || prop,
+        type,
+        nullable: !!(g('nullable') && g('nullable').id === 'true'),
+        pk: false,
+        comment: str(g('comment')),
+        identity: ann.some(a => /Identity|ValueGenerationStrategy|Autoincrement/i.test(a)),
+        default: str(g('defaultValueSql')) || literal(g('defaultValue')),
+      };
+    };
+    const emit = (o, line) => { o.file = file; o.line = line || 0; pending.push(o); };
+
+    for (const st of body) {
+      if (!st || !st.chain || st.chain[0].name !== 'migrationBuilder' || !st.chain[1]) continue;
+      const c = st.chain[1], line = c.line;
+      const nm = k => (c.args && c.args.named ? c.args.named[k] : undefined);
+      stats.statements++;
+      const t = tparts(nm('table') || nm('name'), nm('schema'));
+      switch (c.name) {
+        case 'CreateTable': {
+          const map = new Map();   // C# özellik adı → kolon adı (kısıt lambdaları özellik adını kullanır)
+          const columns = [];
+          const cl = nm('columns');
+          const obj = cl && cl.lambda && cl.lambda.body[0] && cl.lambda.body[0].obj;
+          for (const [prop, e] of obj || []) {
+            const cc = e && e.chain && e.chain.find(x => x.name === 'Column');
+            if (!cc) continue;
+            const col = column(cc, cc.gen, prop, e.chain);
+            map.set(prop, col.name);
+            columns.push(col);
+          }
+          const tp = tparts(nm('name'), nm('schema'));
+          emit({ op: 'create', t: tp, def: { columns, comment: str(nm('comment')) } }, line);
+          stats.tables++;
+          const cons = nm('constraints');
+          for (const s of (cons && cons.lambda && cons.lambda.body) || []) {
+            const k = s && s.chain && s.chain[1];
+            if (!k) continue;
+            if (k.name === 'PrimaryKey') emit({ op: 'pk', t: tp, cols: lamCols(arg(k, 1, 'columns'), map), name: str(arg(k, 0, 'name')) }, k.line);
+            else if (k.name === 'UniqueConstraint') emit({ op: 'uq', t: tp, cols: lamCols(arg(k, 1, 'columns'), map), name: str(arg(k, 0, 'name')) }, k.line);
+            else if (k.name === 'ForeignKey') {
+              const cols = lamCols(arg(k, 1, 'column') || arg(k, 1, 'columns'), map);
+              const refCols = colList(arg(k, 4, 'principalColumn') || arg(k, 4, 'principalColumns'));
+              emit({ op: 'fk', t: tp, cols, ref: tparts(arg(k, 3, 'principalTable'), arg(k, 2, 'principalSchema')), refCols, name: str(arg(k, 0, 'name')), disabled: false, onDelete: onDel(arg(k, 5, 'onDelete')) }, k.line);
+            } else if (k.name === 'CheckConstraint') checkOp(tp, str(arg(k, 1, 'sql')), k.line);
+          }
+          break;
+        }
+        case 'DropTable': emit({ op: 'drop', t }, line); break;
+        case 'RenameTable': {
+          const to = str(nm('newName'));
+          if (to) emit({ op: 'rename', t, to }, line);
+          break;
+        }
+        case 'AddColumn': emit({ op: 'addcol', t, col: column(c, c.gen, str(nm('name')), st.chain) }, line); break;
+        case 'DropColumn': emit({ op: 'dropcol', t, col: str(nm('name')) }, line); break;
+        case 'RenameColumn': emit({ op: 'renamecol', t, col: str(nm('name')), to: str(nm('newName')) }, line); break;
+        case 'AlterColumn': {
+          const col = column(c, c.gen, str(nm('name')), st.chain);
+          emit({ op: 'type', t, col: col.name, type: col.type }, line);
+          emit({ op: 'null', t, col: col.name, nullable: col.nullable }, line);
+          if (nm('defaultValue') !== undefined || nm('defaultValueSql') !== undefined || nm('oldDefaultValue') !== undefined || nm('oldDefaultValueSql') !== undefined) emit({ op: 'default', t, col: col.name, value: col.default }, line);
+          if (nm('comment') !== undefined || nm('oldComment') !== undefined) emit({ op: 'ccomment', t, col: col.name, text: col.comment }, line);
+          break;
+        }
+        case 'AddPrimaryKey': emit({ op: 'pk', t, cols: colList(nm('column') || nm('columns')), name: str(nm('name')) }, line); break;
+        case 'DropPrimaryKey': emit({ op: 'droppk', t }, line); break;
+        case 'AddUniqueConstraint': emit({ op: 'uq', t, cols: colList(nm('column') || nm('columns')), name: str(nm('name')) }, line); break;
+        case 'DropUniqueConstraint': case 'DropForeignKey': case 'DropCheckConstraint': emit({ op: 'dropcon', t, name: str(nm('name')) }, line); break;
+        case 'AddForeignKey':
+          emit({ op: 'fk', t, cols: colList(nm('column') || nm('columns')), ref: tparts(nm('principalTable'), nm('principalSchema')), refCols: colList(nm('principalColumn') || nm('principalColumns')), name: str(nm('name')), disabled: false, onDelete: onDel(nm('onDelete')) }, line);
+          break;
+        case 'CreateIndex': {
+          const cols = colList(nm('column') || nm('columns'));
+          const unique = nm('unique') && nm('unique').id === 'true';
+          emit(unique ? { op: 'uq', t, cols, name: str(nm('name')), index: true } : { op: 'index', t, cols, name: str(nm('name')) }, line);
+          stats.indexes++;
+          break;
+        }
+        case 'DropIndex': emit({ op: 'dropindex', name: str(nm('name')), t }, line); break;
+        case 'AddCheckConstraint': checkOp(t, str(nm('sql')), line); break;
+        case 'AlterTable': if (nm('comment') !== undefined) emit({ op: 'tcomment', t: tparts(nm('name'), nm('schema')), text: str(nm('comment')) }, line); break;
+        case 'Sql': { const s = str(arg(c, 0, 'sql')); if (s) { raw.push({ sql: s, line, at: pending.length }); } break; }
+        case 'EnsureSchema': case 'DropSchema': case 'AlterDatabase': case 'RenameIndex': break;
+        default: skip(c.name);
+      }
+    }
+    function checkOp(tp, sql, line) {
+      const m = /^\s*\(?\s*[["`]?(\w+)[\]"`]?\s+IN\s*\(([^)]*)\)\s*\)?\s*$/i.exec(sql || '');
+      if (m) emit({ op: 'check', t: tp, col: m[1], values: m[2].split(',').map(v => v.trim().replace(/^N?'(.*)'$/, '$1')).filter(Boolean) }, line);
+    }
+    dialect = providerOf(hints, types);
+    // ham SQL kendi yerinde (önceki işlemlerden sonra) uygulanır
+    let added = 0;
+    for (const r of raw) {
+      const res = NS.parseSQL ? NS.parseSQL(r.sql, { file, dialect }) : null;
+      if (!res) continue;
+      for (const o of res.ops) o.line = r.line;
+      for (const [k, v] of res.stats.skipped) stats.skipped.set(k, (stats.skipped.get(k) || 0) + v);
+      pending.splice(r.at + added, 0, ...res.ops);
+      added += res.ops.length;
+    }
+    ops.push(...pending);
+  } catch (err) {
+    stats.errors.push({ file, line: 0, message: String(err && err.message || err) });
+  }
+  return { file, dialect, ops, stats, orm: 'efcore' };
+}
+
+Object.assign(NS, { parseEfCore, looksLikeEfSnapshot, parseEfMigration, looksLikeEfMigration });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});
