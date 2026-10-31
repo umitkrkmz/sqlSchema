@@ -5,6 +5,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+## [0.13.0] - 2026-10-31
+
 ### Eklendi · Added
 
 - **EF Core migration geçmişi:** `20240115093000_Initial.cs` gibi migration dosyaları sürüm olarak okunur (`Up()` içindeki `CreateTable`, `AddColumn`, `AlterColumn`, `RenameColumn`, `RenameTable`, `CreateIndex`, `AddForeignKey`, `DropTable` …; `Sql("...")` içindeki ham SQL). Zaman çizelgesi, şema farkı, değişiklik incelemesi ve `--since` EF projelerinde SQL'siz çalışır. Migration'lar varken model özeti (son hâlin kopyası) atlanır; `.Designer.cs` ve `Down()` okunmaz. **Bayi portalı** örneğine üç sürümlük geçmiş eklendi; test, geçmişin sonunun model özetiyle aynı şemayı verdiğini denetler.
@@ -211,7 +213,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 - **Geliştirme araçları:** test seti, ekran görüntüsü üreticisi.
   Test suite and screenshot generator.
 
-[Yayımlanmamış · Unreleased]: ../../compare/v0.12.0...HEAD
+[Yayımlanmamış · Unreleased]: ../../compare/v0.13.0...HEAD
+[0.13.0]: ../../compare/v0.12.0...v0.13.0
 [0.12.0]: ../../compare/v0.11.0...v0.12.0
 [0.11.0]: ../../compare/v0.10.0...v0.11.0
 [0.10.0]: ../../compare/v0.9.0...v0.10.0
