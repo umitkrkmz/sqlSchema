@@ -5,6 +5,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+## [0.14.0] - 2026-11-03
+
 ### Eklendi · Added
 
 - **PL/SQL kod haritası:** paket, yordam, fonksiyon ve tetikleyiciler okunur; PL/SQL varken üst çubukta **Tablolar / Kod** geçişi. Kod haritasında paketler takımyıldız, yordamlar yıldız, çağrılar ok; kartta çağırdıkları, yazdığı (`W`) ve okuduğu (`R`) tablolar, dinamik SQL sayısı. Panelde çağırdıkları, çağıranlar, kullandığı tablolar, dışa açık / paket içi, aşırı yüklemeler ve dinamik SQL metni (değişkene atamalar izlenir; adı değişkenden gelen kısım `…` ile gösterilir ve sayılır). Tablo panelinde **Bu tabloyu kullanan kod**. Yol bulma çağrı yönünde, etki analizi çağıranları verir. Yalnızca paket dosyaları açılınca doğrudan kod haritası; `?view=code`. Yeni örnek: **Telekom PL/SQL kodu**.
@@ -223,7 +225,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 - **Geliştirme araçları:** test seti, ekran görüntüsü üreticisi.
   Test suite and screenshot generator.
 
-[Yayımlanmamış · Unreleased]: ../../compare/v0.13.0...HEAD
+[Yayımlanmamış · Unreleased]: ../../compare/v0.14.0...HEAD
+[0.14.0]: ../../compare/v0.13.0...v0.14.0
 [0.13.0]: ../../compare/v0.12.0...v0.13.0
 [0.12.0]: ../../compare/v0.11.0...v0.12.0
 [0.11.0]: ../../compare/v0.10.0...v0.11.0

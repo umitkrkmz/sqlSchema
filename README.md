@@ -572,7 +572,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
       # bir sürüm etiketine sabitleyin
-      - run: git clone --depth 1 --branch v0.13.0 https://github.com/umitkrkmz/sqlSchema.git ../sqlschema
+      - run: git clone --depth 1 --branch v0.14.0 https://github.com/umitkrkmz/sqlSchema.git ../sqlschema
       - run: git worktree add ../base origin/${{ github.base_ref }}
       - run: node ../sqlschema/tools/sqlschema-lint.js db/migration --baseline ../base/db/migration --format md --out review.md --fail-on error
       - if: always()
@@ -1357,7 +1357,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
       # pin to a release tag
-      - run: git clone --depth 1 --branch v0.13.0 https://github.com/umitkrkmz/sqlSchema.git ../sqlschema
+      - run: git clone --depth 1 --branch v0.14.0 https://github.com/umitkrkmz/sqlSchema.git ../sqlschema
       - run: git worktree add ../base origin/${{ github.base_ref }}
       - run: node ../sqlschema/tools/sqlschema-lint.js db/migration --baseline ../base/db/migration --format md --out review.md --fail-on error
       - if: always()
