@@ -320,5 +320,53 @@
       "sector": "Telecom",
       "scenario": "The EF Core migration history (three versions, with the timeline) and model snapshot of a .NET application together with the reporting and archive scripts the DBA wrote by hand: owned types, TPH / TPT inheritance, a many-to-many join table."
     }
+  },
+  {
+    "id": "plsql",
+    "title": "Telekom PL/SQL kodu",
+    "sector": "Telekom",
+    "dialect": "Oracle",
+    "scenario": "15 paket, tetikleyiciler ve yordamlar: paketler arası çağrılar, ortak log / hata / parametre paketleri, okunan ve yazılan tablolar; aylık CDR tabloları ve tablodan okunan iş adlarıyla bol dinamik SQL.",
+    "files": [
+      "db/paketler/ORTAK.HATA_PKG.pkb",
+      "db/paketler/ORTAK.HATA_PKG.pks",
+      "db/paketler/ORTAK.LOG_PKG.pkb",
+      "db/paketler/ORTAK.LOG_PKG.pks",
+      "db/paketler/ORTAK.PARAM_PKG.pkb",
+      "db/paketler/ORTAK.PARAM_PKG.pks",
+      "db/paketler/ORTAK.TARIH_PKG.pkb",
+      "db/paketler/ORTAK.TARIH_PKG.pks",
+      "db/paketler/TEL.ABONE_PKG.pkb",
+      "db/paketler/TEL.ABONE_PKG.pks",
+      "db/paketler/TEL.BATCH_PKG.pkb",
+      "db/paketler/TEL.BATCH_PKG.pks",
+      "db/paketler/TEL.BILDIRIM_PKG.pkb",
+      "db/paketler/TEL.BILDIRIM_PKG.pks",
+      "db/paketler/TEL.CDR_PKG.pkb",
+      "db/paketler/TEL.CDR_PKG.pks",
+      "db/paketler/TEL.ENTEGRASYON_PKG.pks",
+      "db/paketler/TEL.FATURA_PKG.pkb",
+      "db/paketler/TEL.FATURA_PKG.pks",
+      "db/paketler/TEL.HAT_PKG.pkb",
+      "db/paketler/TEL.HAT_PKG.pks",
+      "db/paketler/TEL.KAMPANYA_PKG.pkb",
+      "db/paketler/TEL.KAMPANYA_PKG.pks",
+      "db/paketler/TEL.MUSTERI_PKG.pkb",
+      "db/paketler/TEL.MUSTERI_PKG.pks",
+      "db/paketler/TEL.RAPOR_PKG.pkb",
+      "db/paketler/TEL.RAPOR_PKG.pks",
+      "db/paketler/TEL.TAHSILAT_PKG.pkb",
+      "db/paketler/TEL.TAHSILAT_PKG.pks",
+      "db/paketler/TEL.TARIFE_PKG.pkb",
+      "db/paketler/TEL.TARIFE_PKG.pks",
+      "db/tablolar.sql",
+      "db/tetikleyiciler.sql",
+      "db/yordamlar.sql"
+    ],
+    "en": {
+      "title": "Telecom PL/SQL code",
+      "sector": "Telecom",
+      "scenario": "15 packages, triggers and procedures: calls between packages, shared log / error / parameter packages, tables read and written; plenty of dynamic SQL with monthly CDR tables and job names read from a table."
+    }
   }
 ];
