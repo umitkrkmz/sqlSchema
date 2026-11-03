@@ -5,6 +5,11 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Düzeltildi · Fixed
+
+- **Kod haritası, tablo kullanımı:** `FROM` listesinde alt sorgudan, `AS OF` / `PARTITION` eklerinden ya da `TABLE()` öğesinden sonra virgülle gelen tablolar okunmuyordu (`FROM (SELECT …) s, T2` içinde `T2`). Liste artık öğe öğe okunur. `MERGE` sonrasındaki `EXECUTE IMMEDIATE … USING değişken` tablo sanılmıyor.
+  Code map, table usage: tables after a subquery, an `AS OF` / `PARTITION` clause or a `TABLE()` item in a comma-separated `FROM` list were missed (`T2` in `FROM (SELECT …) s, T2`). The list is now read item by item. `EXECUTE IMMEDIATE … USING variable` after a `MERGE` is no longer taken for a table.
+
 ## [0.14.0] - 2026-11-03
 
 ### Eklendi · Added

@@ -80,6 +80,12 @@ function insideCall(toks, i, names) {
   return false;
 }
 
+// i'nin bulunduğu deyimde (önceki ';' ile i arası) verilen kelime geçiyor mu
+function sameStatement(toks, i, word) {
+  for (let k = i - 1; k >= 0 && !isP(toks[k], ';'); k--) if (isW(toks[k], word)) return true;
+  return false;
+}
+
 const STOP_FROM = new Set(['WHERE', 'GROUP', 'ORDER', 'CONNECT', 'START', 'HAVING', 'UNION', 'MINUS', 'INTERSECT', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'FULL', 'CROSS', 'NATURAL', 'ON', 'USING', 'INTO', 'FOR', 'WHEN', 'THEN', 'SET', 'VALUES', 'RETURNING', 'MODEL', 'PIVOT', 'UNPIVOT', 'SAMPLE', 'LOOP', 'BULK', 'LIMIT', 'OFFSET', 'FETCH', 'WINDOW']);
 
 // SQL parçasındaki tablo kullanımları; tokens doğrusal taranır (alt sorguların FROM'u da sırası gelince okunur)
@@ -115,26 +121,29 @@ function tableUses(toks, ctes, dynamic) {
     if (t.u === 'UPDATE' && !isW(prev, 'FOR') && !isW(prev, 'BEFORE', 'AFTER', 'OR')) { i = target(i + 1, 'w', 'UPDATE') - 1; continue; }
     if (t.u === 'DELETE' && !isW(prev, 'ON', 'BEFORE', 'AFTER', 'OR')) { i = target(isW(toks[i + 1], 'FROM') ? i + 2 : i + 1, 'w', 'DELETE') - 1; continue; }
     if (t.u === 'MERGE' && isW(toks[i + 1], 'INTO')) { i = target(i + 2, 'w', 'MERGE') - 1; continue; }
-    if (t.u === 'USING' && toks.slice(Math.max(0, i - 30), i).some(x => isW(x, 'MERGE'))) { i = target(i + 1, 'r', 'MERGE') - 1; continue; }
+    // MERGE ... USING kaynak: yalnızca aynı deyimin içinde (EXECUTE IMMEDIATE ... USING değişken değil)
+    if (t.u === 'USING' && sameStatement(toks, i, 'MERGE')) { i = target(i + 1, 'r', 'MERGE') - 1; continue; }
     if (t.u === 'TRUNCATE' && isW(toks[i + 1], 'TABLE')) { i = target(i + 2, 'w', 'TRUNCATE') - 1; continue; }
     if (t.u === 'JOIN') { i = target(i + 1, 'r', 'SELECT') - 1; continue; }
     // EXTRACT(YEAR FROM d), TRIM(' ' FROM x): FROM tablo değil
     if (t.u === 'FROM' && insideCall(toks, i, ['EXTRACT', 'TRIM', 'SUBSTRING', 'OVERLAY'])) continue;
     if (t.u === 'FROM' && !isW(prev, 'DELETE')) {
-      // FROM a x, b y, (alt sorgu) z
-      let j = i + 1;
-      for (;;) {
-        // alt sorgu: içi doğrusal taramada okunur, burada durulur
-        if (isP(toks[j], '(')) break;
-        else if (isName(toks[j]) && !(toks[j].t === 'w' && STOP_FROM.has(toks[j].u))) j = target(j, 'r', 'SELECT');
-        else break;
-        // takma ad
-        if (isW(toks[j], 'AS')) j++;
-        if (isName(toks[j]) && !(toks[j].t === 'w' && (STOP_FROM.has(toks[j].u) || KEYWORDS.has(toks[j].u)))) j++;
-        if (isP(toks[j], ',')) { j++; continue; }
-        break;
+      // FROM a x, (alt sorgu) s, b AS OF TIMESTAMP ..., TABLE(f) t, c PARTITION (p):
+      // listenin her öğesi parantez dışındaki virgüllere kadar; öğenin ilk adı tablodur. Alt sorguların ve
+      // JOIN'lerin içi burada atlanır, doğrusal tarama (i ilerletilmez) onları sırası gelince okur.
+      let d = 0, start = true;
+      for (let j = i + 1; j < toks.length; j++) {
+        const x = toks[j];
+        if (isP(x, '(')) { d++; start = false; continue; }
+        if (isP(x, ')')) { if (d === 0) break; d--; continue; }
+        if (d > 0) continue;
+        if (isP(x, ';') || (x.t === 'w' && STOP_FROM.has(x.u))) break;
+        if (isP(x, ',')) { start = true; continue; }
+        if (!start) continue;
+        start = false;
+        // TABLE(koleksiyon), LATERAL (alt sorgu): ad değil, işlev
+        if (isName(x) && !isP(toks[j + 1], '(') && !(x.t === 'w' && KEYWORDS.has(x.u))) j = target(j, 'r', 'SELECT') - 1;
       }
-      i = j - 1;
     }
   }
   return out;

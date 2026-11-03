@@ -792,6 +792,26 @@ END P;
   const cm = NS.buildCodeModel([r]);
   const callsOfA = cm.calls.filter(c => c.from === a).map(c => c.to.name).sort();
   check('PL/SQL: yerel çağrılar (ileri bildirimli olan dahil)', same(callsOfA, ['B', 'ILERI']) && same(r.units[2].uses.map(x => x.op + ':' + x.parts[0]), ['DELETE:T4']), callsOfA);
+  // dur kelimeleri (UNION, JOIN, WHERE ...) ve FROM listesinin zor öğeleri tablo kaçırtmamalı
+  const SQLS = [
+    ['SELECT a FROM T1 UNION ALL SELECT a FROM T2 MINUS SELECT a FROM T3 INTERSECT SELECT a FROM T4', 'r:T1 r:T2 r:T3 r:T4'],
+    ['SELECT * FROM T1 a INNER JOIN T2 b ON a.x=b.x LEFT OUTER JOIN T3 c ON 1=1 FULL OUTER JOIN T4 ON 1=1 CROSS JOIN T5 NATURAL JOIN T6 JOIN T7 USING (ID)', 'r:T1 r:T2 r:T3 r:T4 r:T5 r:T6 r:T7'],
+    ['SELECT * FROM (SELECT x FROM T1) s, T2 t WHERE s.x = t.x', 'r:T1 r:T2'],
+    ['SELECT * FROM T1 a JOIN (SELECT x FROM T2 UNION SELECT y FROM T3) b ON a.x = b.x', 'r:T1 r:T2 r:T3'],
+    ['SELECT * FROM S.T1 AS OF TIMESTAMP SYSDATE - 1, T2 PARTITION (P1) p, T3@UZAK', 'r:S.T1 r:T2 r:T3'],
+    ['SELECT * FROM TABLE(f(x)) t, DUAL, T1 CROSS APPLY (SELECT * FROM T2) b, LATERAL (SELECT * FROM T3) c', 'r:T1 r:T2 r:T3'],
+    ['WITH A AS (SELECT * FROM T1), B AS (SELECT * FROM T2 JOIN A ON 1=1) SELECT * FROM A, B, T3', 'r:T1 r:T2 r:T3'],
+    ['DELETE FROM T1 WHERE id NOT IN (SELECT id FROM T2 UNION SELECT id FROM T3)', 'r:T2 r:T3 w:T1'],
+    ['MERGE INTO T1 t USING (SELECT * FROM T2 JOIN T3 USING (ID)) s ON (t.id = s.id) WHEN MATCHED THEN UPDATE SET t.x = s.x', 'r:T2 r:T3 w:T1'],
+    ["MERGE INTO T1 t USING T2 s ON (1=1) WHEN MATCHED THEN UPDATE SET t.x = 1; EXECUTE IMMEDIATE 'DELETE FROM T3' USING P_ID", 'r:T2 w:T1 w:T3'],
+  ];
+  const wrongSql = [];
+  for (const [sql, want] of SQLS) {
+    const pu = NS.parsePlsql(`CREATE OR REPLACE PROCEDURE P IS BEGIN ${sql}; END;\n/`).units[0];
+    const got = [...new Set(pu.uses.map(x => x.mode + ':' + x.parts.join('.')))].sort().join(' ');
+    if (got !== want) wrongSql.push({ sql: sql.slice(0, 50), want, got });
+  }
+  check('PL/SQL: UNION / JOIN / alt sorgu / FROM listesi tablo kaçırmaz, MERGE dışındaki USING tablo değil', !wrongSql.length, wrongSql);
   check('PL/SQL: PL/SQL içermeyen dosya', !NS.looksLikePlsql('CREATE TABLE X (A NUMBER);') && NS.parsePlsql('CREATE TABLE X (A NUMBER);').units.length === 0);
 }
 
