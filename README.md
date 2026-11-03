@@ -39,16 +39,17 @@ draw.io kadar elle uğraştırmaz, veri modelleme aracı kadar ağır değildir.
 5. [Desteklenen veritabanları](#tr-veritabanlari)
 6. [MongoDB](#tr-mongodb)
 7. [EF Core (kod öncelikli)](#tr-efcore)
-8. [Adlandırma profili](#tr-adlandirma)
-9. [Tasarım denetimi](#tr-denetim)
-10. [Belge ve diyagram olarak dışa aktarmak](#tr-belge)
-11. [KVKK haritası](#tr-kvkk)
-12. [Örnekler](#tr-ornekler)
-13. [Şemayı dışa aktarmak](#tr-disa-aktarma)
-14. [Dil](#tr-dil)
-15. [Proje yapısı ve geliştirme](#tr-gelistirme)
-16. [Sınırlar](#tr-sinirlar)
-17. [Katkı, güvenlik, lisans](#tr-katki)
+8. [PL/SQL kod haritası](#tr-kod)
+9. [Adlandırma profili](#tr-adlandirma)
+10. [Tasarım denetimi](#tr-denetim)
+11. [Belge ve diyagram olarak dışa aktarmak](#tr-belge)
+12. [KVKK haritası](#tr-kvkk)
+13. [Örnekler](#tr-ornekler)
+14. [Şemayı dışa aktarmak](#tr-disa-aktarma)
+15. [Dil](#tr-dil)
+16. [Proje yapısı ve geliştirme](#tr-gelistirme)
+17. [Sınırlar](#tr-sinirlar)
+18. [Katkı, güvenlik, lisans](#tr-katki)
 
 <a id="tr-one-cikanlar"></a>
 
@@ -58,6 +59,7 @@ draw.io kadar elle uğraştırmaz, veri modelleme aracı kadar ağır değildir.
 - **Gizlilik:** dosyalar tarayıcıdan çıkmaz, hiçbir sunucuya gönderilmez.
 - **Sekiz veritabanı:** Oracle, SQL Server, MySQL, MariaDB, PostgreSQL, SQLite, Cassandra ve MongoDB.
 - **Kod öncelikli projeler:** EF Core model özeti (`ModelSnapshot.cs`) ve migration geçmişi SQL'e çevirmeden okunur; DBA betikleriyle birlikte açılabilir.
+- **PL/SQL kod haritası:** paketlerdeki yordamlar, aralarındaki çağrılar, okudukları ve yazdıkları tablolar; dinamik SQL'in okunamayan yerleri işaretlenir.
 - **Tek dosya, birden fazla dosya ya da bütün bir klasör:** bölünmüş dökümler, migration klasörleri (Flyway, golang-migrate, Prisma, Diesel), çok veritabanlı projeler.
 - **Karga ayağı notasyonu:** kardinalite `NOT NULL`, `UNIQUE` ve PK bilgisinden çıkarılır.
 - **Tahmini ilişkiler:** FK tanımlı olmayan eski sistemlerde, Cassandra'da ve MongoDB'de bağlantılar kolon adlarından bulunur.
@@ -358,7 +360,7 @@ Migration'lar baştan sona uygulanır ve harita şemanın **son hâlini** göste
 
 `DATE`, `INTEGER`, `VARCHAR` gibi her veritabanında bulunan tipler ayırt etmeye yaramadığı için sayılmaz. İpucu taşımayan sade bir `CREATE TABLE` dosyası, aynı klasördeki dosyaların baskın türünü alır. MongoDB dosyaları uzantıdan ve içerikten (`$jsonSchema`, `new Schema(…)`, JSON belgeleri) tanınır.
 
-**Çizime girmeyenler.** View, sequence, trigger, package, procedure, function, type, grant ve `INSERT` raporda sayılır ama çizilmez (`INSERT … VALUES` satırları yalnızca [sözlük değerleri](#tr-haritayi-okumak) için okunur). Ayrıştırıcı bunların içindeki `;` işaretlerine takılmaz:
+**Çizime girmeyenler.** View, sequence, type, grant ve `INSERT` raporda sayılır ama tablo haritasına çizilmez (`INSERT … VALUES` satırları yalnızca [sözlük değerleri](#tr-haritayi-okumak) için okunur). Package, procedure, function ve trigger [kod haritasında](#tr-kod) çizilir. Ayrıştırıcı bunların içindeki `;` işaretlerine takılmaz:
 - PL/SQL blokları `/` satırına kadar bütün tutulur.
 - T-SQL blokları `GO` satırına kadar bütün tutulur.
 - MySQL blokları `DELIMITER` ayracına kadar bütün tutulur.
@@ -409,6 +411,23 @@ Gömülü nesneler ve nesne dizileri, sahibinin yanında duran **uydu** tablolar
 - **Okunmayanlar:** `ToView` ile görünüme bağlanan varlıklar, `HasData` tohum verisi ve migration'ların `Down()` yöntemi.
 
 <img src="docs/images/tr/ef-core.png" alt="EF Core: bayi portalının model özeti ve DBA'nın raporlama tabloları birlikte" width="900">
+
+<a id="tr-kod"></a>
+
+### PL/SQL kod haritası
+
+Şemayla birlikte paketler, yordamlar ve tetikleyiciler de açıldıysa (SQL Developer ya da `DBMS_METADATA` dökümü, `.pks` / `.pkb` dosyaları) üst çubukta **Tablolar / Kod** geçişi belirir. **Kod** aynı yıldız haritasını yordamlar için çizer: "bu pakette şu yordamlar var, bu yordamdan şuna gidiliyor". Kod çalıştırılmaz; metin okunarak çıkarılır.
+
+- **Haritada:** her paket bir takımyıldız, her yordam ve fonksiyon bir yıldız, çağrılar oklu çizgi (ok çağrılanı gösterir). Tetikleyiciler ve tek başına yordamlar kendi gruplarındadır. Yakınlaşınca kartta yordamın çağırdıkları (`→`), yazdığı (`W`) ve okuduğu (`R`) tablolar ve dinamik SQL sayısı (`SQL`) görünür; çağrı oku o satırdan çıkar.
+- **Panelde:** çağırdıkları ve onu çağıranlar (satır numarasıyla), kullandığı tablolar (SELECT, INSERT, UPDATE, DELETE, MERGE, TRUNCATE; paket düzeyindeki imleçler dahil), dışa açık mı paket içi mi, kaç aşırı yüklemesi olduğu. Bir tabloya tıklamak tablo haritasında onu açar.
+- **Tablo haritasında:** her tablonun panelinde **Bu tabloyu kullanan kod**: onu yazan, okuyan yordamlar ve üzerindeki tetikleyiciler. Tıklanınca kod haritasına geçilir.
+- **Dinamik SQL:** `EXECUTE IMMEDIATE`, `OPEN … FOR` ve `DBMS_SQL.PARSE` metni, değişkene yapılan atamalar (`v_sql := … || …`) izlenerek kurulur; sabit kısımlardaki tablolar ve çağrılar okunur. Adı değişkenden gelen kısım okunamaz: panel metni `…` ile gösterir ve "adı değişkenden gelen tablo: `TEL.CDR_…`" diye yazar, yordamın üstünde kaç yerin okunamadığı sayılır. Böylece analizin nerede kör kaldığı bilinir.
+- **Yol bul:** kod haritasında çağrı yönündedir: "bu yordamdan şuna nasıl gidilir" sorusuna adım adım çağrı zinciri.
+- **Etki analizi:** bu yordam değişirse onu doğrudan ve dolaylı çağıranlar, derece derece.
+- **Dışarısı:** Oracle'ın kendi paketlerine (`DBMS_*`, `UTL_*`) çağrılar yalnızca kartta ve panelde listelenir. Gövdesi dökümde olmayan paketin yordamları `∅` ile gösterilir.
+- Yalnızca paket dosyaları açılırsa (tablo betiği yok) doğrudan kod haritası açılır. Bağlantı: `?view=code&select=FATURA_KES`.
+
+<img src="docs/images/tr/kod-haritasi.png" alt="PL/SQL kod haritası: FATURA_KES fonksiyonunun çağırdıkları, yazdığı ve okuduğu tablolar" width="900">
 
 <a id="tr-adlandirma"></a>
 
@@ -639,6 +658,7 @@ Bulgular adlardan ve açıklamalardan tahmindir, hukuki görüş değildir; enva
 | Karışık adlandırma | Oracle | İki ekip, iki alışkanlık: PK `ID` ve `<TABLO>_ID`, kuralsız FK'ler, ORM tabloları |
 | Sözlük ağırlıklı | Oracle | Bütün kodlar tek bir `SOZLUK` tablosunda; 30'dan fazla kolon ona `@ref` ile bağlı |
 | Hatalı tasarım (DBA incelemesi) | Oracle | Düzgün bir şemaya özensiz eklenmiş migration'lar; her denetim kuralı tetiklenir |
+| Telekom PL/SQL kodu | Oracle | 15 paket, tetikleyiciler ve yordamlar; ortak log / hata / parametre paketleri, bol dinamik SQL ([kod haritası](#tr-kod)) |
 | Bayi portalı (EF Core) | SQL Server | .NET uygulamasının üç sürümlük migration geçmişi ve `ModelSnapshot.cs`'i ile DBA'nın raporlama ve arşiv betikleri birlikte: owned tip, TPH / TPT, çoka çok |
 
 <a id="tr-disa-aktarma"></a>
@@ -714,6 +734,7 @@ js/                 tarayıcıda bu sırayla yüklenir; hepsi globalThis.sqlSche
   sql-parser.js     DDL → sıralı işlem listesi (create, fk, rename, drop ...)
   mongo.js          $jsonSchema, Mongoose ve JSON belgelerinden aynı işlem listesi
   efcore.js         EF Core model özeti ve migration dosyalarından aynı işlem listesi
+  plsql.js          PL/SQL kod haritası: yordamlar, çağrılar, tablo kullanımı, dinamik SQL
   files.js          dosya sıralama (Flyway, golang-migrate, Prisma, Diesel, EF Core), ayrıştırıcı seçimi
   model.js          işlemleri uygular: tablolar, ilişkiler, kardinalite, ara tablo, tahmini ilişki; etki analizi, yol bulma
   diff.js           iki modelin farkı: tablo, kolon, PK, FK, UNIQUE; ad değişikliği tahmini; zaman çizelgesi
@@ -753,6 +774,7 @@ sqlSchema.loadText('CREATE TABLE a (id int PRIMARY KEY);', 'deneme.sql')
 ### Sınırlar
 
 - View'lar ve view'lar üzerinden kurulan ilişkiler çizilmez.
+- Kod haritasında aynı adlı aşırı yüklenmiş yordamlar tek düğümdür; çağrı adla eşleşir, parametreden hangisinin çağrıldığı ayrılmaz. Adı değişkenden gelen dinamik SQL okunamaz (yalnızca sayılır). Nesne tipleri (`TYPE BODY`), Java yordamları ve view gövdeleri okunmaz.
 - Tahmini ilişkiler yalnızca kolon adlarına dayanır; adlandırma kuralı tutarsız şemalarda eksik ya da fazla çıkabilir. MongoDB'de `authorId` gibi koleksiyon adıyla eşleşmeyen alanlar bağlanmaz.
 - `CREATE TABLE … AS SELECT` tabloları kolonsuz görünür.
 - MongoDB şeması örnek belgelerden çıkarılıyorsa yalnızca o belgelerde görülen alanlar listelenir.
@@ -800,16 +822,17 @@ It is less manual than draw.io and lighter than a data-modelling tool. The goal 
 5. [Supported databases](#en-databases)
 6. [MongoDB](#en-mongodb)
 7. [EF Core (code first)](#en-efcore)
-8. [Naming profile](#en-naming)
-9. [Design audit](#en-audit)
-10. [Exporting documents and diagrams](#en-docs)
-11. [Personal data map](#en-privacy)
-12. [Samples](#en-samples)
-13. [Exporting a schema](#en-export)
-14. [Language](#en-language)
-15. [Project layout and development](#en-development)
-16. [Limitations](#en-limitations)
-17. [Contributing, security, license](#en-contributing)
+8. [PL/SQL code map](#en-kod)
+9. [Naming profile](#en-naming)
+10. [Design audit](#en-audit)
+11. [Exporting documents and diagrams](#en-docs)
+12. [Personal data map](#en-privacy)
+13. [Samples](#en-samples)
+14. [Exporting a schema](#en-export)
+15. [Language](#en-language)
+16. [Project layout and development](#en-development)
+17. [Limitations](#en-limitations)
+18. [Contributing, security, license](#en-contributing)
 
 <a id="en-highlights"></a>
 
@@ -819,6 +842,7 @@ It is less manual than draw.io and lighter than a data-modelling tool. The goal 
 - **Privacy:** files never leave the browser and are not sent to any server.
 - **Eight databases:** Oracle, SQL Server, MySQL, MariaDB, PostgreSQL, SQLite, Cassandra and MongoDB.
 - **Code-first projects:** the EF Core model snapshot (`ModelSnapshot.cs`) and migration history are read without converting them to SQL; it can be opened together with DBA scripts.
+- **PL/SQL code map:** the procedures in packages, the calls between them and the tables they read and write; unreadable dynamic SQL is marked.
 - **One file, many files or a whole folder:** split dumps, migration folders (Flyway, golang-migrate, Prisma, Diesel), multi-database projects.
 - **Crow's foot notation:** cardinality is derived from `NOT NULL`, `UNIQUE` and primary keys.
 - **Inferred relationships:** links are found from column names in legacy systems without FKs, in Cassandra and in MongoDB.
@@ -1121,7 +1145,7 @@ Migrations are applied from first to last, and the map shows the **final state**
 
 Types found in every database, such as `DATE`, `INTEGER` or `VARCHAR`, cannot tell databases apart and are not counted. A plain `CREATE TABLE` file without hints takes the dominant type of the other files in its folder. MongoDB files are recognised by extension and content (`$jsonSchema`, `new Schema(…)`, JSON documents).
 
-**Not drawn.** Views, sequences, triggers, packages, procedures, functions, types, grants and `INSERT`s are counted in the report but not drawn (`INSERT … VALUES` rows are read only for [lookup values](#en-reading)). The parser does not trip over the `;` inside them:
+**Not drawn.** Views, sequences, types, grants and `INSERT`s are counted in the report but not drawn on the table map (`INSERT … VALUES` rows are read only for [lookup values](#en-reading)). Packages, procedures, functions and triggers are drawn on the [code map](#en-kod). The parser does not trip over the `;` inside them:
 - PL/SQL blocks are kept whole up to the `/` line.
 - T-SQL blocks are kept whole up to the `GO` line.
 - MySQL blocks are kept whole up to the `DELIMITER` mark.
@@ -1172,6 +1196,23 @@ Projects whose schema is defined in .NET code (Entity Framework Core) need no SQ
 - **Not read:** entities mapped to a view with `ToView`, `HasData` seed data and the `Down()` method of migrations.
 
 <img src="docs/images/en/ef-core.png" alt="EF Core: the dealer portal's model snapshot together with the DBA's reporting tables" width="900">
+
+<a id="en-kod"></a>
+
+### PL/SQL code map
+
+When packages, procedures and triggers are opened along with the schema (an SQL Developer or `DBMS_METADATA` dump, `.pks` / `.pkb` files), a **Tables / Code** switch appears in the top bar. **Code** draws the same star map for procedures: "this package has these procedures, this one leads to that one". No code is run; everything is read from the text.
+
+- **On the map:** each package is a constellation, each procedure and function a star, and calls are arrows (the arrow points at the procedure being called). Triggers and standalone procedures have groups of their own. Up close, a card lists what the procedure calls (`→`), the tables it writes (`W`) and reads (`R`), and how much dynamic SQL it has (`SQL`); each call arrow leaves from its row.
+- **In the panel:** what it calls and what calls it (with line numbers), the tables it uses (SELECT, INSERT, UPDATE, DELETE, MERGE, TRUNCATE, including package-level cursors), whether it is public or private to the package, and how many overloads it has. Clicking a table opens it on the table map.
+- **On the table map:** each table's panel has **Code using this table**: the procedures that write and read it and the triggers on it. Clicking one switches to the code map.
+- **Dynamic SQL:** the text of `EXECUTE IMMEDIATE`, `OPEN … FOR` and `DBMS_SQL.PARSE` is rebuilt by following assignments to the variable (`v_sql := … || …`); tables and calls in the constant parts are read. A part whose name comes from a variable cannot be read: the panel shows the text with `…` and says "table whose name comes from a variable: `TEL.CDR_…`", and the number of unreadable places is counted for the procedure. You know where the analysis is blind.
+- **Find path:** on the code map it follows the call direction: the chain of calls from one procedure to another, step by step.
+- **Impact:** if this procedure changes, the procedures that call it directly and indirectly, level by level.
+- **Outside:** calls to Oracle's own packages (`DBMS_*`, `UTL_*`) are listed only on the card and in the panel. Procedures of a package whose body is not in the dump are marked `∅`.
+- If only package files are opened (no table scripts), the code map opens directly. Link: `?view=code&select=FATURA_KES`.
+
+<img src="docs/images/en/kod-haritasi.png" alt="PL/SQL code map: what FATURA_KES calls and the tables it writes and reads" width="900">
 
 <a id="en-naming"></a>
 
@@ -1402,6 +1443,7 @@ The samples under `samples/` are **synthetic**: they do not belong to any real o
 | Mixed naming | Oracle | Two teams, two habits: PK `ID` and `<TABLE>_ID`, irregular FKs, ORM tables |
 | Lookup-heavy | Oracle | Every code lives in a single `SOZLUK` table; more than 30 columns point to it with `@ref` |
 | Flawed design (DBA review) | Oracle | Careless migrations added to a clean schema; every audit rule fires |
+| Telecom PL/SQL code | Oracle | 15 packages, triggers and procedures; shared log / error / parameter packages, plenty of dynamic SQL ([code map](#en-kod)) |
 | Dealer portal (EF Core) | SQL Server | A .NET application's three-version migration history and `ModelSnapshot.cs` together with the DBA's reporting and archive scripts: owned types, TPH / TPT, many-to-many |
 
 <a id="en-export"></a>
@@ -1477,6 +1519,7 @@ js/                 loaded in this order; each file adds to the globalThis.sqlSc
   sql-parser.js     DDL → ordered operation list (create, fk, rename, drop ...)
   mongo.js          the same operation list from $jsonSchema, Mongoose and JSON documents
   efcore.js         the same operation list from the EF Core model snapshot and migration files
+  plsql.js          PL/SQL code map: procedures, calls, table usage, dynamic SQL
   files.js          file ordering (Flyway, golang-migrate, Prisma, Diesel, EF Core), parser selection
   model.js          applies operations: tables, relationships, cardinality, junctions, inference; impact analysis, paths
   diff.js           difference of two models: tables, columns, PK, FK, UNIQUE; rename guesses; timeline
@@ -1516,6 +1559,7 @@ sqlSchema.loadText('CREATE TABLE a (id int PRIMARY KEY);', 'test.sql')
 ### Limitations
 
 - Views and relationships expressed only through views are not drawn.
+- On the code map, same-named overloaded procedures share one node; calls match by name, not by parameters. Dynamic SQL whose names come from variables cannot be read (it is only counted). Object types (`TYPE BODY`), Java procedures and view bodies are not read.
 - Inferred relationships rely on column names only; schemas with inconsistent naming can produce missing or extra links. In MongoDB, fields such as `authorId` that do not match a collection name are not linked.
 - `CREATE TABLE … AS SELECT` tables appear without columns.
 - When a MongoDB schema comes from sample documents, only fields seen in those documents are listed.

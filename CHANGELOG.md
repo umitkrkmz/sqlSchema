@@ -5,6 +5,16 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Eklendi · Added
+
+- **PL/SQL kod haritası:** paket, yordam, fonksiyon ve tetikleyiciler okunur; PL/SQL varken üst çubukta **Tablolar / Kod** geçişi. Kod haritasında paketler takımyıldız, yordamlar yıldız, çağrılar ok; kartta çağırdıkları, yazdığı (`W`) ve okuduğu (`R`) tablolar, dinamik SQL sayısı. Panelde çağırdıkları, çağıranlar, kullandığı tablolar, dışa açık / paket içi, aşırı yüklemeler ve dinamik SQL metni (değişkene atamalar izlenir; adı değişkenden gelen kısım `…` ile gösterilir ve sayılır). Tablo panelinde **Bu tabloyu kullanan kod**. Yol bulma çağrı yönünde, etki analizi çağıranları verir. Yalnızca paket dosyaları açılınca doğrudan kod haritası; `?view=code`. Yeni örnek: **Telekom PL/SQL kodu**.
+  PL/SQL code map: packages, procedures, functions and triggers are read; with PL/SQL present a **Tables / Code** switch appears in the top bar. On the code map packages are constellations, procedures stars and calls arrows; a card lists what it calls and the tables it writes (`W`) and reads (`R`), plus its dynamic SQL count. The panel shows calls, callers, tables used, public / private, overloads and the dynamic SQL text (assignments to the variable are followed; a part whose name comes from a variable is shown as `…` and counted). Table panels get **Code using this table**. Find path follows the call direction, impact lists the callers. Opening only package files opens the code map directly; `?view=code`. New sample: **Telecom PL/SQL code**.
+
+### Değişti · Changed
+
+- **Tasarım denetimi:** `TARIH_KOLONU` gibi bir kolonun adını tutan alanlar metin tarih sayılmaz; `CDR_` önekli aylık çağrı tabloları ve yükleme tabloları (`_YUKLEME`, `_LOAD`) kayıt tablosu sayılır, PK'siz olmaları bilgi düzeyinde kalır.
+  Design audit: fields holding a column's name, such as `TARIH_KOLONU`, are not counted as dates stored as text; monthly call tables prefixed `CDR_` and load tables (`_YUKLEME`, `_LOAD`) count as log tables, and a missing PK stays at info level.
+
 ## [0.13.0] - 2026-10-31
 
 ### Eklendi · Added

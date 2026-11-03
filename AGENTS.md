@@ -29,7 +29,7 @@ Betikler `index.html`'de şu sırayla yüklenir ve her biri `globalThis.sqlSchem
 | `js/sql-parser.js` | DDL → sıralı işlem listesi (`create`, `fk`, `pk`, `rename`, `drop` ...; ayrıntı dosya başında) | yok |
 | `js/mongo.js` | `$jsonSchema`, Mongoose ve JSON belgelerinden aynı işlem listesi | yok |
 | `js/efcore.js` | EF Core model özeti (`*ModelSnapshot.cs`, `parseEfCore`) ve migration dosyaları (`<zaman>_<Ad>.cs` içindeki `Up()`, `parseEfMigration`) → aynı işlem listesi; küçük C# okuyucu, owned tip, TPH / TPT / TPC, sağlayıcı tahmini (`result.orm = 'efcore'`) | yok |
-| `js/plsql.js` | PL/SQL kod haritası: paket, yordam, fonksiyon ve tetikleyiciler; çağrılar, tablo kullanımı (okuma / yazma), dinamik SQL (değişken atamaları izlenir, okunamayan kısım sayılır); `buildCodeModel` çağrıları birimlere, adları tablolara çözer | yok |
+| `js/plsql.js` | PL/SQL kod haritası: paket, yordam, fonksiyon ve tetikleyiciler; çağrılar, tablo kullanımı (okuma / yazma), dinamik SQL (değişken atamaları izlenir, okunamayan kısım sayılır); `buildCodeModel` çağrıları birimlere, adları tablolara çözer; `buildCodeMap` kodu yerleşim ve çizim katmanının beklediği "tablo" biçimine çevirir (yordam = düğüm, çağrı = `kind: 'call'` ilişki, kart satırı = çağrı / tablo / dinamik SQL) | yok |
 | `js/files.js` | dosya sıralama (Flyway, golang-migrate; Prisma ve Diesel'de sürüm klasör adında, `fileLabel`; EF Core migration'ları varken model özeti atlanır), ayrıştırıcı seçimi, ayrı veritabanı adları; `*.sqlschema.json` proje dosyası şema sayılmaz | yok |
 | `js/model.js` | işlemleri dosya sırasıyla uygular; FK çözümleme, kardinalite, ara tablo, tahmini ilişki; etki analizi (`impactOf`), iki tablo arası yollar (`pathsBetween`) | yok |
 | `js/diff.js` | iki modelin farkı (tablo, kolon, varsayılan, PK, FK, UNIQUE), ad değişikliği tahmini; zaman çizelgesi (sürüm adımları, tablo soyu, geçmiş) | yok |
@@ -43,7 +43,7 @@ Betikler `index.html`'de şu sırayla yüklenir ve her biri `globalThis.sqlSchem
 | `js/sample-small.js` | gömülü küçük örnek | yok |
 | `samples/catalog.js` | örnek kataloğu (üretilir) | yok |
 | `js/render.js` | canvas çizimi, kamera, karga ayağı | var |
-| `js/ui.js` | yükleme, dosya listesi, arama, panel, rapor, URL parametreleri | var |
+| `js/ui.js` | yükleme, dosya listesi, arama, panel, rapor, URL parametreleri; Tablolar / Kod geçişi (`S.view`, kod görünümünde tablo modeli `S.tableView`'da saklanır) | var |
 
 Veri akışı: `dosyalar → orderFiles → parseFile (parseSQL | parseMongo | parseEfCore) → buildModel → layoutModel → render`.
 
