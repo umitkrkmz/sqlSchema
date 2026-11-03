@@ -42,6 +42,10 @@
   </div>
 
   <div class="tools">
+    <div class="viewsw" id="viewSwitch" role="group" hidden data-i18n-attr="aria-label:viewSwitch;title:viewSwitchTitle">
+      <button data-view="tables" aria-pressed="true" data-i18n="viewTables"></button>
+      <button data-view="code" aria-pressed="false" data-i18n="viewCode"></button>
+    </div>
     <div class="menu">
       <button class="btn ghost" data-act="view" aria-haspopup="true"><span data-i18n="view"></span> <span aria-hidden="true">▾</span></button>
       <div class="menu-list view-menu pop" id="viewMenu" hidden>
@@ -62,7 +66,7 @@
     </div>
     <button class="btn ghost" data-act="fit" data-i18n="fit" data-i18n-attr="title:fitTitle"></button>
     <button class="btn ghost" data-act="png" data-i18n-attr="title:pngTitle">PNG</button>
-    <button class="btn ghost" data-act="export" data-i18n="exBtn" data-i18n-attr="title:exIntro"></button>
+    <button class="btn ghost no-code" data-act="export" data-i18n="exBtn" data-i18n-attr="title:exIntro"></button>
     <div class="lang" role="group" data-i18n-attr="aria-label:language;title:language">
       <button data-lang="tr" aria-pressed="false">TR</button>
       <button data-lang="en" aria-pressed="false">EN</button>
@@ -110,6 +114,15 @@
   <section id="legend" class="legend" data-i18n-attr="aria-label:legend">
     <button class="legend-toggle" data-act="legend" data-i18n="legend"></button>
     <div class="legend-body">
+      <div class="code-legend">
+        <h4 data-i18n="lgCode"></h4>
+        <ul class="lines">
+          <li><canvas data-line="fk" data-right="arrow"></canvas><span data-i18n="lgCall"></span></li>
+          <li><canvas data-line="ref" data-right="arrow"></canvas><span data-i18n="lgCallDyn"></span></li>
+        </ul>
+        <p class="keys-tags" data-i18n-html="lgCodeTags"></p>
+      </div>
+      <div class="table-legend">
       <h4><span data-i18n="lgEnds"></span> <small data-i18n="lgCrow"></small></h4>
       <ul class="ends">
         <li><canvas data-end="one"></canvas><div><b data-i18n="endOne"></b><span data-i18n="endOneHint"></span></div></li>
@@ -137,6 +150,7 @@
         <li><i class="s-ghost"></i><span data-i18n="starGhost"></span></li>
       </ul>
       <p class="keys-tags" data-i18n-html="keyTags"></p>
+      </div>
       <p class="keys" data-i18n-html="keysHelp"></p>
     </div>
   </section>
@@ -146,11 +160,11 @@
     <span id="hudView"></span>
     <span id="hudStats"></span>
     <button class="link" id="hudFiles" data-act="files" hidden></button>
-    <button class="link" data-act="diff" data-i18n="diffLink"></button>
-    <button class="link" data-act="naming" data-i18n="naming"></button>
-    <button class="link" data-act="audit" data-i18n="auditLink"></button>
-    <button class="link" data-act="privacy" data-i18n="privLink"></button>
-    <button class="link" data-act="report" data-i18n="report"></button>
+    <button class="link no-code" data-act="diff" data-i18n="diffLink"></button>
+    <button class="link no-code" data-act="naming" data-i18n="naming"></button>
+    <button class="link no-code" data-act="audit" data-i18n="auditLink"></button>
+    <button class="link no-code" data-act="privacy" data-i18n="privLink"></button>
+    <button class="link no-code" data-act="report" data-i18n="report"></button>
   </div>
   <div id="report" class="report pop" hidden></div>
   <div id="namingPop" class="report naming-pop pop" hidden></div>
@@ -192,6 +206,7 @@
 <script src="js/sql-parser.js"></script>
 <script src="js/mongo.js"></script>
 <script src="js/efcore.js"></script>
+<script src="js/plsql.js"></script>
 <script src="js/files.js"></script>
 <script src="js/model.js"></script>
 <script src="js/diff.js"></script>

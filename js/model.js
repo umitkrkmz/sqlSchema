@@ -776,7 +776,8 @@ function impactOf(root, opts = {}) {
  * Önce tanımlı ilişkiler (FK, @ref, gömülü) denenir; yol yoksa tahmini ilişkiler de katılır, sonuç "tahmini" olur.
  * Sözlük tabloları ve denetim kolonları (CREATED_BY → kullanıcı) her şeyi birbirine bağlar; sözlükten geçilmez
  * (yalnızca uç olabilir), denetim kolonu sayılmaz.
- *   pathsBetween(a, b, { accept, max }) → { from, to, paths: [{ tables, hops: [{ a, b, rels }] }], inferred }
+ *   pathsBetween(a, b, { accept, max, directed }) → { from, to, paths: [{ tables, hops: [{ a, b, rels }] }], inferred }
+ *   directed: yalnızca child → parent yönünde (kod haritasında "bu yordamdan şuna nasıl gidilir")
  * hops[i].rels: aynı iki tablo arasındaki bütün bağlantılar (ör. fatura ve teslimat adresi)
  */
 function pathsBetween(a, b, opts = {}) {
@@ -811,7 +812,8 @@ function pathsBetween(a, b, opts = {}) {
     for (const r of [...rels].sort((x, y) => x.id - y.id)) {
       if (r.self || !accept(r) || hub(r) || (!withImplicit && r.kind === 'implicit')) continue;
       link(r.child, r.parent, r);
-      link(r.parent, r.child, r);
+      // yönlü (kod haritası: çağıran → çağrılan) yolda yalnızca ileri gidilir
+      if (!opts.directed) link(r.parent, r.child, r);
     }
     const key = (x, y) => x.key + '\u{1}' + y.key;
     // yasaklı düğüm ve kenarlarla en kısa yol (BFS); sözlükten geçilmez

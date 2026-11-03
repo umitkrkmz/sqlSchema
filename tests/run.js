@@ -287,6 +287,20 @@ const EXPECT = {
     check('plsql: dış çağrılar yalnızca Oracle paketleri', [...cm.externals.values()].every(e => e.oracle) && cm.externals.has('UTL_HTTP.REQUEST'), [...cm.externals.keys()]);
     check('plsql: tek başına yordam ve fonksiyon', to(cm.units.find(x => x.name === 'GUNLUK_KAPANIS'), 'BATCH_PKG', 'GECE_ISI') && to(cm.units.find(x => x.name === 'ABONE_OZETI'), 'TAHSILAT_PKG', 'BORC'));
     check('plsql: tabloya göre kullanan kod', (cm.byTable.get(find(m, 'FATURA')) || []).length >= 5, (cm.byTable.get(find(m, 'FATURA')) || []).map(x => x.unit.name + ':' + x.mode));
+    // kod haritası: yordamlar düğüm, çağrılar ok; satırlar çağrı, yazılan / okunan tablo, dinamik SQL
+    check('plsql: dosya ayrıştırması PL/SQL sonucunu taşır', files.filter(f => /\.pkb$/.test(f.path)).every(f => (NS.parseFile(f.path, f.text).code || {}).units.length));
+    const map = NS.buildCodeMap(cm);
+    const node = n => map.tables.find(x => x.name === n);
+    const kap = node('KAPAT');
+    check('plsql haritası: düğüm, ok ve kart satırları', map.tables.length === cm.units.length && map.rels.length === cm.calls.filter(c => !c.to.external).length &&
+      same(kap.columns.map(c => c.tag + c.name), ['\u{2192}HAT_PKG.HAT_KAPAT', '\u{2192}DURUM_DEGISTIR', '\u{2192}BILDIRIM_PKG.KUYRUGA_EKLE', '\u{2192}HATA_PKG.KAYDET', 'WABONE', 'RHAT']) &&
+      kap.out.every(r => r.parentEnd === 'arrow' && r.cols[0] === (r.parent.unit.pkg === 'ABONE_PKG' ? r.parent.name : r.parent.unit.pkg + '.' + r.parent.name)), kap.columns.map(c => c.tag + c.name));
+    const lay = NS.layoutModel(map, { grouping: 'file' });
+    check('plsql haritası: her paket bir takımyıldız', ['ABONE_PKG', 'FATURA_PKG', 'LOG_PKG', 'BATCH_PKG'].every(p => lay.groups.some(g => g.label === p && g.tables.every(x => x.unit.pkg === p))), lay.groups.map(g => g.label));
+    const yol = NS.pathsBetween(node('GUNLUK_KAPANIS'), node('KALEM_EKLE'), { directed: true });
+    check('plsql haritası: yönlü yol çağrı zincirini izler, tersi yok', yol.paths.length && same(yol.paths[0].tables.map(x => x.name), ['GUNLUK_KAPANIS', 'GECE_ISI', 'DONEM_KES', 'FATURA_KES', 'KALEM_EKLE']) && !NS.pathsBetween(node('KALEM_EKLE'), node('GUNLUK_KAPANIS'), { directed: true }).paths.length, yol.paths.map(p => p.tables.map(x => x.name)));
+    const etki = NS.impactOf(node('FIRLAT'));
+    check('plsql haritası: etki analizi çağıranları derece derece verir', etki.total >= 7 && etki.levels[0].some(x => x.t.name === 'DOGRULA'), etki.levels.map(l => l.map(x => x.t.name)));
   },
   sosyal({ model: m }) {
     check('sosyal: MongoDB', m.stats.dialects.includes('mongodb'), m.stats.dialects);
@@ -812,6 +826,14 @@ END P;
   for (const f of ['ui.js', 'render.js']) {
     const src = fs.readFileSync(path.join(ROOT, 'js', f), 'utf8');
     for (const m of src.matchAll(/\b(?:t|tr)\('([A-Za-z_]+)'/g)) used.add(m[1]);
+  }
+  // kod haritası: birim türleri ('codeKind_' + tür) ve buildCodeMap'in çevirttiği satır ve grup etiketleri
+  used.delete('codeKind_');
+  for (const k of ['procedure', 'function', 'trigger', 'init']) used.add('codeKind_' + k);
+  {
+    const pf = NS.SAMPLES.find(x => x.id === 'plsql');
+    const res = pf.files.map(p => fs.readFileSync(path.join(ROOT, 'samples', 'plsql', p), 'utf8')).filter(NS.looksLikePlsql).map(x => NS.parsePlsql(x));
+    NS.buildCodeMap(NS.buildCodeModel(res), k => { used.add(k); return k; });
   }
   // 'skip_' + kod biçimindeki dinamik anahtarlar: files.js ve ui.js'teki bütün atlama kodları
   used.delete('skip_');

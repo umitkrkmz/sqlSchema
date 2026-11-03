@@ -596,5 +596,79 @@ function buildCodeModel(results, model) {
   return { units, packages, calls, uses, externals, byTable, callers };
 }
 
-Object.assign(NS, { parsePlsql, looksLikePlsql, buildCodeModel });
+/*
+ * Kod haritası: kod modelini tablo haritasının yerleşim ve çizim katmanının beklediği biçime çevirir.
+ * Yordamlar "tablo", paketler takımyıldız (dosya gruplaması yolu), çağrılar oklu ilişki olur. Kart satırları
+ * çağrılar, tetiklendiği tablo, yazılan / okunan tablolar ve dinamik SQL'dir; çağrı çizgisi çağıranın o satırından çıkar.
+ *   buildCodeMap(cm, tr) → { tables, rels, stats }   tr: satır ve grup etiketleri için çeviri işlevi (anahtar, değişkenler)
+ * Oracle paketlerine ve dökümde olmayan paketlere çağrılar düğüm olmaz; satırda ve panelde görünür.
+ */
+const BADGE = { function: 'FN', trigger: 'TRG', init: 'INIT' };
+function buildCodeMap(cm, tr) {
+  const T = tr || (k => k);
+  const tables = [], rels = [];
+  const node = new Map();
+  const groupOf = u => (u.pkg ? u.pkg : u.kind === 'trigger' ? T('codeGroupTriggers') : T('codeGroupStandalone'));
+  const label = u => (u.kind === 'init' ? T('codeInit') : u.path || u.name);
+  for (const u of cm.units) {
+    const t = {
+      key: 'code:' + u.key, name: label(u), schema: u.schema || '', db: 'code', dialect: 'oracle',
+      src: { file: groupOf(u), line: u.line }, files: [u.file], columns: [], colIdx: new Map(),
+      pk: [], uniques: [], indexes: [], out: [], inc: [], deg: 0, unit: u, code: true,
+      external: !!u.noBody, badge: u.noBody ? '\u{2205}' : BADGE[u.kind] || '',
+    };
+    node.set(u, t);
+    tables.push(t);
+  }
+  // aynı paketteki yordam kısa adla, başka paketteki PAKET.AD ile yazılır
+  const callName = (from, to) => (to.external ? to.name : to.pkg && to.pkg !== from.pkg ? to.pkg + '.' + (to.path || to.name) : to.kind === 'init' ? T('codeInit') : to.path || to.name);
+  const addRow = (t, col) => {
+    const k = col.name.toUpperCase();
+    if (t.colIdx.has(k)) return t.colIdx.get(k);
+    t.columns.push(col);
+    t.colIdx.set(k, col);
+    return col;
+  };
+  const row = (name, type, tag, extra) => ({ name, type, tag, nullable: false, pk: false, fk: false, ...extra });
+  for (const c of cm.calls) {
+    const from = node.get(c.from);
+    const name = callName(c.from, c.to);
+    addRow(from, row(name, T(c.to.external ? (c.to.oracle ? 'codeRowOracle' : 'codeRowMissing') : c.dynamic ? 'codeRowCallDyn' : 'codeRowCall'), c.to.external ? '\u{2197}' : '\u{2192}', { nullable: !!c.to.external, call: true }));
+    if (c.to.external) continue;
+    const to = node.get(c.to);
+    const r = { id: rels.length, kind: 'call', child: from, parent: to, cols: [name], refCols: [], name: null, self: from === to, dict: false, disabled: false, onDelete: null, childEnd: 'none', parentEnd: 'arrow', dynamic: c.dynamic, many: false, line: c.line };
+    rels.push(r);
+    from.out.push(r);
+    to.inc.push(r);
+  }
+  for (const u of cm.units) {
+    const t = node.get(u);
+    if (u.on) addRow(t, row(u.onTable ? u.onTable.name : u.on.parts.join('.'), [u.timing, ...u.on.events].filter(Boolean).join(' ').toLowerCase(), '\u{26A1}'));
+    // tablo başına tek satır: okur, yazar ya da ikisi
+    const byTable = new Map();
+    for (const x of cm.uses) {
+      if (x.unit !== u) continue;
+      const n = x.table ? x.table.name : x.name;
+      if (!byTable.has(n)) byTable.set(n, { r: false, w: false, dyn: true });
+      const e = byTable.get(n);
+      e[x.mode] = true;
+      if (!x.dynamic) e.dyn = false;
+    }
+    const sorted = [...byTable.entries()].sort((a, b) => (b[1].w - a[1].w) || a[0].localeCompare(b[0]));
+    for (const [n, e] of sorted) addRow(t, row(n, T(e.r && e.w ? 'codeRowRW' : e.w ? 'codeRowWrite' : 'codeRowRead') + (e.dyn ? ' ~' : ''), e.w ? 'W' : 'R', { nullable: e.dyn, table: true }));
+    const blind = u.dynamic.reduce((s, d) => s + d.unresolved, 0);
+    if (u.dynamic.length) addRow(t, row(T('codeRowDyn', { n: u.dynamic.length }), blind ? T('codeRowBlind', { n: blind }) : '', 'SQL', { dyn: true }));
+  }
+  for (const t of tables) t.deg = t.out.length + t.inc.length;
+  const units = cm.units.length;
+  const stats = {
+    tables: units, fk: rels.length, implicit: 0, embedded: 0, dialects: ['oracle'],
+    units, calls: rels.length, packages: cm.packages.size,
+    dynamic: cm.units.reduce((s, u) => s + u.dynamic.length, 0),
+    blind: cm.units.reduce((s, u) => s + u.dynamic.reduce((a, d) => a + d.unresolved, 0), 0),
+  };
+  return { tables, rels, stats };
+}
+
+Object.assign(NS, { parsePlsql, looksLikePlsql, buildCodeModel, buildCodeMap });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});

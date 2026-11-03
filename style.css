@@ -211,6 +211,18 @@ code, kbd { font-family: var(--mono); }
 .lang button:hover { color: var(--text); background: rgba(140, 160, 215, 0.1); }
 .lang button[aria-pressed="true"] { background: rgba(242, 180, 90, 0.16); color: var(--accent); }
 .lang button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* Tablolar / Kod geçişi (yalnızca PL/SQL kaynağı varken) */
+.viewsw { display: inline-flex; border: 1px solid var(--line-2); border-radius: 7px; overflow: hidden; flex: none; }
+.viewsw[hidden] { display: none; }
+.viewsw button { height: 30px; padding: 0 11px; border: 0; background: transparent; color: var(--dim); font: 500 12px var(--sans); cursor: pointer; }
+.viewsw button + button { border-left: 1px solid var(--line-2); }
+.viewsw button:hover:not(:disabled) { color: var(--text); background: rgba(140, 160, 215, 0.1); }
+.viewsw button[aria-pressed="true"] { background: rgba(165, 140, 242, 0.18); color: #c9b8ff; }
+.viewsw button:disabled { opacity: 0.4; cursor: default; }
+.code-view .no-code, .code-view #timeBar, .code-view #styleBar { display: none !important; }
+.code-legend { display: none; }
+.code-view .code-legend { display: block; }
+.code-view .table-legend { display: none; }
 
 /* ─── Sahne ─── */
 .stage { position: fixed; inset: var(--bar-h) 0 0 0; }
@@ -469,6 +481,22 @@ code, kbd { font-family: var(--mono); }
 .tag.act-unenforced { border-style: dashed; }
 .has-impact table.cols tr[data-col] { cursor: pointer; }
 
+/* Kod haritası paneli */
+.rels.code-rels li { grid-template-columns: 1fr; padding: 7px 6px; }
+.rels.code-rels li.ext { cursor: default; opacity: 0.75; }
+.rels.code-rels li.ext:hover { background: transparent; }
+.tag.t-w { color: var(--rose); border-color: rgba(239, 123, 134, 0.5); }
+.tag.t-r { color: var(--cyan); border-color: rgba(108, 198, 220, 0.5); }
+.code-dyn .cd-list { list-style: none; margin: 0; padding: 0; }
+.code-dyn .cd-list li { padding: 7px 0; border-top: 1px solid var(--line); }
+.code-dyn .cd-list li:first-child { border-top: 0; }
+.cd-head { display: flex; align-items: center; gap: 8px; font: 10.5px var(--mono); color: var(--faint); }
+.cd-head .tag { margin-left: auto; }
+.cd-sql { margin: 5px 0 0; padding: 7px 8px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line); border-radius: 6px; font: 11px/1.45 var(--mono); color: #c8d2ee; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cd-pat { margin: 5px 0 0; font-size: 11px; color: var(--dim); }
+.cd-pat code { font: 11px var(--mono); color: #d8a3d0; }
+.table-code { border-bottom: 1px solid var(--line); }
+
 /* Yol vurgulama */
 .path { border-bottom: 1px solid var(--line); }
 .path h3 { display: flex; align-items: center; gap: 4px; }
@@ -618,6 +646,10 @@ table.dict .dc:hover { border-color: var(--accent); color: var(--text); }
 .keys-tags b { font: 500 10px var(--mono); }
 .keys-tags .k-pk { color: var(--accent); }
 .keys-tags .k-fk { color: var(--cyan); }
+.keys-tags .k-call { color: var(--accent); }
+.keys-tags .k-w { color: var(--rose); }
+.keys-tags .k-r { color: var(--cyan); }
+.keys-tags .k-sql { color: #d8a3d0; }
 .keys { margin: 10px 0 0; font-size: 11px; color: var(--dim); line-height: 1.9; }
 .keys kbd { font-size: 10px; padding: 0 5px; border: 1px solid var(--line-2); border-radius: 4px; color: #c3cbe2; }
 body:not(.loaded) .legend, body:not(.loaded) .hud { display: none; }
