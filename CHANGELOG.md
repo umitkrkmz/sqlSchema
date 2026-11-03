@@ -5,6 +5,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+## [0.14.1] - 2026-11-03
+
 ### Düzeltildi · Fixed
 
 - **Kod haritası, tablo kullanımı:** `FROM` listesinde alt sorgudan, `AS OF` / `PARTITION` eklerinden ya da `TABLE()` öğesinden sonra virgülle gelen tablolar okunmuyordu (`FROM (SELECT …) s, T2` içinde `T2`). Liste artık öğe öğe okunur. `MERGE` sonrasındaki `EXECUTE IMMEDIATE … USING değişken` tablo sanılmıyor.
@@ -230,7 +232,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 - **Geliştirme araçları:** test seti, ekran görüntüsü üreticisi.
   Test suite and screenshot generator.
 
-[Yayımlanmamış · Unreleased]: ../../compare/v0.14.0...HEAD
+[Yayımlanmamış · Unreleased]: ../../compare/v0.14.1...HEAD
+[0.14.1]: ../../compare/v0.14.0...v0.14.1
 [0.14.0]: ../../compare/v0.13.0...v0.14.0
 [0.13.0]: ../../compare/v0.12.0...v0.13.0
 [0.12.0]: ../../compare/v0.11.0...v0.12.0
