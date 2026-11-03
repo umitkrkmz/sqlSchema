@@ -29,6 +29,7 @@ Betikler `index.html`'de şu sırayla yüklenir ve her biri `globalThis.sqlSchem
 | `js/sql-parser.js` | DDL → sıralı işlem listesi (`create`, `fk`, `pk`, `rename`, `drop` ...; ayrıntı dosya başında) | yok |
 | `js/mongo.js` | `$jsonSchema`, Mongoose ve JSON belgelerinden aynı işlem listesi | yok |
 | `js/efcore.js` | EF Core model özeti (`*ModelSnapshot.cs`, `parseEfCore`) ve migration dosyaları (`<zaman>_<Ad>.cs` içindeki `Up()`, `parseEfMigration`) → aynı işlem listesi; küçük C# okuyucu, owned tip, TPH / TPT / TPC, sağlayıcı tahmini (`result.orm = 'efcore'`) | yok |
+| `js/plsql.js` | PL/SQL kod haritası: paket, yordam, fonksiyon ve tetikleyiciler; çağrılar, tablo kullanımı (okuma / yazma), dinamik SQL (değişken atamaları izlenir, okunamayan kısım sayılır); `buildCodeModel` çağrıları birimlere, adları tablolara çözer; `buildCodeMap` kodu yerleşim ve çizim katmanının beklediği "tablo" biçimine çevirir (yordam = düğüm, çağrı = `kind: 'call'` ilişki, kart satırı = çağrı / tablo / dinamik SQL) | yok |
 | `js/files.js` | dosya sıralama (Flyway, golang-migrate; Prisma ve Diesel'de sürüm klasör adında, `fileLabel`; EF Core migration'ları varken model özeti atlanır), ayrıştırıcı seçimi, ayrı veritabanı adları; `*.sqlschema.json` proje dosyası şema sayılmaz | yok |
 | `js/model.js` | işlemleri dosya sırasıyla uygular; FK çözümleme, kardinalite, ara tablo, tahmini ilişki; etki analizi (`impactOf`), iki tablo arası yollar (`pathsBetween`) | yok |
 | `js/diff.js` | iki modelin farkı (tablo, kolon, varsayılan, PK, FK, UNIQUE), ad değişikliği tahmini; zaman çizelgesi (sürüm adımları, tablo soyu, geçmiş) | yok |
@@ -42,7 +43,7 @@ Betikler `index.html`'de şu sırayla yüklenir ve her biri `globalThis.sqlSchem
 | `js/sample-small.js` | gömülü küçük örnek | yok |
 | `samples/catalog.js` | örnek kataloğu (üretilir) | yok |
 | `js/render.js` | canvas çizimi, kamera, karga ayağı | var |
-| `js/ui.js` | yükleme, dosya listesi, arama, panel, rapor, URL parametreleri | var |
+| `js/ui.js` | yükleme, dosya listesi, arama, panel, rapor, URL parametreleri; Tablolar / Kod geçişi (`S.view`, kod görünümünde tablo modeli `S.tableView`'da saklanır) | var |
 
 Veri akışı: `dosyalar → orderFiles → parseFile (parseSQL | parseMongo | parseEfCore) → buildModel → layoutModel → render`.
 
@@ -52,7 +53,7 @@ Bunları bozan bir değişiklik yapmayın; gerekirse önce bir issue açın.
 
 1. **Bağımlılık ve derleme yok.** npm paketi, paketleyici, TypeScript derlemesi ya da CDN betiği eklenmez. Yalnızca Google Fonts bağlantısı vardır ve olmadan da çalışır.
 2. **Klasik betikler, ES modülü değil.** `type="module"` ve `import` kullanılmaz; sayfa `file://` ile açıldığında da çalışmalıdır. Her dosya `(function (NS) { ... })(globalThis.sqlSchema = globalThis.sqlSchema || {})` kalıbını izler ve dışa açtıklarını `Object.assign(NS, {...})` ile verir.
-3. **Çekirdek DOM'a dokunmaz.** `lexer`, `sql-parser`, `mongo`, `efcore`, `files`, `model`, `diff`, `layout`, `conventions`, `audit`, `fixes`, `migrate`, `export`, `privacy` Node'da `require` edilebilmelidir; testler buna dayanır.
+3. **Çekirdek DOM'a dokunmaz.** `lexer`, `sql-parser`, `mongo`, `efcore`, `plsql`, `files`, `model`, `diff`, `layout`, `conventions`, `audit`, `fixes`, `migrate`, `export`, `privacy` Node'da `require` edilebilmelidir; testler buna dayanır.
 4. **Yerleşim deterministiktir.** `Math.random` yoktur; aynı girdi her zaman aynı haritayı verir.
 5. **Kart boyutu ile yerleşim yarıçapı bağlıdır.** `render.js`'teki `CARD` (164 × en fazla 127) ile `layout.js`'teki `L.nodeR` (105) birlikte değişir; testler kart çakışmasını denetler.
 6. **Her arayüz metni iki dilde.** Kullanıcıya görünen her metin `js/i18n.js`'te hem `tr` hem `en` sözlüğünde bulunur ve `t('anahtar')` ile kullanılır. HTML'de `data-i18n`, `data-i18n-html`, `data-i18n-attr` kullanılır. Testler eksik anahtarı yakalar. Çekirdek modüller metin değil kod döndürür (ör. `skip: 'config'`, `warnings: [{ kind: 'dup', ... }]`); çeviri arayüzde yapılır.

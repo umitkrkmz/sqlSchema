@@ -40,6 +40,7 @@ const S = {
   pick: new Set(), relSet: null,   // çoklu seçim (tablo anahtarları) · alt diyagramda görünen ilişkiler
   impact: false, impactRes: null, impactDepth: null,   // etki analizi kipi, sonucu, tablo → derece
   pathFrom: null, pathRes: null, pathIdx: 0,   // yol: hedef bekleyen başlangıç, sonuç, seçili seçenek
+  view: 'tables', code: null, codeMap: null, tableView: null,   // kod haritası: görünüm, kod modeli, harita, saklanan tablo görünümü
   em: { active: null, near: null, hiRels: null, focus: null },
   anim: null, frame: 0, title: '', parseMs: 0,
 };
@@ -51,7 +52,7 @@ const wx = px => (px - S.w / 2) / S.cam.k + S.cam.x;
 const wy = py => (py - S.h / 2) / S.cam.k + S.cam.y;
 // alt diyagramda yalnızca iki ucu da diyagramda olan ilişkiler görünür (panel de dahil)
 const relVisible = r => (S.implicit || r.kind !== 'implicit') && (!S.relSet || S.relSet.has(r));
-const relStyle = r => (r.kind === 'implicit' ? 'imp' : r.kind === 'embed' ? 'emb' : r.kind === 'ref' ? 'ref' : r.disabled ? 'off' : 'fk');
+const relStyle = r => (r.kind === 'call' ? (r.dynamic ? 'ref' : 'fk') : r.kind === 'implicit' ? 'imp' : r.kind === 'embed' ? 'emb' : r.kind === 'ref' ? 'ref' : r.disabled ? 'off' : 'fk');
 const schemaColor = t => (t.external ? '#8892ad' : PALETTE[t.schemaRef.index % PALETTE.length]);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 // Şemasız tablolar ve bağımsız yıldızlar için etiket arayüz dilinde yazılır
@@ -86,6 +87,8 @@ function shortType(type) {
 
 // PK etiketi; Cassandra'da bölüm anahtarı PK, sıralama (clustering) anahtarı CK
 function keyTag(t, c) {
+  // kod haritası satırları kendi etiketini taşır: → çağrı, W yazar, R okur, SQL dinamik
+  if (c.tag) return c.tag;
   if (c.pk && t.partition && !t.partition.some(p => p.toUpperCase() === c.name.toUpperCase())) return c.fk ? 'CF' : 'CK';
   return c.pk && c.fk ? 'PF' : c.pk ? 'PK' : c.fk ? 'FK' : '';
 }
@@ -147,6 +150,16 @@ function cardGeom(r) {
  */
 function drawEnd(g, px, py, ux, uy, kind, s, bg) {
   const nx = -uy, ny = ux;
+  // kod haritası: çağrılanın ucunda ok, çağıranın ucunda işaret yok
+  if (kind === 'none') return;
+  if (kind === 'arrow') {
+    g.beginPath();
+    g.moveTo(px + ux * s * 1.3 + nx * s * 0.55, py + uy * s * 1.3 + ny * s * 0.55);
+    g.lineTo(px, py);
+    g.lineTo(px + ux * s * 1.3 - nx * s * 0.55, py + uy * s * 1.3 - ny * s * 0.55);
+    g.stroke();
+    return;
+  }
   const many = kind === 'zeroMany' || kind === 'oneMany';
   const bar = d => {
     const cx = px + ux * d, cy = py + uy * d;
@@ -195,7 +208,11 @@ function drawGlyph(cv, left, right, style, color) {
   g.setLineDash([]);
   const bg = getComputedStyle(cv).getPropertyValue('--glyph-bg').trim() || C.bg;
   if (left) { g.beginPath(); g.moveTo(2, 3); g.lineTo(2, h - 3); g.stroke(); drawEnd(g, 2, h / 2, 1, 0, left, 6, bg); }
-  if (right) { g.beginPath(); g.moveTo(w - 2, 3); g.lineTo(w - 2, h - 3); g.stroke(); drawEnd(g, w - 2, h / 2, -1, 0, right, 6, bg); }
+  if (right) {
+    // karga ayağında varlığın sınırı çizilir; kod haritasının okunda çizilmez
+    if (right !== 'arrow') { g.beginPath(); g.moveTo(w - 2, 3); g.lineTo(w - 2, h - 3); g.stroke(); }
+    drawEnd(g, w - 2, h / 2, -1, 0, right, 6, bg);
+  }
 }
 
 // Etiket çakışma ızgarası
@@ -293,6 +310,8 @@ function nodeAlpha(t) {
   const em = S.em;
   if (em.focus && !em.focus.has(t)) return 0.07;
   if (em.active && !em.near.has(t)) return 0.3;
+  // kod haritasında tablo katmanları (fark, denetim, KVKK, stil) yoktur
+  if (t.code) return 1;
   // karşılaştırmada değişmeyen tablolar geri planda
   if (S.diffRes) { const d = diffOf(t); if (!d || d.status === 'same') return 0.35; }
   // denetim haritada: hata ve uyarısı olmayan tablolar geri planda
@@ -303,6 +322,9 @@ function nodeAlpha(t) {
   else if (S.styleColor) { if (!S.styleColor.get(t)) return 0.35; }
   return 1;
 }
+
+// Kod haritası satır etiketleri: çağrı, yazar, okur, dinamik SQL, tetiklendiği tablo
+const CODE_TAG_COLOR = { '\u{2192}': '#f2b45a', W: '#ef7b86', R: '#6cc6dc', SQL: '#d8a3d0', '\u{26A1}': '#a58cf2' };
 
 // Şema farkı: eklenen yeşil, silinen kırmızı, değişen sarı; adı değişen ayrıca mavi halka
 const DIFF_COLOR = { added: '#7fd49a', removed: '#ef7b86', changed: '#f2b45a', renamed: '#6cc6dc' };
@@ -856,7 +878,8 @@ function drawCards() {
     ctx.textAlign = 'left';
     ctx.font = `600 ${10 * k}px ${FONT_SANS}`;
     ctx.fillStyle = C.text;
-    const badge = t.junction ? 'M:N' : t.external ? tr('badgeExt') : t.embedded ? tr('badgeSat') : '';
+    // kod haritasında birim türü (FN, TRG, ∅ gövdesiz)
+    const badge = t.badge || (t.junction ? 'M:N' : t.external ? tr('badgeExt') : t.embedded ? tr('badgeSat') : '');
     // kolonlar gizliyken başlıkta kolon sayısı: kartın ne kadar dolu olduğu yine görünsün
     const right = [badge, !S.columns && t.columns.length ? String(t.columns.length) : ''].filter(Boolean).join(' · ');
     ctx.fillText(fitText(t.name, W - (right ? 50 : 22) * k), x0 + 16 * k, y0 + CARD.head * k / 2 + 0.5);
@@ -884,7 +907,7 @@ function drawCards() {
       ctx.textAlign = 'left';
       if (tag) {
         ctx.font = `500 ${7 * k}px ${FONT_MONO}`;
-        ctx.fillStyle = c.pk ? '#f2b45a' : '#6cc6dc';
+        ctx.fillStyle = c.tag ? CODE_TAG_COLOR[c.tag] || C.dim : c.pk ? '#f2b45a' : '#6cc6dc';
         ctx.fillText(tag, x0 + 6 * k, y + 0.5);
       }
       ctx.font = `${c.nullable ? 400 : 500} ${8.5 * k}px ${FONT_SANS}`;
@@ -915,7 +938,7 @@ function drawCards() {
       ctx.textAlign = 'left';
       ctx.font = `${7.5 * k}px ${FONT_MONO}`;
       ctx.fillStyle = C.dim;
-      ctx.fillText(t.noColumns ? 'CREATE TABLE … AS SELECT' : tr('noCols'), x0 + 8 * k, y + 0.5);
+      ctx.fillText(t.noColumns ? 'CREATE TABLE … AS SELECT' : tr(t.code ? 'codeNoRows' : 'noCols'), x0 + 8 * k, y + 0.5);
     }
   }
   ctx.globalAlpha = 1;
@@ -928,6 +951,7 @@ function updateHud(lv) {
   if (txt === hudText) return;
   hudText = txt;
   $('#hudView').textContent = txt;
+  if (S.view === 'code') { $('#hudStats').textContent = tr('hudCode', st); return; }
   const mongoOnly = st.dialects.length === 1 && st.dialects[0] === 'mongodb';
   const parts = [tr(mongoOnly ? 'nCollections' : 'nTables', { n: st.tables }), `${st.fk} FK`, tr('nInferred', { n: st.implicit })];
   if (st.embedded) parts.push(tr('nSatellites', { n: st.embedded }));

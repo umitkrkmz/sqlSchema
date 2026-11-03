@@ -108,7 +108,8 @@ function typeMismatch(a, b) {
 
 const DATE_LAST = new Set(['DATE', 'TARIH', 'TARIHI', 'TAR', 'DT', 'AT', 'ON', 'ZAMAN', 'ZAMANI', 'TIMESTAMP', 'TS']);
 const DATE_FIRST = new Set(['DATE', 'TARIH']);
-const DATE_NOT = new Set(['FORMAT', 'FMT', 'MASK', 'BICIM', 'BICIMI', 'TYPE', 'TIP', 'TIPI', 'KEY']);
+// TARIH_KOLONU, DATE_COLUMN_NAME: tarihin kendisi değil, tarih kolonunun adı
+const DATE_NOT = new Set(['FORMAT', 'FMT', 'MASK', 'BICIM', 'BICIMI', 'TYPE', 'TIP', 'TIPI', 'KEY', 'KOLON', 'KOLONU', 'COLUMN', 'COL', 'NAME', 'ADI', 'ALAN', 'ALANI', 'FIELD']);
 // CREATED_AT, UPDATED_ON: AT / ON yalnızca geçmiş zaman ekinden sonra tarih sayılır (ADD_ON bir ürün adıdır)
 function isDateName(w) {
   const lw = w[w.length - 1] || '';
@@ -121,7 +122,8 @@ const QUANTITY = new Set(['ADET', 'ADEDI', 'QTY', 'QUANTITY', 'MIKTAR', 'MIKTARI
 const DESCRIPTIVE = new Set(['ACIKLAMA', 'ACIKLAMASI', 'DESCRIPTION', 'DESC', 'NOTE', 'NOTES', 'NOT', 'NOTU', 'NOTLAR', 'COMMENT', 'COMMENTS', 'MESSAGE', 'MESAJ', 'MESAJI', 'BODY', 'CONTENT', 'ICERIK', 'ICERIGI', 'PAYLOAD', 'JSON', 'XML', 'DETAIL', 'DETAILS', 'DETAY', 'TEXT', 'METIN', 'ADRES', 'ADDRESS', 'URL', 'PATH', 'YOL', 'SQL', 'QUERY', 'SORGU', 'DATA', 'VERI', 'HATA', 'ERROR', 'STACK', 'TRACE', 'RAW', 'RECORD', 'KAYIT', 'VALUE', 'DEGER', 'DEGERI']);
 const GENERIC = new Set(['VALUE', 'DEGER', 'DEGERI', 'VAL', 'DATA', 'VERI']);
 // PascalCase adlar da (OrdersHistory, AuditLogs): ad kelimelere bölünüp alt çizgiyle birleştirilerek denetlenir
-const APPEND_ONLY_RE = /(^|_)(HIST|HISTORY|LOG|LOGS|AUDIT|ARCHIVE|ARC|ARSIV|GECMIS|BAK|BCK|BACKUP|TMP|TEMP|STG|STAGING|CDR|EVENTS?)$|^(STG|TMP|FACT)_/i;
+// CDR_202410 (aylık çağrı kaydı), CDR_YUKLEME / *_LOAD (yükleme alanı) de bilinçli olarak PK'siz tutulur
+const APPEND_ONLY_RE = /(^|_)(HIST|HISTORY|LOG|LOGS|AUDIT|ARCHIVE|ARC|ARSIV|GECMIS|BAK|BCK|BACKUP|TMP|TEMP|STG|STAGING|CDR|EVENTS?|YUKLEME|LOAD)$|^(STG|TMP|FACT|CDR)_/i;
 const appendOnly = name => APPEND_ONLY_RE.test(name) || APPEND_ONLY_RE.test(words(name).join('_'));
 const FK_FLAG = new Set(['other', 'roleOnly', 'targetOther']);
 const SHORT = new Set(['NAME', 'AD', 'ADI', 'CODE', 'KOD', 'KODU', 'TITLE', 'BASLIK', 'STATUS', 'DURUM', 'DURUMU', 'TYPE', 'TIP', 'TIPI', 'NO', 'NUMARA', 'NUMARASI', 'EMAIL', 'EPOSTA', 'PHONE', 'TELEFON', 'TEL', 'GSM']);

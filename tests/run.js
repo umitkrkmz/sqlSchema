@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'efcore', 'files', 'model', 'diff', 'layout', 'conventions', 'audit', 'fixes', 'migrate', 'export', 'privacy', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
+for (const f of ['i18n', 'lexer', 'sql-parser', 'mongo', 'efcore', 'plsql', 'files', 'model', 'diff', 'layout', 'conventions', 'audit', 'fixes', 'migrate', 'export', 'privacy', 'sample-small']) require(path.join(ROOT, 'js', f + '.js'));
 require(path.join(ROOT, 'samples', 'catalog.js'));
 const NS = globalThis.sqlSchema;
 
@@ -255,6 +255,52 @@ const EXPECT = {
     check('bayi: varsayılan şema, bileşik ve adlı indeks, alternatif anahtar', find(m, 'AuditLogs').schema === 'portal' && find(m, 'Orders').indexes.some(x => x.name === 'IX_Orders_Dealer_Date' && same(x.cols, ['DealerId', 'OrderedAt'])) && find(m, 'Regions').uniques.some(u => same(u.cols, ['Code'])));
     check('bayi: DBA betiğinin FK\'si EF tablosuna bağlanır', !!rel(m, 'DealerMonthlyTarget', 'DealerId', 'Dealers', 'fk') && !!rel(m, 'CommissionRate', 'CategoryId', 'ProductCategories', 'fk'));
     check('bayi: 1:1 alt tablonun PK\'si tahmine hedef olmaz', !!rel(m, 'OrdersHistory', 'DealerId', 'Dealers', 'implicit'));
+  },
+  // PL/SQL kod haritası: paketler, çağrılar, tablo kullanımı, dinamik SQL
+  plsql({ model: m }, all, s) {
+    const files = s.files.map(p => ({ path: 'plsql/' + p, text: fs.readFileSync(path.join(ROOT, 'samples', 'plsql', p), 'utf8') }));
+    const results = files.filter(f => NS.looksLikePlsql(f.text)).map(f => NS.parsePlsql(f.text, { file: f.path }));
+    const cm = NS.buildCodeModel(results, m);
+    const u = (pkg, name) => cm.units.find(x => (x.pkg || null) === pkg && (x.path || x.name) === name);
+    const to = (from, pkg, name) => cm.calls.some(c => c.from === from && !c.to.external && c.to.pkg === pkg && (c.to.path || c.to.name) === name);
+    const uses = (unit, table, mode, dyn) => cm.uses.some(x => x.unit === unit && x.table && x.table.name === table && x.mode === mode && (dyn === undefined || x.dynamic === dyn));
+    check('plsql: 24 tablo, 16 paket, hatasız', m.stats.tables === 24 && cm.packages.size === 16 && results.every(r => !r.stats.errors.length), [m.stats.tables, cm.packages.size]);
+    const kapat = u('ABONE_PKG', 'KAPAT');
+    check('plsql: paketler arası çağrılar', to(kapat, 'HAT_PKG', 'HAT_KAPAT') && to(kapat, 'ABONE_PKG', 'DURUM_DEGISTIR') && to(kapat, 'BILDIRIM_PKG', 'KUYRUGA_EKLE') && to(kapat, 'HATA_PKG', 'KAYDET'), cm.calls.filter(c => c.from === kapat).map(c => c.to.name));
+    const yaz = u('LOG_PKG', 'YAZ');
+    // iki YAZ tek birim: biri öbürünü çağırdığı için kendine çağrı (özyineleme) işaretlenir, ok çizilmez
+    check('plsql: aşırı yükleme tek birim, ortak log paketini 10 yordam çağırır', yaz.overloads === 2 && yaz.recursive && cm.callers.get(yaz).length === 10, [yaz.overloads, (cm.callers.get(yaz) || []).length]);
+    check('plsql: iç içe fonksiyon, gizli yordam, belirtimdekiler açık', to(u('MUSTERI_PKG', 'KAYDET'), 'MUSTERI_PKG', 'KAYDET.TCKN_GECERLI') && !u('ABONE_PKG', 'DOGRULA').public && u('ABONE_PKG', 'BUL').public);
+    check('plsql: paket başlatma bölümü ve paket düzeyindeki imleç', to(u('PARAM_PKG', '<init>'), 'PARAM_PKG', 'YENILE') && uses(u('PARAM_PKG', 'YENILE'), 'PARAMETRE', 'r') && uses(u('FATURA_PKG', 'DONEM_KES'), 'ABONE', 'r'));
+    check('plsql: okuma ve yazma', uses(u('TAHSILAT_PKG', 'MAHSUP'), 'ODEME', 'r') && uses(u('TAHSILAT_PKG', 'MAHSUP'), 'ODEME_MAHSUP', 'w') && uses(u('TAHSILAT_PKG', 'MAHSUP'), 'FATURA', 'w') && uses(u('TARIFE_PKG', 'FIYAT_SATIRI'), 'TARIFE_FIYAT', 'r') && uses(u('KAMPANYA_PKG', 'KATIL'), 'KAMPANYA_KATILIM', 'w'));
+    check('plsql: her tablo adı modeldeki bir tabloya çözülür', cm.uses.every(x => x.table), cm.uses.filter(x => !x.table).map(x => x.name));
+    // dinamik SQL: sabit kısımdan okunan tablolar, değişkenden gelen ad (TEL.CDR_…) okunamaz ama sayılır
+    const kul = u('FATURA_PKG', 'KULLANIM');
+    check('plsql: dinamik SQL, aylık tablo adı okunamaz, JOIN okunur', uses(kul, 'HAT', 'r', true) && kul.dynamic.length === 1 && kul.dynamic[0].unresolved === 1 && kul.dynamic[0].patterns[0].pattern === 'TEL.CDR_\u{2026}', kul.dynamic);
+    const liste = u('RAPOR_PKG', 'ABONE_LISTESI');
+    check('plsql: bildirimdeki ilk değer ve eklemelerle kurulan SQL', ['ABONE', 'MUSTERI', 'TARIFE'].every(t => uses(liste, t, 'r', true)) && !liste.dynamic[0].unresolved, liste.dynamic);
+    check('plsql: tablodan okunan iş adıyla dinamik çağrı okunamaz', u('BATCH_PKG', 'ISI_CALISTIR').dynamic[0].unresolved > 0 && u('BATCH_PKG', 'ARSIVLE').dynamic.every(d => d.unresolved > 0));
+    check('plsql: dinamik SQL\'de sabit tablo', uses(u('CDR_PKG', 'YUKLE'), 'CDR_YUKLEME', 'w', true) && uses(u('CDR_PKG', 'AY_TABLOSU_AC'), 'CDR_202410', 'r', true));
+    const odeme = cm.units.find(x => x.name === 'TRG_ODEME_AI'), mus = cm.units.find(x => x.name === 'TRG_MUSTERI_BI');
+    check('plsql: tetikleyici tablosu ve çağrısı', odeme.onTable && odeme.onTable.name === 'ODEME' && to(odeme, 'TAHSILAT_PKG', 'MAHSUP') && uses(cm.units.find(x => x.name === 'TRG_ABONE_DURUM_AU'), 'ABONE_TARIHCE', 'w'));
+    check('plsql: gövdesi dökümde olmayan paket', to(mus, 'ENTEGRASYON_PKG', 'MUSTERI_AKTAR') && u('ENTEGRASYON_PKG', 'MUSTERI_AKTAR').noBody);
+    check('plsql: dış çağrılar yalnızca Oracle paketleri', [...cm.externals.values()].every(e => e.oracle) && cm.externals.has('UTL_HTTP.REQUEST'), [...cm.externals.keys()]);
+    check('plsql: tek başına yordam ve fonksiyon', to(cm.units.find(x => x.name === 'GUNLUK_KAPANIS'), 'BATCH_PKG', 'GECE_ISI') && to(cm.units.find(x => x.name === 'ABONE_OZETI'), 'TAHSILAT_PKG', 'BORC'));
+    check('plsql: tabloya göre kullanan kod', (cm.byTable.get(find(m, 'FATURA')) || []).length >= 5, (cm.byTable.get(find(m, 'FATURA')) || []).map(x => x.unit.name + ':' + x.mode));
+    // kod haritası: yordamlar düğüm, çağrılar ok; satırlar çağrı, yazılan / okunan tablo, dinamik SQL
+    check('plsql: dosya ayrıştırması PL/SQL sonucunu taşır', files.filter(f => /\.pkb$/.test(f.path)).every(f => (NS.parseFile(f.path, f.text).code || {}).units.length));
+    const map = NS.buildCodeMap(cm);
+    const node = n => map.tables.find(x => x.name === n);
+    const kap = node('KAPAT');
+    check('plsql haritası: düğüm, ok ve kart satırları', map.tables.length === cm.units.length && map.rels.length === cm.calls.filter(c => !c.to.external).length &&
+      same(kap.columns.map(c => c.tag + c.name), ['\u{2192}HAT_PKG.HAT_KAPAT', '\u{2192}DURUM_DEGISTIR', '\u{2192}BILDIRIM_PKG.KUYRUGA_EKLE', '\u{2192}HATA_PKG.KAYDET', 'WABONE', 'RHAT']) &&
+      kap.out.every(r => r.parentEnd === 'arrow' && r.cols[0] === (r.parent.unit.pkg === 'ABONE_PKG' ? r.parent.name : r.parent.unit.pkg + '.' + r.parent.name)), kap.columns.map(c => c.tag + c.name));
+    const lay = NS.layoutModel(map, { grouping: 'file' });
+    check('plsql haritası: her paket bir takımyıldız', ['ABONE_PKG', 'FATURA_PKG', 'LOG_PKG', 'BATCH_PKG'].every(p => lay.groups.some(g => g.label === p && g.tables.every(x => x.unit.pkg === p))), lay.groups.map(g => g.label));
+    const yol = NS.pathsBetween(node('GUNLUK_KAPANIS'), node('KALEM_EKLE'), { directed: true });
+    check('plsql haritası: yönlü yol çağrı zincirini izler, tersi yok', yol.paths.length && same(yol.paths[0].tables.map(x => x.name), ['GUNLUK_KAPANIS', 'GECE_ISI', 'DONEM_KES', 'FATURA_KES', 'KALEM_EKLE']) && !NS.pathsBetween(node('KALEM_EKLE'), node('GUNLUK_KAPANIS'), { directed: true }).paths.length, yol.paths.map(p => p.tables.map(x => x.name)));
+    const etki = NS.impactOf(node('FIRLAT'));
+    check('plsql haritası: etki analizi çağıranları derece derece verir', etki.total >= 7 && etki.levels[0].some(x => x.t.name === 'DOGRULA'), etki.levels.map(l => l.map(x => x.t.name)));
   },
   sosyal({ model: m }) {
     check('sosyal: MongoDB', m.stats.dialects.includes('mongodb'), m.stats.dialects);
@@ -669,6 +715,7 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
       for (const v of variants) {
         n++;
         try {
+          if (NS.looksLikePlsql(v)) NS.buildCodeModel([NS.parsePlsql(v, { file: p })]);
           const r = NS.parseFile(s.id + '/' + p, v);
           if (!r) continue;
           const m = NS.buildModel([{ ...r, db: 'main' }]);
@@ -716,6 +763,38 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   check('yol: aynı tablo ya da bağlantısız', !NS.pathsBetween(f(m, 'ADDRESS'), f(m, 'ADDRESS')).paths.length && !NS.pathsBetween(f(m, 'ADDRESS'), f(m, 'APP_USER'), { accept: () => false }).paths.length);
 }
 
+// PL/SQL okuyucunun kenar durumları
+{
+  const src = `CREATE OR REPLACE PACKAGE BODY P AS
+  PROCEDURE ILERI(X NUMBER);                       -- ileri bildirim: birim değil
+  PROCEDURE A IS
+    V VARCHAR2(100) := q'[x; END; PROCEDURE SAHTE IS]';   /* PROCEDURE YORUM IS BEGIN */
+  BEGIN
+    IF V IS NULL THEN NULL; ELSIF V = 'a' THEN B; END IF;
+    FOR I IN 1 .. 3 LOOP CASE I WHEN 1 THEN B; ELSE NULL; END CASE; END LOOP;
+    BEGIN
+      INSERT ALL INTO T1 (X) VALUES (1) INTO T2 (X) VALUES (2) SELECT 1 FROM DUAL;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+    SELECT EXTRACT(YEAR FROM SYSDATE) INTO V FROM T3 WHERE ROWNUM = 1 FOR UPDATE;
+    ILERI(1);
+  END A;
+  PROCEDURE B IS BEGIN NULL; END;
+  PROCEDURE ILERI(X NUMBER) IS BEGIN DELETE T4 WHERE 1 = 0; END ILERI;
+END P;
+/`;
+  const r = NS.parsePlsql(src, { file: 'p.pkb' });
+  const names = r.units.map(u => u.name + ':' + u.line + '-' + u.endLine);
+  check('PL/SQL: metin ve yorumdaki anahtar kelimeler, ileri bildirim, IF/LOOP/CASE derinliği', same(names, ['A:3-14', 'B:15-15', 'ILERI:16-16']), names);
+  const a = r.units[0];
+  const tabs = a.uses.map(x => x.mode + ':' + x.parts.join('.')).sort();
+  check('PL/SQL: INSERT ALL, EXTRACT(... FROM), FOR UPDATE', same(tabs, ['r:T3', 'w:T1', 'w:T2']), tabs);
+  const cm = NS.buildCodeModel([r]);
+  const callsOfA = cm.calls.filter(c => c.from === a).map(c => c.to.name).sort();
+  check('PL/SQL: yerel çağrılar (ileri bildirimli olan dahil)', same(callsOfA, ['B', 'ILERI']) && same(r.units[2].uses.map(x => x.op + ':' + x.parts[0]), ['DELETE:T4']), callsOfA);
+  check('PL/SQL: PL/SQL içermeyen dosya', !NS.looksLikePlsql('CREATE TABLE X (A NUMBER);') && NS.parsePlsql('CREATE TABLE X (A NUMBER);').units.length === 0);
+}
+
 // Sürümü klasör adında olan migration'lar: Prisma (migration.sql) ve Diesel (up.sql / down.sql)
 {
   const prisma = build([
@@ -747,6 +826,14 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   for (const f of ['ui.js', 'render.js']) {
     const src = fs.readFileSync(path.join(ROOT, 'js', f), 'utf8');
     for (const m of src.matchAll(/\b(?:t|tr)\('([A-Za-z_]+)'/g)) used.add(m[1]);
+  }
+  // kod haritası: birim türleri ('codeKind_' + tür) ve buildCodeMap'in çevirttiği satır ve grup etiketleri
+  used.delete('codeKind_');
+  for (const k of ['procedure', 'function', 'trigger', 'init']) used.add('codeKind_' + k);
+  {
+    const pf = NS.SAMPLES.find(x => x.id === 'plsql');
+    const res = pf.files.map(p => fs.readFileSync(path.join(ROOT, 'samples', 'plsql', p), 'utf8')).filter(NS.looksLikePlsql).map(x => NS.parsePlsql(x));
+    NS.buildCodeMap(NS.buildCodeModel(res), k => { used.add(k); return k; });
   }
   // 'skip_' + kod biçimindeki dinamik anahtarlar: files.js ve ui.js'teki bütün atlama kodları
   used.delete('skip_');

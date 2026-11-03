@@ -119,7 +119,10 @@ function parseFile(path, text) {
     const r = parseMongo(text, { file: path });
     return r.ops.length ? r : null;
   }
-  return parseSQL(text, { file: path, dialect: detectDialect(text, name) });
+  const r = parseSQL(text, { file: path, dialect: detectDialect(text, name) });
+  // PL/SQL kaynağı (paket, yordam, tetikleyici) varsa kod haritası için ayrıca okunur
+  if (NS.looksLikePlsql && NS.looksLikePlsql(text)) r.code = NS.parsePlsql(text, { file: path });
+  return r;
 }
 
 // Lehçe ipucu taşımayan dosyalar (yalnızca ALTER TABLE ya da INSERT içerenler gibi) aynı klasördeki

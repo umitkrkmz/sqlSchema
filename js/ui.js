@@ -6,7 +6,7 @@
  * URL parametreleri (paylaşılabilir bağlantılar ve belge görüntüleri için):
  *   ?lang=tr|en   ?sample=<örnek kimliği>   ?select=<tablo adı>   ?center=<tablo adı>   ?zoom=<1.6>   ?legend=0|1
  *   ?pop=naming|report|files|diff|audit|privacy   (örnekle birlikte: açılışta gösterilecek pencere)   ?columns=0|1
- *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)   ?impact=1 (select ile)   ?path=A,B&pathn=2 (yol)
+ *   ?grouping=auto|file|name   ?list=0|1   ?sub=<tablo>,<tablo>&near=1 (alt diyagram)   ?impact=1 (select ile)   ?path=A,B&pathn=2 (yol)   ?view=code (kod haritası)
  *   ?diff=V3 (migration klasöründe bu sürümle karşılaştır)   ?time=V4 (zaman çizelgesi bu sürümde; ?time=1 baştan)
  *   ?privacy=1 (KVKK haritası)   ?style=pkStyle (stile göre boya)   ?audit=1 (tasarım denetimi haritada)   ?fix=1 (düzeltme önerileri penceresi)   ?std=1 (standart ve kurallar)   ?doc=1 (standart belgesi)
  *   ?review=1 (değişiklik incelemesi; diff ya da time ile)   ?alter=1 (farkı kapatan SQL taslağı; diff ya da time ile)   ?export=md|mermaid|plantuml|dbml|csv|svg
@@ -76,17 +76,34 @@ function rebuild() {
   S.ordered = ordered;
   S.full = null;
   S.relSet = null;
-  if (!model.tables.length) {
+  // PL/SQL kaynakları varsa kod haritası; harita kod görünümüne geçilince kurulur
+  const codeRes = active.map(f => f.result.code).filter(c => c && (c.units.length || c.packages.length));
+  S.code = codeRes.length ? NS.buildCodeModel(codeRes, model) : null;
+  S.codeMap = null;
+  S.tableView = null;
+  const wantCode = S.view === 'code';
+  S.view = 'tables';
+  document.body.classList.remove('code-view');
+  if (!model.tables.length && !S.code) {
     S.model = S.lay = null;
     return false;
   }
+  // yalnızca paket ve yordam dosyaları açıldıysa (tablo yok) doğrudan kod haritası
+  S.codeOnly = !model.tables.length;
   // karşılaştırma açıksa: "önce" modeli kurulur, fark hesaplanır; silinen tablolar da haritada yerini alır
   let shown = model;
   S.diffRes = S.diffBefore = null;
   stopPlay();
   S.tl = null;
   S.hover = S.sel = null;
-  if (S.time && migration && active.length > 1) {
+  if (S.codeOnly) {
+    const cm = codeMapModel();
+    S.view = 'code';
+    document.body.classList.add('code-view');
+    S.model = cm.model;
+    S.lay = cm.lay;
+    S.order = cm.model.tables.slice().sort(byDegree);
+  } else if (S.time && migration && active.length > 1) {
     S.tl = timelineState(active, inputs, model, migration);
     applyStep(S.time.pos);
   } else {
@@ -133,6 +150,9 @@ function rebuild() {
   refreshStyle();
   S.pick = new Set([...S.pick].filter(k => S.byKey.has(k)));
   renderPickBar();
+  renderViewSwitch();
+  // dil ya da görünüm ayarı değişince yeniden kurulduysa kod görünümü korunur
+  if (wantCode && S.code && !S.codeOnly) setView('code');
   return true;
 }
 
@@ -167,7 +187,8 @@ function setFiles(files, title, opts = {}) {
         return resolve(false);
       }
       const st = S.model.stats;
-      toast(t('loadedSummary', { files: files.filter(f => f.result).length, tables: st.tables, rels: st.fk, inferred: st.implicit, sats: st.embedded, ms: S.parseMs }));
+      if (S.codeOnly) toast(t('loadedCode', { files: files.filter(f => f.result).length, ...st }));
+      else toast(t('loadedSummary', { files: files.filter(f => f.result).length, tables: st.tables, rels: st.fk, inferred: st.implicit, sats: st.embedded, ms: S.parseMs }));
       resolve(true);
     } catch (err) {
       console.error(err);
@@ -342,7 +363,10 @@ $('#filesPop').addEventListener('change', e => {
 });
 
 function renderReport() {
-  const st = S.model.stats;
+  // rapor tablo modelini anlatır: kod görünümünde saklanan tablo modeli, yalnızca kod açıldıysa rapor yok
+  const tm = S.view === 'code' ? S.tableView && S.tableView.model : S.model;
+  if (!tm || !tm.stats || !tm.stats.files) { $('#report').innerHTML = ''; return; }
+  const st = tm.stats;
   const row = (k, v) => `<tr><td>${esc(t(k))}</td><td>${v}</td></tr>`;
   const list = (title, items) => (items.length ? `<h5>${esc(t(title))}</h5><ul>${items.join('')}</ul>` : '');
   $('#report').innerHTML = `
@@ -1574,7 +1598,8 @@ S.subKeys = null;
 S.subNeighbors = false;
 
 function togglePick(tb) {
-  if (!tb) return;
+  // çoklu seçim ve alt diyagram yalnızca tablo haritasında
+  if (!tb || tb.code) return;
   if (S.pick.has(tb.key)) S.pick.delete(tb.key); else S.pick.add(tb.key);
   afterPick();
 }
@@ -2171,7 +2196,7 @@ function stopTimeline() {
 
 // Adım değişimi: model ve fark değişir, yerleşim ve kamera aynı kalır
 function timeGo(i) {
-  if (!S.tl) return;
+  if (!S.tl || S.view === 'code') return;
   applyStep(i);
   buildIndex();
   computeImpact();
@@ -2346,7 +2371,8 @@ function startPath(from) {
 function showPath(a, b) {
   if (S.impact) setImpact(false);
   S.pathFrom = null;
-  S.pathRes = NS.pathsBetween(a, b, { accept: relVisible });
+  // kod haritasında yol çağrı yönündedir: "bu yordamdan şuna nasıl gidilir"
+  S.pathRes = NS.pathsBetween(a, b, { accept: relVisible, directed: S.view === 'code' });
   S.pathIdx = 0;
   if (S.sel !== b) select(b);
   afterPath(true);
@@ -2383,6 +2409,8 @@ function fitTables(tables) {
 function hopText(h, r) {
   const cols = (tb, cs) => cs.map(c => `${tb.name}.${c}`).join(', ');
   if (r.kind === 'embed') return `${r.parent.name}.${r.cols[0]}${r.many ? '[]' : ''} \u{2283} ${r.child.name}`;
+  // kod haritası: A, B'yi çağırır (satır numarasıyla)
+  if (r.kind === 'call') return `${codeUnitName(r.child.unit)} \u{2192} ${codeUnitName(r.parent.unit)} \u{00B7} ${t('codeLine', { n: r.line })}`;
   return r.child === h.a
     ? `${cols(h.a, r.cols)} \u{2192} ${cols(h.b, r.refCols.length ? r.refCols : ['?'])}`
     : `${cols(h.a, r.refCols.length ? r.refCols : ['?'])} \u{2190} ${cols(h.b, r.cols)}`;
@@ -2394,7 +2422,7 @@ const hopTag = r => r.kind === 'implicit' ? `<span class="tag t-imp">${esc(t('ta
 function pathHtml() {
   const res = S.pathRes;
   const head = `<h3>${esc(t('pathHead'))} \u{00B7} ${esc(res.from.name)} \u{2192} ${esc(res.to.name)}<button class="p-x" data-act="path-close" title="${esc(t('pathClose'))}" aria-label="${esc(t('pathClose'))}">\u{00D7}</button></h3>`;
-  if (!res.paths.length) return `<section class="path">${head}<p class="imp-sum">${esc(t('pathNone'))}</p><p class="imp-hint">${esc(t('pathNoneHint'))}</p></section>`;
+  if (!res.paths.length) return `<section class="path">${head}<p class="imp-sum">${esc(t(S.view === 'code' ? 'codePathNone' : 'pathNone'))}</p><p class="imp-hint">${esc(t(S.view === 'code' ? 'codePathNoneHint' : 'pathNoneHint'))}</p></section>`;
   const p = curPath();
   const via = q => q.tables.slice(1, -1).map(tb => tb.name).join(', ') || '\u{2014}';
   const opts = res.paths.length > 1 ? `<ul class="path-opts">${res.paths.map((q, i) => `<li class="${i === S.pathIdx ? 'on' : ''}" data-path-i="${i}" tabindex="0"><b>${esc(t('pathSteps', { n: q.hops.length }))}</b><span title="${esc(via(q))}">${esc(via(q))}</span></li>`).join('')}</ul>` : '';
@@ -2405,9 +2433,222 @@ function pathHtml() {
     ${res.inferred ? `<p class="imp-hint">${esc(t('pathInferred'))}</p>` : ''}
     ${opts}
     <ol class="path-steps"><li><button class="pt" data-go="${esc(res.from.key)}">${esc(res.from.name)}</button></li>${steps}</ol>
-    <p class="imp-hint">${esc(t('pathHint'))}</p>
+    <p class="imp-hint">${esc(t(S.view === 'code' ? 'codePathHint' : 'pathHint'))}</p>
   </section>`;
 }
+
+/* ─── Kod haritası ─── */
+
+// PL/SQL kaynakları (plsql.js) yordam haritası olarak: paketler takımyıldız, yordamlar yıldız, çağrılar ok.
+// Harita ilk geçişte kurulur; tablo görünümü (model, yerleşim, kamera) saklanır ve dönüşte geri gelir.
+function codeMapModel() {
+  if (!S.codeMap) {
+    const map = NS.buildCodeMap(S.code, (k, v) => t(k, v));
+    S.codeMap = { model: map, lay: layoutModel(map, { grouping: 'file' }) };
+  }
+  return S.codeMap;
+}
+
+function setView(v, opts = {}) {
+  if (v === S.view || (v === 'code' && !S.code)) return;
+  // açık pencereler (rapor, adlandırma, denetim ...) tablo modeline göre çizilir
+  for (const p of popovers) $(p).hidden = true;
+  stopPlay();
+  if (S.impact) setImpact(false);
+  S.pathFrom = S.pathRes = null;
+  S.focus = 0;
+  S.hover = null;
+  const back = S.tableView;
+  if (v === 'code') {
+    if (S.full) exitSubset();
+    S.pick = new Set();
+    S.tableView = { model: S.model, lay: S.lay, order: S.order, sel: S.sel, cam: { ...S.cam }, history: S.history, histPos: S.histPos };
+    const cm = codeMapModel();
+    S.model = cm.model;
+    S.lay = cm.lay;
+    S.order = cm.model.tables.slice().sort(byDegree);
+    S.history = [];
+    S.histPos = -1;
+  } else if (back) {
+    S.model = back.model;
+    S.lay = back.lay;
+    S.order = back.order;
+    S.history = back.history;
+    S.histPos = back.histPos;
+    S.tableView = null;
+  }
+  S.view = v;
+  S.sel = null;
+  document.body.classList.toggle('code-view', v === 'code');
+  for (const tb of S.model.tables) tb._rows = null;
+  buildIndex();
+  resetHud();
+  renderList();
+  renderPickBar();
+  renderViewSwitch();
+  if (v === 'tables' && back && !opts.select) { S.cam = back.cam; select(back.sel); }
+  else if (opts.select) select(opts.select, { fly: true });
+  else { select(null); fitView(false); }
+  invalidate();
+}
+
+function renderViewSwitch() {
+  const el = $('#viewSwitch');
+  el.hidden = !S.code;
+  for (const b of el.querySelectorAll('[data-view]')) {
+    b.setAttribute('aria-pressed', String(b.dataset.view === S.view));
+    // yalnızca kod dosyaları açıldıysa tablo haritası yok
+    b.disabled = b.dataset.view === 'tables' && !!S.codeOnly;
+  }
+}
+$('#viewSwitch').addEventListener('click', e => {
+  const b = e.target.closest('[data-view]');
+  if (b) setView(b.dataset.view);
+});
+
+// Bir tablonun ya da birimin öbür haritadaki karşılığına geçiş
+function goCodeUnit(unit) {
+  if (S.view !== 'code') setView('code', { select: codeMapModel().model.tables.find(x => x.unit === unit) });
+  else select(S.model.tables.find(x => x.unit === unit), { fly: true });
+}
+function goTable(table) {
+  if (S.view !== 'tables') setView('tables', { select: table });
+  else select(table, { fly: true });
+}
+
+const codeUnitName = u => (u.external ? u.name : (u.pkg ? u.pkg + '.' : '') + (u.kind === 'init' ? t('codeInit') : u.path || u.name));
+
+function renderCodePanel(p, tb) {
+  const u = tb.unit, cm = S.code;
+  const col = schemaColor(tb);
+  const tag = (cls, text, title) => `<span class="tag ${cls}"${title ? ` title="${esc(title)}"` : ''}>${esc(text)}</span>`;
+  const badges = [
+    tag('', t('codeKind_' + u.kind)),
+    u.pkg && u.kind !== 'init' && !u.noBody ? tag(u.public ? 't-ref' : '', t(u.public ? 'codePublic' : 'codePrivate'), t(u.public ? 'codePublicTitle' : 'codePrivateTitle')) : '',
+    u.overloads > 1 ? tag('', t('codeOverloads', { n: u.overloads }), t('codeOverloadsTitle')) : '',
+    u.noBody ? tag('t-off', t('codeNoBody'), t('codeNoBodyTitle')) : '',
+    u.recursive ? tag('', t('codeRecursive')) : '',
+  ].join('');
+  const group = u.pkg || t(u.kind === 'trigger' ? 'codeGroupTriggers' : 'codeGroupStandalone');
+  const loc = u.file ? `${baseName(u.file)}:${u.line}` : '';
+  const outs = cm.calls.filter(c => c.from === u);
+  const ins = cm.callers.get(u) || [];
+  const item = (c, other) => {
+    const tags = [
+      c.dynamic ? tag('t-ref', t('codeDyn')) : '',
+      other.external ? tag('t-off', t(other.oracle ? 'codeExtOracle' : 'codeExtMissing')) : '',
+      other.noBody ? tag('t-off', t('codeNoBody')) : '',
+    ].join('');
+    return `<li ${other.external ? 'class="ext"' : `data-unit="${esc(other.key)}" tabindex="0"`}><div class="ri">
+      <div class="rn"><b>${esc(codeUnitName(other))}</b>${other.external ? '' : `<span class="rs">${esc(t('codeKind_' + other.kind))}</span>`}${tags}</div>
+      <div class="rc">${esc(t('codeLine', { n: c.line }))}</div></div></li>`;
+  };
+  // tablolar: okuma ve yazma tablo başına birleşir; tıklanınca tablo haritasında seçilir
+  const byTable = new Map();
+  for (const x of cm.uses) {
+    if (x.unit !== u) continue;
+    const k = x.table ? x.table.key : x.name;
+    if (!byTable.has(k)) byTable.set(k, { table: x.table, name: x.table ? x.table.name : x.name, ops: new Set(), modes: new Set(), dyn: true, lines: new Set() });
+    const e = byTable.get(k);
+    e.ops.add(x.op);
+    e.modes.add(x.mode);
+    if (!x.dynamic) e.dyn = false;
+    e.lines.add(x.line);
+  }
+  const tables = [...byTable.values()].sort((a, b) => b.modes.has('w') - a.modes.has('w') || a.name.localeCompare(b.name));
+  const tableItem = e => `<li ${e.table ? `data-table="${esc(e.table.key)}" tabindex="0"` : 'class="ext"'}><div class="ri">
+      <div class="rn"><b>${esc(e.name)}</b>${e.table && e.table.schema ? `<span class="rs">${esc(e.table.schema)}</span>` : ''}
+        ${tag(e.modes.has('w') ? 't-w' : 't-r', t(e.modes.has('w') && e.modes.has('r') ? 'codeRowRW' : e.modes.has('w') ? 'codeRowWrite' : 'codeRowRead'))}
+        ${e.dyn ? tag('t-ref', t('codeDyn')) : ''}${e.table ? '' : tag('t-off', t('codeTableUnknown'), t('codeTableUnknownTitle'))}</div>
+      <div class="rc">${esc([...e.ops].join(', '))} · ${esc(t('codeLine', { n: [...e.lines].sort((a, b) => a - b).join(', ') }))}</div></div></li>`;
+  const blind = u.dynamic.reduce((s, d) => s + d.unresolved, 0);
+  const dyn = u.dynamic.map(d => `<li><div class="cd-head"><span>${esc(d.via)}</span><span>${esc(t('codeLine', { n: d.line }))}</span>
+      ${d.unresolved ? tag('t-off', t('codeDynBlindN', { n: d.unresolved })) : tag('t-ref', t('codeDynRead'))}</div>
+      <pre class="cd-sql">${esc(d.text)}</pre>
+      ${d.patterns ? `<p class="cd-pat">${esc(t('codeDynPattern'))}: ${d.patterns.map(x => `<code>${esc(x.pattern)}</code>`).join(' ')}</p>` : ''}</li>`).join('');
+  const trig = u.on ? `<section><h3>${esc(t('codeOnTable'))}</h3><ul class="rels code-rels">${tableItem({ table: u.onTable, name: u.onTable ? u.onTable.name : u.on.parts.join('.'), ops: new Set([[u.timing, ...u.on.events].filter(Boolean).join(' ')]), modes: new Set(), dyn: false, lines: new Set([u.line]) })}</ul></section>` : '';
+  p.innerHTML = `
+    <div class="p-head" style="--c:${col}">
+      <button class="p-close" data-act="close" aria-label="${esc(t('panelClose'))}">×</button>
+      ${trailHtml()}
+      <div class="p-eyebrow"><span class="dot"></span>${esc(u.schema || t('defaultSchema'))}<span class="sep">/</span>${esc(group)}</div>
+      <h2 title="${esc(codeUnitName(u))}">${esc(tb.name)}</h2>
+      <div class="badges">${badges}</div>
+      ${loc ? `<p class="p-src">${esc(loc)}</p>` : ''}
+      <div class="p-actions">
+        <button class="btn sm ${S.focus ? '' : 'ghost'}" data-act="focus" title="${esc(t('focusTitle'))}">${esc(t('focus')[S.focus])}</button>
+        <button class="btn sm ghost" data-act="zoom">${esc(t('codeShowCard'))}</button>
+        <button class="btn sm ${S.impact ? '' : 'ghost'}" data-act="impact" title="${esc(t('codeImpactTitle'))}">${esc(t('impactBtn'))}</button>
+        <button class="btn sm ${S.pathFrom === tb || S.pathRes ? '' : 'ghost'}" data-act="path" title="${esc(t('codePathTitle'))}">${esc(t('pathBtn'))}</button>
+      </div>
+    </div>
+    <div class="p-body">
+      ${S.pathRes ? pathHtml() : ''}
+      ${S.impactRes && S.impactRes.root === tb ? codeImpactHtml(S.impactRes) : ''}
+      ${trig}
+      <section><h3>${esc(t('codeCalls'))} <span>${outs.length}</span></h3>
+        <ul class="rels code-rels">${outs.map(c => item(c, c.to)).join('') || `<li class="none">${esc(t(u.noBody ? 'codeNoBodyCalls' : 'codeNoCalls'))}</li>`}</ul></section>
+      <section><h3>${esc(t('codeCallers'))} <span>${ins.length}</span></h3>
+        <ul class="rels code-rels">${ins.map(c => item(c, c.from)).join('') || `<li class="none">${esc(t(u.public ? 'codeNoCallersPublic' : 'codeNoCallers'))}</li>`}</ul></section>
+      <section><h3>${esc(t('codeTables'))} <span>${tables.length}</span></h3>
+        <ul class="rels code-rels">${tables.map(tableItem).join('') || `<li class="none">${esc(t('codeNoTables'))}</li>`}</ul></section>
+      ${u.dynamic.length ? `<section class="code-dyn"><h3>${esc(t('codeDynamic'))} <span>${u.dynamic.length}</span></h3>
+        ${blind ? `<p class="imp-hint">${esc(t('codeDynBlind', { n: blind }))}</p>` : ''}<ul class="cd-list">${dyn}</ul></section>` : ''}
+    </div>`;
+}
+
+// Etki: bu yordam değişirse onu (doğrudan ya da dolaylı) çağıranlar
+function codeImpactHtml(res) {
+  const levels = res.levels.map((l, i) => `<h4>${esc(t('impactDepth', { d: i + 1 }))} <span>${l.length}</span></h4>
+    <p class="imp-chips">${l.map(x => `<button data-go="${esc(x.t.key)}">${esc(codeUnitName(x.t.unit))}</button>`).join('')}</p>`).join('');
+  return `<section class="impact">
+    <h3>${esc(t('impactHead'))} <span>${res.total}</span></h3>
+    <p class="imp-sum">${esc(t(res.total ? 'codeImpactSummary' : 'codeImpactNone', { n: res.total, d1: res.levels[0] ? res.levels[0].length : 0 }))}</p>
+    ${levels}
+  </section>`;
+}
+
+// Tablo panelinde: bu tabloyu okuyan ve yazan kod (iki harita arasında geçiş)
+function tableCodeHtml(tb) {
+  const uses = S.code && S.code.byTable.get(tb);
+  const trig = S.code ? S.code.units.filter(u => u.onTable === tb) : [];
+  if (!(uses && uses.length) && !trig.length) return '';
+  const byUnit = new Map();
+  for (const x of uses || []) {
+    if (!byUnit.has(x.unit)) byUnit.set(x.unit, { unit: x.unit, modes: new Set(), ops: new Set(), dyn: true });
+    const e = byUnit.get(x.unit);
+    e.modes.add(x.mode);
+    e.ops.add(x.op);
+    if (!x.dynamic) e.dyn = false;
+  }
+  const list = [...byUnit.values()].sort((a, b) => b.modes.has('w') - a.modes.has('w') || codeUnitName(a.unit).localeCompare(codeUnitName(b.unit)));
+  const w = list.filter(e => e.modes.has('w')).length;
+  const tag = (cls, text) => `<span class="tag ${cls}">${esc(text)}</span>`;
+  const item = e => `<li data-unit="${esc(e.unit.key)}" tabindex="0"><div class="ri"><div class="rn"><b>${esc(codeUnitName(e.unit))}</b>
+    ${tag(e.modes.has('w') ? 't-w' : 't-r', t(e.modes.has('w') && e.modes.has('r') ? 'codeRowRW' : e.modes.has('w') ? 'codeRowWrite' : 'codeRowRead'))}${e.dyn ? tag('t-ref', t('codeDyn')) : ''}</div>
+    <div class="rc">${esc([...e.ops].join(', '))}</div></div></li>`;
+  const trigItem = u => `<li data-unit="${esc(u.key)}" tabindex="0"><div class="ri"><div class="rn"><b>${esc(u.name)}</b>${tag('', t('codeKind_trigger'))}</div>
+    <div class="rc">${esc([u.timing, ...u.on.events].filter(Boolean).join(' '))}</div></div></li>`;
+  return `<section class="table-code"><h3>${esc(t('codeUsedBy'))} <span>${list.length + trig.length}</span></h3>
+    <p class="imp-hint">${esc(t('codeUsedBySummary', { w, r: list.length - w }))}</p>
+    <ul class="rels code-rels">${trig.map(trigItem).join('')}${list.map(item).join('')}</ul></section>`;
+}
+
+$('#panel').addEventListener('click', e => {
+  const u = e.target.closest('[data-unit]');
+  if (u) {
+    e.stopPropagation();
+    const unit = S.code && S.code.units.find(x => x.key === u.dataset.unit);
+    if (unit) goCodeUnit(unit);
+    return;
+  }
+  const tl = e.target.closest('[data-table]');
+  if (tl) {
+    e.stopPropagation();
+    const table = (S.tableView ? S.tableView.model : S.model).tables.find(x => x.key === tl.dataset.table);
+    if (table) goTable(table);
+  }
+}, true);
 
 /* ─── Gezinme geçmişi ─── */
 
@@ -2531,6 +2772,7 @@ function renderPanel() {
   document.body.classList.toggle('has-panel', !!tb);
   if (!tb) { p.hidden = true; p.innerHTML = ''; return; }
   p.hidden = false;
+  if (tb.code) { renderCodePanel(p, tb); return; }
   const col = schemaColor(tb);
   const outs = tb.out.filter(relVisible);
   const ins = tb.inc.filter(r => relVisible(r) && !r.self);
@@ -2581,6 +2823,7 @@ function renderPanel() {
       ${timeHistoryHtml(tb)}
       ${auditPanelHtml(tb)}
       ${privacyPanelHtml(tb)}
+      ${tableCodeHtml(tb)}
       ${S.impactRes && S.impactRes.root === tb ? impactHtml(S.impactRes) : ''}
       <section>
         <h3>${esc(t(mongo ? 'fields' : 'columns'))} <span>${tb.columns.length}</span></h3>
@@ -2818,7 +3061,7 @@ window.addEventListener('keydown', e => {
     else if (S.sel) select(null);
     else if (S.full) exitSubset();
     else if (S.pick.size) { S.pick = new Set(); afterPick(); }
-  } else if ((e.key === ',' || e.key === '.') && S.tl) { stopPlay(); timeGo(S.tl.pos + (e.key === ',' ? -1 : 1)); }
+  } else if ((e.key === ',' || e.key === '.') && S.tl && S.view !== 'code') { stopPlay(); timeGo(S.tl.pos + (e.key === ',' ? -1 : 1)); }
   else if (e.key === 'f' || e.key === 'F') fitView(true);
   else if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey) setColumns(!S.columns);
   else if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.metaKey) {
@@ -2958,7 +3201,7 @@ function exportPng() {
 
 function drawLegend() {
   document.querySelectorAll('#legend canvas[data-end]').forEach(cv => drawGlyph(cv, null, cv.dataset.end, 'fk'));
-  document.querySelectorAll('#legend canvas[data-line]').forEach(cv => drawGlyph(cv, null, null, cv.dataset.line));
+  document.querySelectorAll('#legend canvas[data-line]').forEach(cv => drawGlyph(cv, null, cv.dataset.right || null, cv.dataset.line));
   document.querySelectorAll('#legend canvas[data-pair]').forEach(cv => {
     const [l, r] = cv.dataset.pair.split(',');
     drawGlyph(cv, l, r, 'fk');
@@ -2974,6 +3217,22 @@ function markLang() {
 NS.onLangChange(() => {
   markLang();
   renderSamples();
+  // kod haritasının satır ve grup etiketleri dile bağlı: yeniden kurulur, seçim korunur
+  if (S.code && S.codeMap) {
+    const sel = S.view === 'code' && S.sel ? S.sel.unit : null;
+    S.codeMap = null;
+    if (S.view === 'code') {
+      const cm = codeMapModel();
+      S.model = cm.model;
+      S.lay = cm.lay;
+      S.order = cm.model.tables.slice().sort(byDegree);
+      buildIndex();
+      S.sel = sel ? S.model.tables.find(x => x.unit === sel) || null : null;
+      S.pathFrom = S.pathRes = null;
+      if (S.impact) computeImpact();
+      refreshEmphasis();
+    }
+  }
   if (S.model) {
     for (const tb of S.model.tables) tb._lw = 0;   // etiket genişlikleri yeniden ölçülür
     renderPanel();
@@ -3069,6 +3328,8 @@ if (params.get('sample')) {
       const keys = S.model.tables.filter(x => subNames.includes(x.name.toUpperCase())).map(x => x.key);
       if (keys.length) enterSubset(keys, params.get('near') === '1');
     }
+    // ?view=code: kod haritası (select ve path yordam adlarıyla)
+    if (params.get('view') === 'code' && S.code) setView('code');
     const byName = p => { const n = (params.get(p) || '').toUpperCase(); return n && S.model.tables.find(x => x.name.toUpperCase() === n); };
     const tb = byName('select') || byName('center');
     const zoom = Number(params.get('zoom'));
