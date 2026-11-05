@@ -68,6 +68,13 @@ function common(s, res) {
     if (Math.abs(ts[i].x - ts[j].x) < 164 && Math.abs(ts[i].y - ts[j].y) < (H(ts[i]) + H(ts[j])) / 2) overlaps++;
   }
   check(`${s.id}: kart çakışması yok`, overlaps === 0, overlaps);
+  // yakınlığa göre geçiş: her tablonun serbest (x0) ve ızgara (x1) konumu var; serbest konumlar da çakışmaz
+  // (uzak planda yıldızlar arası en az 2 × nodeR), ızgara konumu kart planındaki x'tir
+  let freeClose = 0;
+  for (let i = 0; i < ts.length; i++) for (let j = i + 1; j < ts.length; j++) {
+    if (ts[i].group === ts[j].group && Math.hypot(ts[i].x0 - ts[j].x0, ts[i].y0 - ts[j].y0) < 209) freeClose++;
+  }
+  check(`${s.id}: iki konum var, serbest konumlar çakışmıyor`, ts.every(t => Number.isFinite(t.x0) && t.x1 === t.x && t.y1 === t.y) && freeClose === 0, freeClose);
 }
 
 const EXPECT = {

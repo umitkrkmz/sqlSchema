@@ -124,10 +124,19 @@ function cardRows(t) {
   return t._rows;
 }
 
+// Kartın dikey merkezi: ızgarada kartlar üst kenarlarından hizalanır (kısa kart ortada değil, satırın üstünde durur).
+// Kayma geçiş oranıyla büyür; serbest yerleşimde merkez t.y'dir.
+function cardCY(t) {
+  cardRows(t);
+  if (t.x0 === undefined) return t.y;
+  const maxH = S.columns ? CARD.head + (CARD.maxRows + 1) * CARD.row + CARD.pad : CARD.head;
+  return t.y + (t._h - maxH) / 2 * blendAt(S.cam.k);
+}
+
 function anchorY(t, colName) {
   cardRows(t);
   const i = colName === undefined ? undefined : t._rowIdx.get(String(colName).toUpperCase());
-  const top = t.y - t._h / 2;
+  const top = cardCY(t) - t._h / 2;
   return i === undefined ? top + CARD.head / 2 : top + CARD.head + i * CARD.row + CARD.row / 2;
 }
 
@@ -353,8 +362,37 @@ function invalidate() {
   S.frame = requestAnimationFrame(() => { S.frame = 0; draw(); if (S.anim) invalidate(); });
 }
 
+// Yakınlığa göre konum: uzakta serbest yerleşim (organik takımyıldız), yakınlaştıkça kartlar altın oranlı
+// ızgaraya kayar; kart planına (LV_CARD) gelmeden geçiş biter, böylece geçiş sırasında kartlar üst üste binmez.
+const BLEND_FROM = 0.35, BLEND_TO = 0.95;
+function blendAt(k) {
+  const u = clamp((k - BLEND_FROM) / (BLEND_TO - BLEND_FROM), 0, 1);
+  return u * u * (3 - 2 * u);
+}
+// Tablonun verilen yakınlıktaki konumu (uçuş hedefi için: varılacak yakınlıktaki yer)
+function posAt(t, k) {
+  if (t.x0 === undefined) return { x: t.x, y: t.y };
+  const b = blendAt(k);
+  return { x: t.x0 + (t.x1 - t.x0) * b, y: t.y0 + (t.y1 - t.y0) * b };
+}
+// Oran değişince bütün tablolar yerine konur ve tıklama ızgarası yenilenir (her şey t.x / t.y'yi okur)
+function applyBlend() {
+  if (!S.model) return;
+  const b = blendAt(S.cam.k);
+  if (b === S.blend && S.blendLay === S.lay) return;
+  S.blend = b;
+  S.blendLay = S.lay;
+  for (const t of S.model.tables) {
+    if (t.x0 === undefined) continue;
+    t.x = t.x0 + (t.x1 - t.x0) * b;
+    t.y = t.y0 + (t.y1 - t.y0) * b;
+  }
+  if (NS.buildIndex) NS.buildIndex();
+}
+
 function draw() {
   if (S.anim) stepAnim();
+  applyBlend();
   const { w, h, dpr } = S;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = C.bg;
@@ -846,7 +884,7 @@ function drawCards() {
   for (const t of order) {
     const rows = cardRows(t);
     const W = CARD.w * k, H = t._h * k;
-    const x0 = sx(t.x) - W / 2, y0 = sy(t.y) - H / 2;
+    const x0 = sx(t.x) - W / 2, y0 = sy(cardCY(t)) - H / 2;
     const col = diffColor(t) || auditColor(t) || privColor(t) || styleColor(t) || schemaColor(t);
     const a = nodeAlpha(t);
     const isSel = t === S.sel, isAct = t === em.active;
@@ -1014,7 +1052,8 @@ function flyToTable(t, k) {
   const kk = k || Math.max(S.cam.k, 0.85);
   // sağdaki panel ve soldaki tablo listesi arasında kalan alanın ortasına
   const offset = (!$('#panel').hidden && S.w > 820 ? 190 : 0) - (!$('#tableList').hidden && S.w > 980 ? 150 : 0);
-  flyTo({ x: t.x + offset / kk, y: t.y, k: kk });
+  const p = posAt(t, kk);
+  flyTo({ x: p.x + offset / kk, y: p.y, k: kk });
 }
 
 /* ─── SVG dışa aktarma ─── */
@@ -1032,7 +1071,7 @@ function exportSvg(tables) {
   for (const t of tables) {
     cardRows(t);
     x0 = Math.min(x0, t.x - CARD.w / 2); x1 = Math.max(x1, t.x + CARD.w / 2);
-    y0 = Math.min(y0, t.y - t._h / 2); y1 = Math.max(y1, t.y + t._h / 2);
+    y0 = Math.min(y0, cardCY(t) - t._h / 2); y1 = Math.max(y1, cardCY(t) + t._h / 2);
   }
   const m = 48;
   const out = [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${f(x0 - m)} ${f(y0 - m)} ${f(x1 - x0 + 2 * m)} ${f(y1 - y0 + 2 * m)}" width="${f(x1 - x0 + 2 * m)}" height="${f(y1 - y0 + 2 * m)}">`,
@@ -1061,7 +1100,7 @@ function exportSvg(tables) {
   }
   out.push('</g>');
   for (const t of tables) {
-    const col = schemaColor(t), top = t.y - t._h / 2, left = t.x - CARD.w / 2;
+    const col = schemaColor(t), top = cardCY(t) - t._h / 2, left = t.x - CARD.w / 2;
     out.push(`<g>`,
       `<rect x="${f(left)}" y="${f(top)}" width="${CARD.w}" height="${f(t._h)}" rx="6" fill="${C.card}" stroke="${col}" stroke-opacity="0.55"/>`,
       `<circle cx="${f(left + 9)}" cy="${f(top + CARD.head / 2)}" r="3" fill="${col}"/>`,
@@ -1085,6 +1124,6 @@ Object.assign(NS, {
   S, $, canvas, C, CARD, PALETTE, DASH, schemaLabel, groupLabel,
   levelOf, wx, wy, starR, cardRows, keyTag, schemaColor, relStyle, relVisible, clamp,
   drawGlyph, refreshEmphasis, invalidate, draw, resetHud,
-  resize, fitView, flyTo, zoomAt, flyToTable,
+  resize, fitView, flyTo, zoomAt, flyToTable, posAt, cardCY,
 });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});

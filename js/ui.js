@@ -1554,7 +1554,7 @@ function hitTest(px, py) {
         if (S.em.focus && !S.em.focus.has(tb)) continue;
         if (lv === 2) {
           cardRows(tb);
-          if (Math.abs(x - tb.x) <= CARD.w / 2 && Math.abs(y - tb.y) <= tb._h / 2) return tb;
+          if (Math.abs(x - tb.x) <= CARD.w / 2 && Math.abs(y - NS.cardCY(tb)) <= tb._h / 2) return tb;
         } else {
           const d = Math.hypot(x - tb.x, y - tb.y) * k;
           if (d < starR(tb) + 7 && d < bd) { bd = d; best = tb; }
@@ -3288,7 +3288,7 @@ try {
 }
 
 // Konsoldan inceleme için: sqlSchema.S.model.tables, sqlSchema.loadText(metin, 'ad.sql')
-Object.assign(NS, { loadText, setFiles, rebuild, loadSample });
+Object.assign(NS, { loadText, setFiles, rebuild, loadSample, buildIndex });
 
 NS.applyI18n();
 markLang();
@@ -3340,7 +3340,8 @@ if (params.get('sample')) {
       const k = zoom > 0 ? zoom : Math.max(S.cam.k, 0.85);
       const offset = !$('#panel').hidden && S.w > 820 ? 190 : 0;
       S.anim = null;
-      S.cam = { x: tb.x + offset / k, y: tb.y, k };
+      const pos = NS.posAt(tb, k);
+      S.cam = { x: pos.x + offset / k, y: pos.y, k };
     } else if (zoom > 0) {
       S.cam.k = zoom;
     }

@@ -17,6 +17,7 @@ const OUT = path.join(__dirname, '..', 'docs', 'images');
 const SCENES = {
   'genel-bakis': 'sample=telekom&legend=1',
   'secim-ve-panel': 'sample=telekom&select=BILLING_ACCOUNT&zoom=0.9&legend=0',
+  'hizali-kartlar': 'sample=telekom&center=INVOICE&zoom=1.2&legend=0',
   'yakin-plan': 'sample=kucuk&select=SUBSCRIPTION&zoom=1.7&legend=0',
   'coklu-veritabani': 'sample=polyglot&legend=0',
   'dosya-takimyildizlari': 'sample=sigorta&legend=0',

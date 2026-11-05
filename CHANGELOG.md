@@ -5,6 +5,11 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Değişti · Changed
+
+- **Altın oranlı hizalama:** yakınlaştıkça tablolar serbest yerleşimden altın oranlı bir ızgaraya (kart ölçüsü × 1,382) yumuşakça kayar; yakın planda kartlar sütun ve satır hâlinde, üst kenarları hizalı durur. Uzaktan görünüm organik kalır. Örneklerde çizgi kesişmeleri yaklaşık %35 azalır.
+  Golden-ratio alignment: as you zoom in, tables slide smoothly from the free layout onto a golden-ratio grid (card size × 1.382); in close-up the cards stand in columns and rows with their top edges aligned. The far view stays organic. On the samples, line crossings drop by about 35%.
+
 ## [0.14.1] - 2026-11-03
 
 ### Düzeltildi · Fixed

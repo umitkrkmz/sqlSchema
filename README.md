@@ -112,6 +112,8 @@ Yakınlaştırma düzeyine göre üç görünüm vardır:
 | Takımyıldız | Tablolar yıldız olur: boyut = bağlantı sayısı, renk = şema. Seçili tablonun çizgilerinde karga ayağı ve kolon adı yazar. |
 | Yakın plan | Tablolar kart olur; çizgiler doğrudan FK ve PK kolon satırlarına bağlanır. |
 
+Uzaktan bakınca yıldızlar serbest, organik bir dağılımdadır. Yakınlaştıkça tablolar yavaşça altın oranlı bir ızgaraya kayar: hücre, kart ölçüsünün 1,382 katıdır (boşluk, altın oranın tümleyeni 0,382). Yakın planda kartlar sütun ve satır hâlinde, üst kenarları hizalı durur. Her tablo serbest konumuna en yakın boş hücreyi alır; komşular yine komşu kalır. Örneklerde çizgi kesişmeleri yaklaşık üçte bir azalır.
+
 **Görünüm** menüsünde tablo listesi, kolon ayrıntıları, tahmini ilişkiler, sözlük bağlantıları, ızgara ve takımyıldız gruplaması seçenekleri var. **Kolon ayrıntıları** kapatılınca (kısayolu `C`) yakın planda kartlar yalnızca tablo adını gösterir ve çizgiler kartın başlığına bağlanır. Böylece yalnızca tablolar ve ilişkileri kalır. Ayrıntı paneli kolonları göstermeye devam eder. Seçim tarayıcıda hatırlanır.
 
 <img src="docs/images/tr/secim-ve-panel.png" alt="Seçili tablo, vurgulu ilişkileri ve ayrıntı paneli" width="900">
@@ -161,6 +163,8 @@ Ayrıntı panelinde kolonlar, açıklamalar, tanımın geçtiği dosya ve satır
 <img src="docs/images/tr/yol-vurgulama.png" alt="Yol bulma: PAYMENT_ALLOCATION tablosundan ADDRESS tablosuna giden ilişki zinciri" width="900">
 
 <img src="docs/images/tr/yakin-plan.png" alt="Yakın plan: kolon satırlarına bağlanan çizgiler ve karga ayağı uçları" width="900">
+
+<img src="docs/images/tr/hizali-kartlar.png" alt="Yakın planda altın oranlı ızgaraya hizalanmış kartlar" width="900">
 
 #### Karga ayağı
 
@@ -895,6 +899,8 @@ The view changes with the zoom level:
 | Constellation | Tables become stars: size = number of links, colour = schema. The lines of the selected table show crow's feet and column names. |
 | Close-up | Tables become cards; lines attach directly to the FK and PK column rows. |
 
+From afar the stars sit in a free, organic spread. As you zoom in, tables slide gently onto a golden-ratio grid: a cell is 1.382 times the card size (the gap is 0.382, the complement of the golden ratio). In close-up the cards stand in columns and rows with their top edges aligned. Each table takes the free cell nearest its free position, so neighbours stay neighbours. On the samples, line crossings drop by about a third.
+
 The **View** menu holds the table list, column details, inferred relations, lookup links, grid and constellation grouping options. With **column details** off (shortcut `C`), close-up cards show only the table name and lines attach to the card header, leaving just tables and their relationships. The detail panel still lists the columns. The choice is remembered in the browser.
 
 <img src="docs/images/en/secim-ve-panel.png" alt="A selected table, its highlighted relationships and the detail panel" width="900">
@@ -946,6 +952,8 @@ The detail panel lists:
 <img src="docs/images/en/yol-vurgulama.png" alt="Finding a path: the chain of relationships from PAYMENT_ALLOCATION to ADDRESS" width="900">
 
 <img src="docs/images/en/yakin-plan.png" alt="Close-up: lines attached to column rows, with crow's foot ends" width="900">
+
+<img src="docs/images/en/hizali-kartlar.png" alt="Close-up cards aligned on the golden-ratio grid" width="900">
 
 #### Crow's foot
 
