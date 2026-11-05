@@ -15,7 +15,7 @@
 'use strict';
 
 const {
-  S, $, canvas, CARD, PALETTE, DIALECTS, t,
+  S, $, canvas, C, CARD, PALETTE, STYLE_COLORS, DIALECTS, t, setTheme,
   levelOf, wx, wy, starR, cardRows, keyTag, schemaColor, schemaLabel, groupLabel, relStyle, relVisible,
   drawGlyph, refreshEmphasis, invalidate, draw, resetHud, resize, fitView, zoomAt, flyToTable,
   classify, orderFiles, parseFile, databaseNames, harmonizeDialects, buildModel, layoutModel, resolveGrouping, namingProfile,
@@ -471,8 +471,8 @@ function renderNaming() {
 S.styleDim = null;
 S.styleColor = null;   // tablo → renk (render.js)
 S.styleCols = null;    // tablo → Map(KOLON → renk)
-const STYLE_HEX = ['#f2b45a', '#6cc6dc', '#a58cf2', '#7fd49a', '#ef7b86', '#d8a3d0'];
-const styleHex = (d, key) => { const i = d.buckets.filter(b => !b.neutral).findIndex(b => b.key === key); return STYLE_HEX[i % STYLE_HEX.length]; };
+// renkler temadan (render.js, STYLE_COLORS); tema değişince applyStyleMap yeniden boyar
+const styleHex = (d, key) => { const i = d.buckets.filter(b => !b.neutral).findIndex(b => b.key === key); return STYLE_COLORS[i % STYLE_COLORS.length]; };
 
 function applyStyleMap() {
   S.styleColor = S.styleCols = null;
@@ -3111,6 +3111,7 @@ document.addEventListener('click', e => {
     case 'std-open': $('#namingPop').hidden = true; openStd(); break;
     case 'naming-md': if (S.model) downloadText(namingMarkdown(), fileStem() + '-' + t('namingFile') + '.md', 'text/markdown;charset=utf-8'); break;
     case 'list-close': setList(false); break;
+    case 'theme': applyTheme(C.name === 'light' ? 'dark' : 'light', true); break;
     case 'legend':
       document.body.classList.toggle('legend-closed');
       // lejant ve tablo listesi aynı kenarı paylaşır
@@ -3233,34 +3234,56 @@ NS.onLangChange(() => {
       refreshEmphasis();
     }
   }
-  if (S.model) {
-    for (const tb of S.model.tables) tb._lw = 0;   // etiket genişlikleri yeniden ölçülür
-    renderPanel();
-    renderReport();
-    renderNaming();
-    renderFiles();
-    renderList();
-    renderViews();
-    renderPickBar();
-    renderDiff();
-    $('#timeBar').innerHTML = '';
-    renderTimeBar();
-    renderAudit();
-    renderPrivacy();
-    renderStyleBar();
-    if ($('#fixDlg').open) renderFix();
-    if ($('#reviewDlg').open) renderReview();
-    if ($('#stdDlg').open) renderStd();
-    if ($('#docDlg').open) openDoc();
-    if ($('#exportDlg').open) renderExport();
-    if ($('#migDlg').open) renderMigration();
-    resetHud();
-  }
+  if (S.model) renderAll();
   if (S.title && S.files.length > 1 && /^\d+ /.test(S.title)) $('#fileName').textContent = t('nFiles', { n: S.files.filter(f => f.text != null).length });
   invalidate();
 });
 
+// dil ya da tema değişince açık olan her şey yeniden yazılır
+function renderAll() {
+  for (const tb of S.model.tables) tb._lw = 0;   // etiket genişlikleri yeniden ölçülür
+  renderPanel();
+  renderReport();
+  renderNaming();
+  renderFiles();
+  renderList();
+  renderViews();
+  renderPickBar();
+  renderDiff();
+  $('#timeBar').innerHTML = '';
+  renderTimeBar();
+  renderAudit();
+  renderPrivacy();
+  renderStyleBar();
+  if ($('#fixDlg').open) renderFix();
+  if ($('#reviewDlg').open) renderReview();
+  if ($('#stdDlg').open) renderStd();
+  if ($('#docDlg').open) openDoc();
+  if ($('#exportDlg').open) renderExport();
+  if ($('#migDlg').open) renderMigration();
+  resetHud();
+}
+
+/* ─── Tema ─── */
+
+// Koyu (gece gökyüzü) ya da açık (basılı yıldız atlası). Tuval renkleri render.js'te, arayüzünkiler style.css'te.
+function applyTheme(name, save) {
+  setTheme(name);
+  document.documentElement.dataset.theme = C.name;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = C.bg;
+  if (save) { try { localStorage.setItem('sqlschema.theme', C.name); } catch (err) { /* depolama kapalı */ } }
+  drawLegend();
+  if (S.model) {
+    if (S.styleDim) applyStyleMap();
+    renderAll();
+  }
+  invalidate();
+}
+
 /* ─── Başlangıç ─── */
+
+applyTheme(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark', false);
 
 const legendPref = params.get('legend');
 try {

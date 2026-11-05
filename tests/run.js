@@ -841,6 +841,23 @@ END P;
   check('genel ad sürüm klasöründe değilse sıradan dosya', NS.classify('db/schema/migration.sql').kind === 'plain' && NS.fileLabel('db/V3__x.sql') === 'V3__x');
 }
 
+// Temalar: CSS'te kullanılan her değişken tanımlı, açık tema yalnızca var olanları ezer; tuvalin iki teması aynı renk adlarını taşır
+{
+  const css = fs.readFileSync(path.join(ROOT, 'style.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const block = sel => { const i = css.indexOf(sel + ' {'); return i < 0 ? '' : css.slice(i, css.indexOf('\n}', i)); };
+  const names = b => new Set([...b.matchAll(/^\s*(--[\w-]+):/gm)].map(m => m[1]));
+  const dark = names(block(':root')), light = names(block(':root[data-theme="light"]'));
+  const inline = new Set(['--c', '--sev']);   // öğe ya da sınıf başına verilir (style="--c:…", .sev-error)
+  const undef = [...new Set([...css.matchAll(/var\((--[\w-]+)/g)].map(m => m[1]))].filter(v => !dark.has(v) && !inline.has(v));
+  const extra = [...light].filter(v => !dark.has(v));
+  check('tema: CSS değişkenleri tanımlı, açık tema yalnızca var olanları ezer', light.size > 30 && !undef.length && !extra.length, { undef, extra });
+  const src = fs.readFileSync(path.join(ROOT, 'js', 'render.js'), 'utf8');
+  const part = name => { const i = src.indexOf('  ' + name + ': {') + name.length + 5; return new Set([...src.slice(i, src.indexOf('\n  },', i)).matchAll(/(\w+): /g)].map(m => m[1])); };
+  const td = part('dark'), tl = part('light');
+  const diffKeys = [...td].filter(k => !tl.has(k)).concat([...tl].filter(k => !td.has(k)));
+  check('tema: tuvalin koyu ve açık temaları aynı renk adlarını taşır', td.size > 20 && !diffKeys.length, diffKeys);
+}
+
 // Dil desteği: iki sözlük aynı anahtarlara sahip, HTML ve kodda kullanılan her anahtar tanımlı
 {
   const tr = new Set(NS.i18nKeys('tr')), en = new Set(NS.i18nKeys('en'));

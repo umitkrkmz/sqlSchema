@@ -5,6 +5,7 @@
  * Sayfanın bir statik sunucuda açık olması gerekir (python -m http.server 8000).
  * Chrome ya da Edge'i başsız (headless) çalıştırır; yolu CHROME ortam değişkeniyle de verilebilir.
  * Her sahne iki dilde çekilir: docs/images/tr/*.png ve docs/images/en/*.png
+ * ONLY=genel-bakis,acik-tema ortam değişkeniyle yalnızca bazı sahneler çekilir.
  */
 'use strict';
 const fs = require('fs');
@@ -18,6 +19,8 @@ const SCENES = {
   'genel-bakis': 'sample=telekom&legend=1',
   'secim-ve-panel': 'sample=telekom&select=BILLING_ACCOUNT&zoom=0.9&legend=0',
   'hizali-kartlar': 'sample=telekom&center=INVOICE&zoom=1.2&legend=0',
+  'acik-tema': 'sample=telekom&theme=light&legend=1',
+  'acik-tema-yakin': 'sample=telekom&theme=light&select=INVOICE&zoom=1.2&legend=0',
   'yakin-plan': 'sample=kucuk&select=SUBSCRIPTION&zoom=1.7&legend=0',
   'coklu-veritabani': 'sample=polyglot&legend=0',
   'dosya-takimyildizlari': 'sample=sigorta&legend=0',
@@ -56,6 +59,7 @@ const profile = fs.mkdtempSync(path.join(require('os').tmpdir(), 'sqlschema-shot
 for (const lang of ['tr', 'en']) {
   fs.mkdirSync(path.join(OUT, lang), { recursive: true });
   for (const [name, query] of Object.entries(SCENES)) {
+    if (process.env.ONLY && !process.env.ONLY.split(',').includes(name)) continue;
     const file = path.join(OUT, lang, name + '.png');
     const url = `${BASE}?lang=${lang}&${query}`;
     execFileSync(chrome, [

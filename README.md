@@ -46,7 +46,7 @@ draw.io kadar elle uğraştırmaz, veri modelleme aracı kadar ağır değildir.
 12. [KVKK haritası](#tr-kvkk)
 13. [Örnekler](#tr-ornekler)
 14. [Şemayı dışa aktarmak](#tr-disa-aktarma)
-15. [Dil](#tr-dil)
+15. [Dil ve tema](#tr-dil)
 16. [Proje yapısı ve geliştirme](#tr-gelistirme)
 17. [Sınırlar](#tr-sinirlar)
 18. [Katkı, güvenlik, lisans](#tr-katki)
@@ -713,9 +713,17 @@ Tabloların bir kısmı ORM'den, bir kısmı DBA betiklerinden geliyorsa iki ç�
 
 <a id="tr-dil"></a>
 
-### Dil
+### Dil ve tema
 
 Arayüz Türkçe ve İngilizcedir. İlk açılışta sistem dili Türkçe ise Türkçe, değilse İngilizce seçilir. Sağ üstteki **TR / EN** düğmeleriyle değiştirilebilir; seçim tarayıcıda hatırlanır. Bir bağlantıda dili sabitlemek için `?lang=tr` ya da `?lang=en` kullanılabilir.
+
+İki tema vardır. **Koyu tema** gece gökyüzüdür ve varsayılandır. **Açık tema** kâğıda basılmış bir yıldız atlasına benzer: krem kâğıt, lacivert mürekkep, koyulaştırılmış şema renkleri. Gündüz ofiste, projeksiyonda ve çıktıda daha rahat okunur. Dil düğmelerinin yanındaki güneş / ay düğmesiyle geçilir; seçim tarayıcıda hatırlanır, `?theme=light` ya da `?theme=dark` bir bağlantıda sabitler. PNG ve SVG dışa aktarma o anki temayı kullanır.
+
+Arayüzün ölçüleri altın orandan gelir: boşluklar Fibonacci adımlarıdır (5 · 8 · 13 · 21 · 34). Üst çubuk 55 piksel (34 piksellik düğme ile 21 piksellik boşluk), ayrıntı paneli 377 piksel genişliğinde ve kenarlardan 13 piksel içeridedir.
+
+<img src="docs/images/tr/acik-tema.png" alt="Açık tema: krem kâğıt üzerinde lacivert mürekkeple çizilmiş yıldız haritası" width="900">
+
+<img src="docs/images/tr/acik-tema-yakin.png" alt="Açık temada yakın plan: seçili tablo, kartlar ve ayrıntı paneli" width="900">
 
 **Paylaşılabilir bağlantılar.** URL parametreleriyle bir örnek, bir tablo ve yakınlaştırma düzeyi doğrudan açılabilir:
 
@@ -833,7 +841,7 @@ It is less manual than draw.io and lighter than a data-modelling tool. The goal 
 12. [Personal data map](#en-privacy)
 13. [Samples](#en-samples)
 14. [Exporting a schema](#en-export)
-15. [Language](#en-language)
+15. [Language and theme](#en-language)
 16. [Project layout and development](#en-development)
 17. [Limitations](#en-limitations)
 18. [Contributing, security, license](#en-contributing)
@@ -1502,9 +1510,17 @@ If some tables come from the ORM and others from DBA scripts, open both outputs 
 
 <a id="en-language"></a>
 
-### Language
+### Language and theme
 
 The interface is available in Turkish and English. On first visit Turkish is chosen if the system language is Turkish, English otherwise. Switch with the **TR / EN** buttons in the top-right corner; the choice is remembered in the browser. Use `?lang=tr` or `?lang=en` to pin the language in a link.
+
+There are two themes. The **dark theme** is the night sky and the default. The **light theme** looks like a star atlas printed on paper: cream paper, navy ink, deepened schema colours. It reads more easily in a daylit office, on a projector and on paper. Switch with the sun / moon button next to the language buttons; the choice is remembered in the browser, and `?theme=light` or `?theme=dark` pins it in a link. PNG and SVG export use the current theme.
+
+The interface's measurements come from the golden ratio: spacing follows Fibonacci steps (5 · 8 · 13 · 21 · 34). The top bar is 55 pixels (a 34-pixel button plus 21 pixels of space), and the detail panel is 377 pixels wide and 13 pixels in from the edges.
+
+<img src="docs/images/en/acik-tema.png" alt="Light theme: the star map drawn in navy ink on cream paper" width="900">
+
+<img src="docs/images/en/acik-tema-yakin.png" alt="Close-up in the light theme: a selected table, cards and the detail panel" width="900">
 
 **Shareable links.** URL parameters open a sample, a table and a zoom level directly:
 
