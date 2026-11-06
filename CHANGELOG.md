@@ -5,6 +5,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+## [0.15.2] - 2026-11-06
+
 ### Düzeltildi · Fixed
 
 - **KVKK ve denetim pencereleri:** kapalıyken dar kalır, bir liste açılınca 520 piksele kadar genişler (yandaki ayrıntı paneliyle çakışmadan). KVKK listelerinde her satır tek satır: tablo adı solda, nereden geldiği sağda; sığmazsa … ile kısalır, tamamı üzerine gelince görünür. Yatay kaydırma çubuğu çıkmaz. Fark penceresi de istenen 360 piksele kavuştu; CSS sırası yüzünden bu pencereler hep 300 pikselde kalıyordu.
@@ -258,7 +260,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 - **Geliştirme araçları:** test seti, ekran görüntüsü üreticisi.
   Test suite and screenshot generator.
 
-[Yayımlanmamış · Unreleased]: ../../compare/v0.15.1...HEAD
+[Yayımlanmamış · Unreleased]: ../../compare/v0.15.2...HEAD
+[0.15.2]: ../../compare/v0.15.1...v0.15.2
 [0.15.1]: ../../compare/v0.15.0...v0.15.1
 [0.15.0]: ../../compare/v0.14.1...v0.15.0
 [0.14.1]: ../../compare/v0.14.0...v0.14.1
