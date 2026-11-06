@@ -5,6 +5,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+## [0.15.0] - 2026-11-06
+
 ### Eklendi · Added
 
 - **Açık tema:** kâğıda basılmış yıldız atlası görünümü (krem kâğıt, lacivert mürekkep, koyulaştırılmış şema renkleri). Üst çubuktaki güneş / ay düğmesiyle geçilir, seçim hatırlanır; `?theme=light|dark`. PNG ve SVG dışa aktarma o anki temayı kullanır.
@@ -244,7 +246,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 - **Geliştirme araçları:** test seti, ekran görüntüsü üreticisi.
   Test suite and screenshot generator.
 
-[Yayımlanmamış · Unreleased]: ../../compare/v0.14.1...HEAD
+[Yayımlanmamış · Unreleased]: ../../compare/v0.15.0...HEAD
+[0.15.0]: ../../compare/v0.14.1...v0.15.0
 [0.14.1]: ../../compare/v0.14.0...v0.14.1
 [0.14.0]: ../../compare/v0.13.0...v0.14.0
 [0.13.0]: ../../compare/v0.12.0...v0.13.0
