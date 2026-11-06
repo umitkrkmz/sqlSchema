@@ -22,7 +22,9 @@ const DIALECTS = {
 
 // İfade başında, satırın tamamını kaplayan SQL*Plus / istemci komutları
 const CLIENT_CMD = /^(PROMPT|REM|REMARK|SET|SPOOL|WHENEVER|CONNECT|CONN|DEFINE|UNDEFINE|SHOW|EXIT|QUIT|PAUSE|ACCEPT|VARIABLE|VAR|COLUMN|TTITLE|BTITLE|BREAK|CLEAR|HOST)\b/i;
-const WORD_RE = /[A-Za-z_\xC0-\u{FFFF}][\w$#\xC0-\u{FFFF}]*/yu;
+// Sözcük: harf (Türkçe dahil), rakam, _ $ #. Kutu çizgisi, ok gibi simgeler sözcük değildir; yorumdan
+// sızan bir ASCII çizimi ifade adı gibi görünmesin.
+const WORD_RE = /[\p{L}_][\p{L}\p{M}\p{N}_$#]*/yu;
 const NUM_RE = /(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?/y;
 const DOLLAR_RE = /\$([A-Za-z_]\w*)?\$/y;
 const Q_CLOSE = { '[': ']', '(': ')', '{': '}', '<': '>' };
@@ -33,7 +35,9 @@ function countNL(s, a, b) {
   return k;
 }
 
-function tokenize(src) {
+// opts.nestedComments: PostgreSQL ve SQL Server /* … /* … */ … */ yorumlarını iç içe sayar; Oracle ve MySQL saymaz
+function tokenize(src, opts = {}) {
+  const nested = !!opts.nestedComments;
   const toks = [];
   const n = src.length;
   const backslashEsc = src.indexOf('`') >= 0; // MySQL dökümlerinde \' kaçışı kullanılır
@@ -77,8 +81,17 @@ function tokenize(src) {
       continue;
     }
     if (c === '/' && src[i + 1] === '*') {
-      const e = src.indexOf('*/', i + 2);
-      const end = e < 0 ? n : e + 2;
+      let end;
+      if (nested) {
+        let j = i + 2, depth = 1;
+        while (j < n && depth) {
+          if (src[j] === '*' && src[j + 1] === '/') { depth--; j += 2; } else if (src[j] === '/' && src[j + 1] === '*') { depth++; j += 2; } else j++;
+        }
+        end = j;
+      } else {
+        const e = src.indexOf('*/', i + 2);
+        end = e < 0 ? n : e + 2;
+      }
       line += countNL(src, i, end);
       i = end;
       continue;

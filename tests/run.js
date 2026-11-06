@@ -618,6 +618,23 @@ const one = sql => build([{ path: 'x.sql', text: sql }]).model;
   const m4 = one("EXEC sp_rename 'dbo.Old', 'New';\nGO\nCREATE TABLE [dbo].[Old] ([Id] int NOT NULL);\nGO\nEXEC sp_rename 'dbo.Old', 'New';\nGO");
   check('sp_rename tabloyu yeniden adlandırır', !!find(m4, 'New') && !find(m4, 'Old'));
 
+  // gerçek bir PostgreSQL dökümünden: iç içe yorumda kutu çizimi; ilk */ yorumu bitirince sonrası sonraki tabloyu yutuyordu
+  const art = '/*\n *   LOCATIONS\n *   \u{250C}\u{2500}\u{2500}\u{2510}\n *   \u{2502} il /* üst */ \u{2502}\n *   DEVICE \u{25BC}\n *   \u{2514}\u{2500}\u{2500}\u{2192} cihaz\n */\n';
+  const pgNest = one('CREATE TABLE locations (id bigserial PRIMARY KEY);\n' + art + 'CREATE TABLE location_type_hierarchy (id serial PRIMARY KEY, parent_id int);\nCREATE INDEX ix_lth ON location_type_hierarchy (parent_id);');
+  check('PostgreSQL iç içe yorum: sonraki tablo yutulmaz, atlanan ifade yok', !!find(pgNest, 'location_type_hierarchy') && !pgNest.stats.orphans.length && !pgNest.stats.skipped.length, [pgNest.tables.map(t => t.name), pgNest.stats.skipped, pgNest.stats.orphans]);
+  const tsNest = one('/* dış /* iç */ hâlâ yorum */\nCREATE TABLE [dbo].[T] ([Id] int NOT NULL);\nGO');
+  check('SQL Server iç içe yorum', tsNest.stats.tables === 1 && !tsNest.stats.skipped.length, tsNest.stats.skipped);
+  // Oracle ve MySQL iç içe saymaz: /* a /* b */ yorumu ilk */ ile biter
+  const oraNest = one('/* a /* b */\nCREATE TABLE "S"."T" ("A" NUMBER(10,0)) TABLESPACE "USERS" ;');
+  check('Oracle yorumu ilk */ ile biter', oraNest.stats.tables === 1, oraNest.stats.tables);
+  const lex = NS.tokenize('a\u{2500}\u{2500}b \u{00C7}ALI\u{015E}AN \u{250C}');
+  check('kutu çizgisi sözcük değil, Türkçe harfler sözcük', lex.map(x => x.t).join('') === 'wppwwp' && lex[4].v ==='\u{00C7}ALI\u{015E}AN', lex.map(x => x.t + ':' + x.v));
+  // yorum dışına sızmış metin: satır başındaki CREATE'ten okunur, öncesi tanınmayan metin sayılır
+  const leak = one('LOCATIONS hiyerarşisi\n\u{250C}\u{2500}\u{2500}\u{2510}\nCREATE TABLE device (id bigserial PRIMARY KEY);');
+  check('sızan metin sonraki tabloyu yutmaz', !!find(leak, 'device') && same(leak.stats.skipped, [['?', 1]]), leak.stats.skipped);
+  const ifTs = one("IF OBJECT_ID('dbo.T') IS NULL\nCREATE TABLE [dbo].[T] ([Id] int NOT NULL);\nGO");
+  check('bilinen sözcükle başlayan ifade (IF) kurtarılmaz', ifTs.stats.tables === 0 && ifTs.stats.skipped[0][0] === 'IF', ifTs.stats.skipped);
+
   // @ref açıklama etiketi
   const r1 = one("CREATE TABLE sozluk (id int PRIMARY KEY, tip_id int, ad varchar(50));\nCREATE TABLE abone (id int PRIMARY KEY, durum_id int NOT NULL, segment_id int, kanal varchar(10));\nCOMMENT ON COLUMN abone.durum_id IS 'Abone durumu. @ref sozluk.id (tip_id = 7)';\nCOMMENT ON COLUMN abone.segment_id IS '@ref yok_tablo';\nCOMMENT ON COLUMN abone.kanal IS 'Satış kanalı @ref SOZLUK';");
   const rr = rel(r1, 'abone', 'durum_id', 'sozluk', 'ref');

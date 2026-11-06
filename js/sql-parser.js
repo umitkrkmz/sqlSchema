@@ -592,6 +592,24 @@ function parseRename(c, P) {
   }
 }
 
+/*
+ * Yorumdan ya da yarım kopyalamadan sızan metin (ör. bir ASCII çizimi) ';' ile bitmediği için ardından gelen
+ * CREATE TABLE'ı yutar. İfade bilinen bir SQL sözcüğüyle başlamıyorsa, satır başındaki ilk CREATE / ALTER /
+ * COMMENT'ten okunur; öncesi "tanınmayan metin" ('?') sayılır.
+ */
+const KNOWN_START = new Set(['CREATE', 'ALTER', 'DROP', 'COMMENT', 'RENAME', 'GRANT', 'REVOKE', 'INSERT', 'UPDATE', 'DELETE', 'MERGE', 'UPSERT', 'REPLACE',
+  'SELECT', 'WITH', 'VALUES', 'SET', 'RESET', 'USE', 'EXEC', 'EXECUTE', 'CALL', 'DO', 'BEGIN', 'DECLARE', 'END', 'IF', 'ELSE', 'WHILE', 'PRINT', 'RAISERROR', 'THROW',
+  'COMMIT', 'ROLLBACK', 'SAVEPOINT', 'START', 'LOCK', 'TRUNCATE', 'COPY', 'ANALYZE', 'ANALYSE', 'VACUUM', 'REINDEX', 'CLUSTER', 'REFRESH', 'SECURITY', 'IMPORT',
+  'PRAGMA', 'ATTACH', 'DETACH', 'EXPLAIN', 'SHOW', 'DESCRIBE', 'DESC', 'OPTIMIZE', 'LOAD', 'PURGE', 'AUDIT', 'NOAUDIT', 'DBCC', 'FLASHBACK', 'ASSOCIATE', 'DISASSOCIATE', 'CHECKPOINT', 'DISCARD', 'LISTEN', 'NOTIFY']);
+const RECOVER_AT = new Set(['CREATE', 'ALTER', 'COMMENT']);
+function recoverStatement(st, P) {
+  if (st[0] && st[0].t === 'w' && KNOWN_START.has(st[0].u)) return st;
+  const k = st.findIndex((t, j) => j > 0 && t.t === 'w' && RECOVER_AT.has(t.u) && t.line > st[j - 1].line);
+  if (k < 0) return st;
+  P.skip('?');
+  return st.slice(k);
+}
+
 function statementLabel(toks) {
   const w = [];
   for (const t of toks) {
@@ -655,10 +673,11 @@ function parseSQL(src, opts = {}) {
     op(o) { o.file = this.file; o.line = this.line; this.ops.push(o); },
     qn(parts) { return parts.length === 1 && this.defaultSchema ? [this.defaultSchema, parts[0]] : parts; },
   };
-  const toks = tokenize(src);
+  const toks = tokenize(src, { nestedComments: dialect === 'postgres' || dialect === 'tsql' });
   const stmts = splitStatements(toks, { plsql: dialect !== 'cassandra' });
   P.stats.statements = stmts.length;
-  for (const st of stmts) {
+  for (let st of stmts) {
+    st = recoverStatement(st, P);
     const c = new Cursor(st);
     P.line = st[0] ? st[0].line : 0;
     try {
