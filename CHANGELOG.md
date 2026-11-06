@@ -5,6 +5,18 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Eklendi · Added
+
+- **Açık tema:** kâğıda basılmış yıldız atlası görünümü (krem kâğıt, lacivert mürekkep, koyulaştırılmış şema renkleri). Üst çubuktaki güneş / ay düğmesiyle geçilir, seçim hatırlanır; `?theme=light|dark`. PNG ve SVG dışa aktarma o anki temayı kullanır.
+  Light theme: a star atlas printed on paper (cream paper, navy ink, deepened schema colours). Switch with the sun / moon button in the top bar; the choice is remembered; `?theme=light|dark`. PNG and SVG export use the current theme.
+
+### Değişti · Changed
+
+- **Altın oranlı arayüz ölçüleri:** boşluklar Fibonacci adımları (5 · 8 · 13 · 21 · 34); üst çubuk 55, düğmeler 34, ayrıntı paneli 377 piksel. Dar ekranda üst çubuğun üçüncü sırası artık kesilmiyor.
+  Golden-ratio interface measurements: spacing follows Fibonacci steps (5 · 8 · 13 · 21 · 34); the top bar is 55, buttons 34 and the detail panel 377 pixels. On narrow screens the top bar's third row is no longer cut off.
+- **Altın oranlı hizalama:** yakınlaştıkça tablolar serbest yerleşimden altın oranlı bir ızgaraya (kart ölçüsü × 1,382) yumuşakça kayar; yakın planda kartlar sütun ve satır hâlinde, üst kenarları hizalı durur. Uzaktan görünüm organik kalır. Örneklerde çizgi kesişmeleri yaklaşık %35 azalır.
+  Golden-ratio alignment: as you zoom in, tables slide smoothly from the free layout onto a golden-ratio grid (card size × 1.382); in close-up the cards stand in columns and rows with their top edges aligned. The far view stays organic. On the samples, line crossings drop by about 35%.
+
 ## [0.14.1] - 2026-11-03
 
 ### Düzeltildi · Fixed

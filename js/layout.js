@@ -14,6 +14,9 @@ const L = {
   // Tablo çarpışma yarıçapı. Merkezler arası en az 210 birim: 164×127'lik iki kart
   // hangi açıyla yan yana gelirse gelsin üst üste binmez (bkz. render.js CARD).
   nodeR: 105,
+  // hizalama ızgarası (alignGrid): kart ölçüsü × 1,382 (altın oranın tümleyeni 0,382 kadar boşluk)
+  gridW: 227,
+  gridH: 176,
   groupSmall: 40,   // bu sayıdan küçük şemalar tek takımyıldızdır
   groupMax: 70,     // bir takımyıldızdaki en fazla tablo
   groupPad: 110,
@@ -75,6 +78,30 @@ function relax(n, rad, links, o) {
   }
   resolveCollisions(x, y, rad, o.pad * 0.6);
   return { x, y };
+}
+
+// Altın oranlı ızgara: kartlar arası boşluk kart ölçüsünün 0,382'si (164 × 1,382 ≈ 227, 127 × 1,382 ≈ 176).
+// Her tablo (merkezdeki önce) gevşetmede bulduğu yere en yakın boş hücreye oturur; kenarlar hizalanır.
+function alignGrid(x, y) {
+  const W = L.gridW, H = L.gridH, used = new Set();
+  for (let i = 0; i < x.length; i++) {
+    const cx = Math.round(x[i] / W), cy = Math.round(y[i] / H);
+    let best = null, bd = Infinity;
+    for (let r = 0; r < 64 && (best === null || r <= best.r + 1); r++) {
+      for (let dx = -r; dx <= r; dx++) {
+        for (let dy = -r; dy <= r; dy++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const k = (cx + dx) + ',' + (cy + dy);
+          if (used.has(k)) continue;
+          const d = Math.hypot((cx + dx) * W - x[i], (cy + dy) * H - y[i]);
+          if (d < bd) { bd = d; best = { gx: cx + dx, gy: cy + dy, r, k }; }
+        }
+      }
+    }
+    used.add(best.k);
+    x[i] = best.gx * W;
+    y[i] = best.gy * H;
+  }
 }
 
 // Yalnızca çakışma giderme: üst üste binen daireleri eşit miktarda iter
@@ -325,6 +352,8 @@ function packCircles(items, rels, keyOf, force, pad) {
 // opts.grouping: 'file' | 'name' (varsayılan 'name'; arayüz resolveGrouping ile seçer)
 function layoutModel(model, opts = {}) {
   const grouping = opts.grouping || 'name';
+  // align: kartlar altın oranlı ızgaraya oturur (varsayılan); false eski serbest yerleşimi verir
+  const align = opts.align !== false;
   // Sözlük tablosuna giden ilişkiler yerleşimi çekmez: yoksa sözlük şemanın ortasına oturup öbürlerini sıkıştırır
   const rels = model.rels.filter(r => !r.dict);
   const byDb = new Map();
@@ -385,17 +414,30 @@ function layoutModel(model, opts = {}) {
     }
     const links = [...lk.entries()].map(([k, w]) => { const [a, b] = k.split(',').map(Number); return [a, b, w]; });
     const p = relax(main.length, new Float64Array(main.length).fill(L.nodeR), links, { ...L.tableForce, spread: L.nodeR * 1.4 });
+    // İki konum: serbest (gevşetmenin bulduğu, uzaktan organik takımyıldız) ve ızgara (yakın planda hizalı kartlar).
+    // Çizim yakınlığa göre ikisi arasında geçer (render.js blendAt). Uydusu olan (MongoDB) takımyıldızlar
+    // hizalanmaz: uydular sahibinin çevresindeki yaya dizilir.
+    const fx = Float64Array.from(p.x), fy = Float64Array.from(p.y);
+    if (align && main.length > 1 && main.length === ts.length) alignGrid(p.x, p.y);
     main.forEach((t, i) => {
       t.lx = p.x[i]; t.ly = p.y[i];
+      t.fx = fx[i]; t.fy = fy[i];
       t.desig = i < GREEK.length ? GREEK[i] : String(i + 1);
     });
     if (main.length < ts.length) {
       placeSatellites(ts, rels, main);
       const x = Float64Array.from(ts, t => t.lx), y = Float64Array.from(ts, t => t.ly);
       resolveCollisions(x, y, new Float64Array(ts.length).fill(L.nodeR), 0);
-      ts.forEach((t, i) => { t.lx = x[i]; t.ly = y[i]; });
+      ts.forEach((t, i) => { t.lx = t.fx = x[i]; t.ly = t.fy = y[i]; });
     }
-    g.r = center(ts, () => L.nodeR) + 20;
+    // her iki konum kümesi kendi merkezine alınır; takımyıldız dairesi ikisini de kapsar
+    const rGrid = center(ts, () => L.nodeR);
+    let mx = 0, my = 0;
+    for (const t of ts) { mx += t.fx; my += t.fy; }
+    mx /= ts.length; my /= ts.length;
+    let rFree = 0;
+    for (const t of ts) { t.fx -= mx; t.fy -= my; rFree = Math.max(rFree, Math.hypot(t.fx, t.fy) + L.nodeR); }
+    g.r = Math.max(rGrid, rFree) + 20;
   }
 
   // 2) takımyıldızlar, 3) şemalar, 4) veritabanları
@@ -414,7 +456,11 @@ function layoutModel(model, opts = {}) {
       for (const g of s.groups) {
         g.x = s.x + g.lx;
         g.y = s.y + g.ly;
-        for (const t of g.tables) { t.x = g.x + t.lx; t.y = g.y + t.ly; }
+        // x, y ızgara konumudur (kart planı); x0, y0 serbest, x1, y1 ızgara: çizim aradaki oranı uygular
+        for (const t of g.tables) {
+          t.x = t.x1 = g.x + t.lx; t.y = t.y1 = g.y + t.ly;
+          t.x0 = g.x + t.fx; t.y0 = g.y + t.fy;
+        }
       }
     }
   }

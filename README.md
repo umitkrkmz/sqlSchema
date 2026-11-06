@@ -46,7 +46,7 @@ draw.io kadar elle uğraştırmaz, veri modelleme aracı kadar ağır değildir.
 12. [KVKK haritası](#tr-kvkk)
 13. [Örnekler](#tr-ornekler)
 14. [Şemayı dışa aktarmak](#tr-disa-aktarma)
-15. [Dil](#tr-dil)
+15. [Dil ve tema](#tr-dil)
 16. [Proje yapısı ve geliştirme](#tr-gelistirme)
 17. [Sınırlar](#tr-sinirlar)
 18. [Katkı, güvenlik, lisans](#tr-katki)
@@ -112,6 +112,8 @@ Yakınlaştırma düzeyine göre üç görünüm vardır:
 | Takımyıldız | Tablolar yıldız olur: boyut = bağlantı sayısı, renk = şema. Seçili tablonun çizgilerinde karga ayağı ve kolon adı yazar. |
 | Yakın plan | Tablolar kart olur; çizgiler doğrudan FK ve PK kolon satırlarına bağlanır. |
 
+Uzaktan bakınca yıldızlar serbest, organik bir dağılımdadır. Yakınlaştıkça tablolar yavaşça altın oranlı bir ızgaraya kayar: hücre, kart ölçüsünün 1,382 katıdır (boşluk, altın oranın tümleyeni 0,382). Yakın planda kartlar sütun ve satır hâlinde, üst kenarları hizalı durur. Her tablo serbest konumuna en yakın boş hücreyi alır; komşular yine komşu kalır. Örneklerde çizgi kesişmeleri yaklaşık üçte bir azalır.
+
 **Görünüm** menüsünde tablo listesi, kolon ayrıntıları, tahmini ilişkiler, sözlük bağlantıları, ızgara ve takımyıldız gruplaması seçenekleri var. **Kolon ayrıntıları** kapatılınca (kısayolu `C`) yakın planda kartlar yalnızca tablo adını gösterir ve çizgiler kartın başlığına bağlanır. Böylece yalnızca tablolar ve ilişkileri kalır. Ayrıntı paneli kolonları göstermeye devam eder. Seçim tarayıcıda hatırlanır.
 
 <img src="docs/images/tr/secim-ve-panel.png" alt="Seçili tablo, vurgulu ilişkileri ve ayrıntı paneli" width="900">
@@ -161,6 +163,8 @@ Ayrıntı panelinde kolonlar, açıklamalar, tanımın geçtiği dosya ve satır
 <img src="docs/images/tr/yol-vurgulama.png" alt="Yol bulma: PAYMENT_ALLOCATION tablosundan ADDRESS tablosuna giden ilişki zinciri" width="900">
 
 <img src="docs/images/tr/yakin-plan.png" alt="Yakın plan: kolon satırlarına bağlanan çizgiler ve karga ayağı uçları" width="900">
+
+<img src="docs/images/tr/hizali-kartlar.png" alt="Yakın planda altın oranlı ızgaraya hizalanmış kartlar" width="900">
 
 #### Karga ayağı
 
@@ -709,9 +713,17 @@ Tabloların bir kısmı ORM'den, bir kısmı DBA betiklerinden geliyorsa iki ç�
 
 <a id="tr-dil"></a>
 
-### Dil
+### Dil ve tema
 
 Arayüz Türkçe ve İngilizcedir. İlk açılışta sistem dili Türkçe ise Türkçe, değilse İngilizce seçilir. Sağ üstteki **TR / EN** düğmeleriyle değiştirilebilir; seçim tarayıcıda hatırlanır. Bir bağlantıda dili sabitlemek için `?lang=tr` ya da `?lang=en` kullanılabilir.
+
+İki tema vardır. **Koyu tema** gece gökyüzüdür ve varsayılandır. **Açık tema** kâğıda basılmış bir yıldız atlasına benzer: krem kâğıt, lacivert mürekkep, koyulaştırılmış şema renkleri. Gündüz ofiste, projeksiyonda ve çıktıda daha rahat okunur. Dil düğmelerinin yanındaki güneş / ay düğmesiyle geçilir; seçim tarayıcıda hatırlanır, `?theme=light` ya da `?theme=dark` bir bağlantıda sabitler. PNG ve SVG dışa aktarma o anki temayı kullanır.
+
+Arayüzün ölçüleri altın orandan gelir: boşluklar Fibonacci adımlarıdır (5 · 8 · 13 · 21 · 34). Üst çubuk 55 piksel (34 piksellik düğme ile 21 piksellik boşluk), ayrıntı paneli 377 piksel genişliğinde ve kenarlardan 13 piksel içeridedir.
+
+<img src="docs/images/tr/acik-tema.png" alt="Açık tema: krem kâğıt üzerinde lacivert mürekkeple çizilmiş yıldız haritası" width="900">
+
+<img src="docs/images/tr/acik-tema-yakin.png" alt="Açık temada yakın plan: seçili tablo, kartlar ve ayrıntı paneli" width="900">
 
 **Paylaşılabilir bağlantılar.** URL parametreleriyle bir örnek, bir tablo ve yakınlaştırma düzeyi doğrudan açılabilir:
 
@@ -829,7 +841,7 @@ It is less manual than draw.io and lighter than a data-modelling tool. The goal 
 12. [Personal data map](#en-privacy)
 13. [Samples](#en-samples)
 14. [Exporting a schema](#en-export)
-15. [Language](#en-language)
+15. [Language and theme](#en-language)
 16. [Project layout and development](#en-development)
 17. [Limitations](#en-limitations)
 18. [Contributing, security, license](#en-contributing)
@@ -895,6 +907,8 @@ The view changes with the zoom level:
 | Constellation | Tables become stars: size = number of links, colour = schema. The lines of the selected table show crow's feet and column names. |
 | Close-up | Tables become cards; lines attach directly to the FK and PK column rows. |
 
+From afar the stars sit in a free, organic spread. As you zoom in, tables slide gently onto a golden-ratio grid: a cell is 1.382 times the card size (the gap is 0.382, the complement of the golden ratio). In close-up the cards stand in columns and rows with their top edges aligned. Each table takes the free cell nearest its free position, so neighbours stay neighbours. On the samples, line crossings drop by about a third.
+
 The **View** menu holds the table list, column details, inferred relations, lookup links, grid and constellation grouping options. With **column details** off (shortcut `C`), close-up cards show only the table name and lines attach to the card header, leaving just tables and their relationships. The detail panel still lists the columns. The choice is remembered in the browser.
 
 <img src="docs/images/en/secim-ve-panel.png" alt="A selected table, its highlighted relationships and the detail panel" width="900">
@@ -946,6 +960,8 @@ The detail panel lists:
 <img src="docs/images/en/yol-vurgulama.png" alt="Finding a path: the chain of relationships from PAYMENT_ALLOCATION to ADDRESS" width="900">
 
 <img src="docs/images/en/yakin-plan.png" alt="Close-up: lines attached to column rows, with crow's foot ends" width="900">
+
+<img src="docs/images/en/hizali-kartlar.png" alt="Close-up cards aligned on the golden-ratio grid" width="900">
 
 #### Crow's foot
 
@@ -1494,9 +1510,17 @@ If some tables come from the ORM and others from DBA scripts, open both outputs 
 
 <a id="en-language"></a>
 
-### Language
+### Language and theme
 
 The interface is available in Turkish and English. On first visit Turkish is chosen if the system language is Turkish, English otherwise. Switch with the **TR / EN** buttons in the top-right corner; the choice is remembered in the browser. Use `?lang=tr` or `?lang=en` to pin the language in a link.
+
+There are two themes. The **dark theme** is the night sky and the default. The **light theme** looks like a star atlas printed on paper: cream paper, navy ink, deepened schema colours. It reads more easily in a daylit office, on a projector and on paper. Switch with the sun / moon button next to the language buttons; the choice is remembered in the browser, and `?theme=light` or `?theme=dark` pins it in a link. PNG and SVG export use the current theme.
+
+The interface's measurements come from the golden ratio: spacing follows Fibonacci steps (5 · 8 · 13 · 21 · 34). The top bar is 55 pixels (a 34-pixel button plus 21 pixels of space), and the detail panel is 377 pixels wide and 13 pixels in from the edges.
+
+<img src="docs/images/en/acik-tema.png" alt="Light theme: the star map drawn in navy ink on cream paper" width="900">
+
+<img src="docs/images/en/acik-tema-yakin.png" alt="Close-up in the light theme: a selected table, cards and the detail panel" width="900">
 
 **Shareable links.** URL parameters open a sample, a table and a zoom level directly:
 

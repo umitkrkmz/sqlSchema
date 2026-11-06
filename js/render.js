@@ -8,17 +8,50 @@
 (function (NS) {
 'use strict';
 
-const PALETTE = ['#f2b45a', '#6cc6dc', '#a58cf2', '#ef7b86', '#7fd39a', '#6f9ff4', '#f0955a', '#5fd6b8', '#e38ad4', '#c7d86a', '#9fb3d9', '#f5d76e'];
-const C = {
-  bg: '#060a18',
-  grid: 'rgba(120,140,205,0.075)',
-  gridLabel: 'rgba(150,165,215,0.38)',
-  edge: '150,172,228',
-  hi: '236,241,255',
-  text: '#e4e9f7',
-  dim: '#8a96b8',
-  card: 'rgba(10,16,36,0.95)',
+// Temalar: koyu = gece gökyüzü, açık = kâğıda basılmış yıldız atlası. Renk adları style.css'teki
+// değişkenlerle aynı; 'r,g,b' biçimindekiler saydamlıkla birleştirilir.
+const THEMES = {
+  dark: {
+    palette: ['#f2b45a', '#6cc6dc', '#a58cf2', '#ef7b86', '#7fd39a', '#6f9ff4', '#f0955a', '#5fd6b8', '#e38ad4', '#c7d86a', '#9fb3d9', '#f5d76e'],
+    bg: '#060a18', grid: 'rgba(120,140,205,0.075)', gridLabel: 'rgba(150,165,215,0.38)',
+    edge: '150,172,228', hi: '236,241,255', text: '#e4e9f7', dim: '#8a96b8', card: 'rgba(10,16,36,0.95)',
+    dust: '#c9d4ff', dustA: 0.6, ring: '200,212,245', label: '226,232,250', sub: '170,180,212',
+    soft: '#aab4d4', groupLabel: '#b8c2e0', groupA: 0.32, chip: '6,10,24', chipText: '190,202,235',
+    regionA: 1, regionW: 1, regionFill: 0.03, schemaFill: 0, labelA: 1,
+    strong: '#ffffff', emb: 'rgba(220,228,248,0.8)', nullCol: 'rgba(200,210,235,0.62)', core: 'rgba(255,255,255,0.55)',
+    external: '#8892ad', accent: '#f2b45a', cyan: '#6cc6dc', rose: '#ef7b86', ok: '#7fd49a', violet: '#a58cf2', pink: '#d8a3d0', muted: '#8a96b8',
+  },
+  light: {
+    palette: ['#c27a12', '#1b84a0', '#6d4fd1', '#c8414f', '#2e8f55', '#2f63c4', '#c7601c', '#11907a', '#b0449c', '#7c8c18', '#536c99', '#a8860c'],
+    bg: '#f4efe4', grid: 'rgba(60,72,120,0.09)', gridLabel: 'rgba(60,72,120,0.55)',
+    edge: '58,70,112', hi: '14,20,44', text: '#1b2140', dim: '#646d8a', card: 'rgba(255,253,248,0.97)',
+    dust: '#5a6488', dustA: 0.22, ring: '60,72,120', label: '27,33,64', sub: '90,98,130',
+    soft: '#5f6889', groupLabel: '#4f5878', groupA: 0.8, chip: '244,239,228', chipText: '58,66,100',
+    // kâğıtta düşük saydamlık kaybolur: sınırlar ve adlar koyulaşır, şema bölgesi hafif boyanır
+    regionA: 2.8, regionW: 1.3, regionFill: 0.06, schemaFill: 0.035, labelA: 1.6,
+    strong: '#0d1330', emb: 'rgba(40,48,84,0.8)', nullCol: 'rgba(40,48,84,0.62)', core: 'rgba(255,255,255,0.6)',
+    external: '#7a8299', accent: '#a9670c', cyan: '#1b7f9a', rose: '#c43b52', ok: '#2a8a4e', violet: '#6a4bcf', pink: '#a8478f', muted: '#646d8a',
+  },
 };
+const PALETTE = [];
+const C = {};
+// Renk tabloları yerinde güncellenir: ui.js aynı nesneleri tutar, tema değişince yeniden okunur
+const STYLE_COLORS = [];
+const CODE_TAG_COLOR = {};   // kod haritası satır etiketleri: çağrı, yazar, okur, dinamik SQL, tetiklendiği tablo
+const DIFF_COLOR = {};
+const AUDIT_COLOR = {};
+const PRIV_COLOR = {};
+function setTheme(name) {
+  const th = THEMES[name] ? name : 'dark', p = THEMES[th];
+  Object.assign(C, p, { name: th });
+  PALETTE.splice(0, PALETTE.length, ...p.palette);
+  STYLE_COLORS.splice(0, STYLE_COLORS.length, p.accent, p.cyan, p.violet, p.ok, p.rose, p.pink);
+  Object.assign(CODE_TAG_COLOR, { '\u{2192}': p.accent, W: p.rose, R: p.cyan, SQL: p.pink, '\u{26A1}': p.violet });
+  Object.assign(DIFF_COLOR, { added: p.ok, removed: p.rose, changed: p.accent, renamed: p.cyan });
+  Object.assign(AUDIT_COLOR, { error: p.rose, warning: p.accent, info: p.cyan });
+  Object.assign(PRIV_COLOR, { special: p.rose, personal: p.accent, linked: p.cyan });
+}
+setTheme('dark');
 const LV_GALAXY = 0.11, LV_CARD = 1.15;
 // En yüksek kart: 22 + (8 + 1) × 11 + 6 = 127 birim; layout.js'teki L.nodeR buna göre seçildi
 const CARD = { w: 164, head: 22, row: 11, maxRows: 8, pad: 6 };
@@ -53,7 +86,7 @@ const wy = py => (py - S.h / 2) / S.cam.k + S.cam.y;
 // alt diyagramda yalnızca iki ucu da diyagramda olan ilişkiler görünür (panel de dahil)
 const relVisible = r => (S.implicit || r.kind !== 'implicit') && (!S.relSet || S.relSet.has(r));
 const relStyle = r => (r.kind === 'call' ? (r.dynamic ? 'ref' : 'fk') : r.kind === 'implicit' ? 'imp' : r.kind === 'embed' ? 'emb' : r.kind === 'ref' ? 'ref' : r.disabled ? 'off' : 'fk');
-const schemaColor = t => (t.external ? '#8892ad' : PALETTE[t.schemaRef.index % PALETTE.length]);
+const schemaColor = t => (t.external ? C.external : PALETTE[t.schemaRef.index % PALETTE.length]);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 // Şemasız tablolar ve bağımsız yıldızlar için etiket arayüz dilinde yazılır
 const schemaLabel = s => s.label || tr('defaultSchema');
@@ -124,10 +157,19 @@ function cardRows(t) {
   return t._rows;
 }
 
+// Kartın dikey merkezi: ızgarada kartlar üst kenarlarından hizalanır (kısa kart ortada değil, satırın üstünde durur).
+// Kayma geçiş oranıyla büyür; serbest yerleşimde merkez t.y'dir.
+function cardCY(t) {
+  cardRows(t);
+  if (t.x0 === undefined) return t.y;
+  const maxH = S.columns ? CARD.head + (CARD.maxRows + 1) * CARD.row + CARD.pad : CARD.head;
+  return t.y + (t._h - maxH) / 2 * blendAt(S.cam.k);
+}
+
 function anchorY(t, colName) {
   cardRows(t);
   const i = colName === undefined ? undefined : t._rowIdx.get(String(colName).toUpperCase());
-  const top = t.y - t._h / 2;
+  const top = cardCY(t) - t._h / 2;
   return i === undefined ? top + CARD.head / 2 : top + CARD.head + i * CARD.row + CARD.row / 2;
 }
 
@@ -323,20 +365,14 @@ function nodeAlpha(t) {
   return 1;
 }
 
-// Kod haritası satır etiketleri: çağrı, yazar, okur, dinamik SQL, tetiklendiği tablo
-const CODE_TAG_COLOR = { '\u{2192}': '#f2b45a', W: '#ef7b86', R: '#6cc6dc', SQL: '#d8a3d0', '\u{26A1}': '#a58cf2' };
-
 // Şema farkı: eklenen yeşil, silinen kırmızı, değişen sarı; adı değişen ayrıca mavi halka
-const DIFF_COLOR = { added: '#7fd49a', removed: '#ef7b86', changed: '#f2b45a', renamed: '#6cc6dc' };
 const diffOf = t => S.diffRes && (S.diffRes.byAfter.get(t) || S.diffRes.byBefore.get(t));
 const diffColor = t => { const d = diffOf(t); return d && d.status !== 'same' ? DIFF_COLOR[d.status] : null; };
 
 // Tasarım denetimi: hata kırmızı, uyarı sarı (bilgi renk almaz)
-const AUDIT_COLOR = { error: '#ef7b86', warning: '#f2b45a', info: '#6cc6dc' };
 const auditColor = t => { const s = !S.diffRes && S.auditSev && S.auditSev.get(t); return s && s !== 'info' ? AUDIT_COLOR[s] : null; };
 
 // KVKK haritası: özel nitelikli kırmızı, kişisel veri sarı, kişiyle ilişkilendirilebilen mavi
-const PRIV_COLOR = { special: '#ef7b86', personal: '#f2b45a', linked: '#6cc6dc' };
 const privColor = t => { const s = !S.diffRes && S.privSev && S.privSev.get(t); return s ? PRIV_COLOR[s] : null; };
 const styleColor = t => (!S.diffRes && S.styleColor ? S.styleColor.get(t) || null : null);
 
@@ -353,8 +389,37 @@ function invalidate() {
   S.frame = requestAnimationFrame(() => { S.frame = 0; draw(); if (S.anim) invalidate(); });
 }
 
+// Yakınlığa göre konum: uzakta serbest yerleşim (organik takımyıldız), yakınlaştıkça kartlar altın oranlı
+// ızgaraya kayar; kart planına (LV_CARD) gelmeden geçiş biter, böylece geçiş sırasında kartlar üst üste binmez.
+const BLEND_FROM = 0.35, BLEND_TO = 0.95;
+function blendAt(k) {
+  const u = clamp((k - BLEND_FROM) / (BLEND_TO - BLEND_FROM), 0, 1);
+  return u * u * (3 - 2 * u);
+}
+// Tablonun verilen yakınlıktaki konumu (uçuş hedefi için: varılacak yakınlıktaki yer)
+function posAt(t, k) {
+  if (t.x0 === undefined) return { x: t.x, y: t.y };
+  const b = blendAt(k);
+  return { x: t.x0 + (t.x1 - t.x0) * b, y: t.y0 + (t.y1 - t.y0) * b };
+}
+// Oran değişince bütün tablolar yerine konur ve tıklama ızgarası yenilenir (her şey t.x / t.y'yi okur)
+function applyBlend() {
+  if (!S.model) return;
+  const b = blendAt(S.cam.k);
+  if (b === S.blend && S.blendLay === S.lay) return;
+  S.blend = b;
+  S.blendLay = S.lay;
+  for (const t of S.model.tables) {
+    if (t.x0 === undefined) continue;
+    t.x = t.x0 + (t.x1 - t.x0) * b;
+    t.y = t.y0 + (t.y1 - t.y0) * b;
+  }
+  if (NS.buildIndex) NS.buildIndex();
+}
+
 function draw() {
   if (S.anim) stepAnim();
+  applyBlend();
   const { w, h, dpr } = S;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = C.bg;
@@ -374,11 +439,11 @@ function draw() {
 function drawDust() {
   const ox = S.cam.x * S.cam.k * 0.03, oy = S.cam.y * S.cam.k * 0.03;
   const W = S.w + 40, H = S.h + 40;
-  ctx.fillStyle = '#c9d4ff';
+  ctx.fillStyle = C.dust;
   for (const d of DUST) {
     const x = ((d.x * W - ox) % W + W) % W - 20;
     const y = ((d.y * H - oy) % H + H) % H - 20;
-    ctx.globalAlpha = d.a * 0.6;
+    ctx.globalAlpha = d.a * C.dustA;
     ctx.fillRect(x, y, d.r, d.r);
   }
   ctx.globalAlpha = 1;
@@ -426,7 +491,7 @@ function drawRegions(lv, labels) {
       const x = sx(db.x), y = sy(db.y), r = db.r * k;
       if (x + r < 0 || x - r > S.w || y + r < 0 || y - r > S.h) continue;
       if (!labels) {
-        ctx.strokeStyle = `rgba(200,212,245,${0.13 * faded})`;
+        ctx.strokeStyle = `rgba(${C.ring},${0.13 * C.regionA * faded})`;
         ctx.lineWidth = 1.2;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -441,11 +506,11 @@ function drawRegions(lv, labels) {
       spaced(4);
       const ty = Math.max(y - r - 10, 30);
       if (grid.claim(x, ty - 10, ctx.measureText(name).width + 10, 32)) {
-        ctx.fillStyle = `rgba(226,232,250,${0.85 * faded})`;
+        ctx.fillStyle = `rgba(${C.label},${0.85 * faded})`;
         ctx.fillText(name, x, ty - 12);
         spaced(0);
         ctx.font = `10px ${FONT_MONO}`;
-        ctx.fillStyle = `rgba(170,180,212,${0.75 * faded})`;
+        ctx.fillStyle = `rgba(${C.sub},${0.75 * faded})`;
         ctx.fillText(tr('database') + ' · ' + sub, x, ty + 2);
       }
       spaced(0);
@@ -460,11 +525,12 @@ function drawRegions(lv, labels) {
     const showCircle = multi && !(multiDb && s.db.schemas.length === 1);
     if (!labels) {
       if (showCircle) {
-        ctx.setLineDash([2, 6]);
-        ctx.strokeStyle = rgba(col, 0.16 * faded);
-        ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
+        if (C.schemaFill) { ctx.fillStyle = rgba(col, C.schemaFill * faded); ctx.fill(); }
+        ctx.setLineDash([2, 6]);
+        ctx.strokeStyle = rgba(col, 0.16 * C.regionA * faded);
+        ctx.lineWidth = C.regionW;
         ctx.stroke();
         ctx.setLineDash([]);
       }
@@ -472,9 +538,9 @@ function drawRegions(lv, labels) {
       for (const g of s.groups) {
         const gr = g.r * k;
         if (!g.file || gr < 14) continue;
-        ctx.fillStyle = rgba(col, 0.03 * faded);
-        ctx.strokeStyle = rgba(col, 0.22 * faded);
-        ctx.lineWidth = 1;
+        ctx.fillStyle = rgba(col, C.regionFill * faded);
+        ctx.strokeStyle = rgba(col, Math.min(0.9, 0.22 * C.regionA) * faded);
+        ctx.lineWidth = C.regionW;
         ctx.beginPath();
         ctx.arc(sx(g.x), sy(g.y), gr, 0, Math.PI * 2);
         ctx.fill();
@@ -497,7 +563,7 @@ function drawRegions(lv, labels) {
         spaced(0);
         if (sub) {
           ctx.font = `10px ${FONT_MONO}`;
-          ctx.fillStyle = rgba('#aab4d4', 0.7 * faded);
+          ctx.fillStyle = rgba(C.soft, 0.7 * faded);
           ctx.fillText(sub, x, y + 12);
         }
       }
@@ -507,7 +573,7 @@ function drawRegions(lv, labels) {
       spaced(2.5);
       const name = schemaLabel(s).toUpperCase();
       if (grid.claim(x, y - r - 12, ctx.measureText(name).width + 8, 14)) {
-        ctx.fillStyle = rgba(col, 0.6 * faded);
+        ctx.fillStyle = rgba(col, Math.min(1, 0.6 * C.labelA) * faded);
         ctx.textBaseline = 'bottom';
         ctx.fillText(name, x, y - r - 6);
       }
@@ -516,7 +582,7 @@ function drawRegions(lv, labels) {
     if (lv === 1 && s.groups.length > 1) {
       ctx.font = `500 10px ${FONT_COND}`;
       spaced(1.5);
-      ctx.fillStyle = rgba('#b8c2e0', 0.32 * faded);
+      ctx.fillStyle = rgba(C.groupLabel, C.groupA * faded);
       ctx.textBaseline = 'bottom';
       for (const g of s.groups) if (!g.file && g.r * k > 60) ctx.fillText(groupLabel(g).toUpperCase(), sx(g.x), sy(g.y - g.r) + 4);
       spaced(0);
@@ -531,7 +597,7 @@ function drawRegions(lv, labels) {
         const name = groupLabel(g);
         const gx = sx(g.x), gy = sy(g.y - g.r) - 5;
         if (!grid.claim(gx, gy - 7, ctx.measureText(name).width + 8, 14)) continue;
-        ctx.fillStyle = rgba(col, 0.75 * faded);
+        ctx.fillStyle = rgba(col, Math.min(1, 0.75 * C.labelA) * faded);
         ctx.fillText(name, gx, gy);
       }
       spaced(0);
@@ -640,7 +706,7 @@ function drawEdges(lv) {
         ctx.font = `9.5px ${FONT_MONO}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
-        ctx.fillStyle = 'rgba(200,212,245,0.85)';
+        ctx.fillStyle = `rgba(${C.ring},0.85)`;
         ctx.fillText(r.cols.join(', ') + (r.filter ? ' · ' + r.filter : ''), 0, -3);
         ctx.restore();
       }
@@ -676,10 +742,10 @@ function drawBundles() {
     ctx.stroke();
     if (Math.hypot(dx, dy) < 160) continue;
     const lx = 0.25 * x1 + 0.5 * cx + 0.25 * x2, ly = 0.25 * y1 + 0.5 * cy + 0.25 * y2;
-    ctx.fillStyle = 'rgba(6,10,24,0.85)';
+    ctx.fillStyle = `rgba(${C.chip},0.85)`;
     const tw = ctx.measureText(String(n)).width + 8;
     ctx.fillRect(lx - tw / 2, ly - 7, tw, 14);
-    ctx.fillStyle = 'rgba(190,202,235,0.8)';
+    ctx.fillStyle = `rgba(${C.chipText},0.8)`;
     ctx.fillText(String(n), lx, ly + 0.5);
   }
 }
@@ -731,7 +797,7 @@ function drawStars(lv) {
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
       if (t.deg >= 3 && lv > 0) {
-        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.fillStyle = C.core;
         ctx.beginPath();
         ctx.arc(x, y, r * 0.42, 0, Math.PI * 2);
         ctx.fill();
@@ -748,11 +814,11 @@ function drawStars(lv) {
 }
 
 // etki derecesi: 1. derece en sıcak renk
-const impactColor = d => (d === 1 ? 'rgba(239,123,134,0.95)' : d === 2 ? 'rgba(242,180,90,0.9)' : 'rgba(138,150,184,0.85)');
+const impactColor = d => (d === 1 ? rgba(C.rose, 0.95) : d === 2 ? rgba(C.accent, 0.9) : rgba(C.muted, 0.85));
 
 // çoklu seçime eklenmiş tablo: vurgu renginde ince halka (etki analizinde dereceye göre renk)
 function drawPickRing(x, y, r, color) {
-  ctx.strokeStyle = color || 'rgba(242,180,90,0.95)';
+  ctx.strokeStyle = color || rgba(C.accent, 0.95);
   ctx.lineWidth = 1.4;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -760,7 +826,7 @@ function drawPickRing(x, y, r, color) {
 }
 
 function drawReticle(x, y, r) {
-  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.strokeStyle = rgba(C.strong, 0.85);
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -815,7 +881,7 @@ function drawLabels(lv) {
     grid.add(x - w / 2, y - 11, w, hgt);
     ctx.globalAlpha = a < 1 ? 0.5 : 1;
     ctx.font = `${t.embedded ? 400 : 500} 11px ${FONT_SANS}`;
-    ctx.fillStyle = t === S.sel || t === S.hover ? '#ffffff' : t.embedded ? 'rgba(220,228,248,0.8)' : C.text;
+    ctx.fillStyle = t === S.sel || t === S.hover ? C.strong : t.embedded ? C.emb : C.text;
     ctx.fillText(name, x, y);
     if (showSub) {
       ctx.font = `9.5px ${FONT_MONO}`;
@@ -846,7 +912,7 @@ function drawCards() {
   for (const t of order) {
     const rows = cardRows(t);
     const W = CARD.w * k, H = t._h * k;
-    const x0 = sx(t.x) - W / 2, y0 = sy(t.y) - H / 2;
+    const x0 = sx(t.x) - W / 2, y0 = sy(cardCY(t)) - H / 2;
     const col = diffColor(t) || auditColor(t) || privColor(t) || styleColor(t) || schemaColor(t);
     const a = nodeAlpha(t);
     const isSel = t === S.sel, isAct = t === em.active;
@@ -863,7 +929,7 @@ function drawCards() {
     ctx.setLineDash(t.external ? [3, 3] : t.embedded ? [5, 2] : []);
     const picked = S.pick.has(t.key);
     const depth = S.impactDepth && S.impactDepth.get(t);
-    ctx.strokeStyle = isSel ? '#ffffff' : depth ? impactColor(depth) : picked ? 'rgba(242,180,90,0.95)' : rgba(col, isAct ? 0.95 : 0.55);
+    ctx.strokeStyle = isSel ? C.strong : depth ? impactColor(depth) : picked ? rgba(C.accent, 0.95) : rgba(col, isAct ? 0.95 : 0.55);
     ctx.lineWidth = isSel || picked || depth ? 1.6 : 1;
     ctx.stroke();
     ctx.setLineDash([]);
@@ -894,7 +960,7 @@ function drawCards() {
     let y = y0 + CARD.head * k + rowH / 2;
     for (const c of rows) {
       const hl = isSel && S.selCol && c.name.toUpperCase() === S.selCol;
-      if (hl) { ctx.fillStyle = 'rgba(242,180,90,0.16)'; ctx.fillRect(x0 + 1, y - rowH / 2, W - 2, rowH); }
+      if (hl) { ctx.fillStyle = rgba(C.accent, 0.16); ctx.fillRect(x0 + 1, y - rowH / 2, W - 2, rowH); }
       const ds = t._diffCols && t._diffCols.get(c.name.toUpperCase());
       if (ds) { ctx.fillStyle = rgba(DIFF_COLOR[ds === 'added' ? 'added' : ds === 'renamed' ? 'renamed' : 'changed'], 0.16); ctx.fillRect(x0 + 1, y - rowH / 2, W - 2, rowH); }
       const as = !ds && t._auditCols && t._auditCols.get(c.name.toUpperCase());
@@ -907,24 +973,24 @@ function drawCards() {
       ctx.textAlign = 'left';
       if (tag) {
         ctx.font = `500 ${7 * k}px ${FONT_MONO}`;
-        ctx.fillStyle = c.tag ? CODE_TAG_COLOR[c.tag] || C.dim : c.pk ? '#f2b45a' : '#6cc6dc';
+        ctx.fillStyle = c.tag ? CODE_TAG_COLOR[c.tag] || C.dim : c.pk ? C.accent : C.cyan;
         ctx.fillText(tag, x0 + 6 * k, y + 0.5);
       }
       ctx.font = `${c.nullable ? 400 : 500} ${8.5 * k}px ${FONT_SANS}`;
-      ctx.fillStyle = c.nullable ? 'rgba(200,210,235,0.62)' : C.text;
+      ctx.fillStyle = c.nullable ? C.nullCol : C.text;
       const cname = fitText(c.name, W * 0.54 - (c.values ? 8 * k : 0));
       ctx.fillText(cname, x0 + 22 * k, y + 0.5);
       // değer listesi olan kolon: adın yanında ≡ (değerler panelde)
       if (c.values) {
         const nx = x0 + 22 * k + ctx.measureText(cname).width + 3 * k;
         ctx.font = `${7.5 * k}px ${FONT_MONO}`;
-        ctx.fillStyle = 'rgba(242,180,90,0.85)';
+        ctx.fillStyle = rgba(C.accent, 0.85);
         ctx.fillText('\u{2261}', nx, y + 0.5);
       }
       ctx.textAlign = 'right';
       ctx.font = `${7 * k}px ${FONT_MONO}`;
       const dict = !S.dictLines && t._dict.get(c.name.toUpperCase());
-      ctx.fillStyle = dict ? 'rgba(242,180,90,0.9)' : C.dim;
+      ctx.fillStyle = dict ? rgba(C.accent, 0.9) : C.dim;
       ctx.fillText(fitText(dict ? '→ ' + dict : shortType(c.type), W * 0.3), x0 + W - 6 * k, y + 0.5);
       y += rowH;
     }
@@ -1014,7 +1080,8 @@ function flyToTable(t, k) {
   const kk = k || Math.max(S.cam.k, 0.85);
   // sağdaki panel ve soldaki tablo listesi arasında kalan alanın ortasına
   const offset = (!$('#panel').hidden && S.w > 820 ? 190 : 0) - (!$('#tableList').hidden && S.w > 980 ? 150 : 0);
-  flyTo({ x: t.x + offset / kk, y: t.y, k: kk });
+  const p = posAt(t, kk);
+  flyTo({ x: p.x + offset / kk, y: p.y, k: kk });
 }
 
 /* ─── SVG dışa aktarma ─── */
@@ -1032,7 +1099,7 @@ function exportSvg(tables) {
   for (const t of tables) {
     cardRows(t);
     x0 = Math.min(x0, t.x - CARD.w / 2); x1 = Math.max(x1, t.x + CARD.w / 2);
-    y0 = Math.min(y0, t.y - t._h / 2); y1 = Math.max(y1, t.y + t._h / 2);
+    y0 = Math.min(y0, cardCY(t) - t._h / 2); y1 = Math.max(y1, cardCY(t) + t._h / 2);
   }
   const m = 48;
   const out = [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${f(x0 - m)} ${f(y0 - m)} ${f(x1 - x0 + 2 * m)} ${f(y1 - y0 + 2 * m)}" width="${f(x1 - x0 + 2 * m)}" height="${f(y1 - y0 + 2 * m)}">`,
@@ -1061,7 +1128,7 @@ function exportSvg(tables) {
   }
   out.push('</g>');
   for (const t of tables) {
-    const col = schemaColor(t), top = t.y - t._h / 2, left = t.x - CARD.w / 2;
+    const col = schemaColor(t), top = cardCY(t) - t._h / 2, left = t.x - CARD.w / 2;
     out.push(`<g>`,
       `<rect x="${f(left)}" y="${f(top)}" width="${CARD.w}" height="${f(t._h)}" rx="6" fill="${C.card}" stroke="${col}" stroke-opacity="0.55"/>`,
       `<circle cx="${f(left + 9)}" cy="${f(top + CARD.head / 2)}" r="3" fill="${col}"/>`,
@@ -1069,7 +1136,7 @@ function exportSvg(tables) {
     t._rows.forEach((c, i) => {
       const y = top + CARD.head + i * CARD.row + CARD.row / 2 + 3;
       const tag = keyTag(t, c);
-      if (tag) out.push(`<text x="${f(left + 6)}" y="${f(y)}" font-family="${font(FONT_MONO)}" font-size="7" fill="${c.pk ? '#f2b45a' : '#6cc6dc'}">${tag}</text>`);
+      if (tag) out.push(`<text x="${f(left + 6)}" y="${f(y)}" font-family="${font(FONT_MONO)}" font-size="7" fill="${c.pk ? C.accent : C.cyan}">${tag}</text>`);
       out.push(`<text x="${f(left + 22)}" y="${f(y)}" font-family="${font(FONT_SANS)}" font-size="8.5" fill="${C.text}">${x(cut(c.name, 22))}</text>`);
       if (c.type) out.push(`<text x="${f(left + CARD.w - 6)}" y="${f(y)}" text-anchor="end" font-family="${font(FONT_MONO)}" font-size="7" fill="${C.dim}">${x(cut(String(c.type).toLowerCase(), 14))}</text>`);
     });
@@ -1082,9 +1149,9 @@ function exportSvg(tables) {
 
 Object.assign(NS, {
   exportSvg,
-  S, $, canvas, C, CARD, PALETTE, DASH, schemaLabel, groupLabel,
+  S, $, canvas, C, CARD, PALETTE, STYLE_COLORS, DASH, setTheme, schemaLabel, groupLabel,
   levelOf, wx, wy, starR, cardRows, keyTag, schemaColor, relStyle, relVisible, clamp,
   drawGlyph, refreshEmphasis, invalidate, draw, resetHud,
-  resize, fitView, flyTo, zoomAt, flyToTable,
+  resize, fitView, flyTo, zoomAt, flyToTable, posAt, cardCY,
 });
 })(globalThis.sqlSchema = globalThis.sqlSchema || {});

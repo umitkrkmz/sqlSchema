@@ -68,6 +68,13 @@ function common(s, res) {
     if (Math.abs(ts[i].x - ts[j].x) < 164 && Math.abs(ts[i].y - ts[j].y) < (H(ts[i]) + H(ts[j])) / 2) overlaps++;
   }
   check(`${s.id}: kart çakışması yok`, overlaps === 0, overlaps);
+  // yakınlığa göre geçiş: her tablonun serbest (x0) ve ızgara (x1) konumu var; serbest konumlar da çakışmaz
+  // (uzak planda yıldızlar arası en az 2 × nodeR), ızgara konumu kart planındaki x'tir
+  let freeClose = 0;
+  for (let i = 0; i < ts.length; i++) for (let j = i + 1; j < ts.length; j++) {
+    if (ts[i].group === ts[j].group && Math.hypot(ts[i].x0 - ts[j].x0, ts[i].y0 - ts[j].y0) < 209) freeClose++;
+  }
+  check(`${s.id}: iki konum var, serbest konumlar çakışmıyor`, ts.every(t => Number.isFinite(t.x0) && t.x1 === t.x && t.y1 === t.y) && freeClose === 0, freeClose);
 }
 
 const EXPECT = {
@@ -832,6 +839,23 @@ END P;
   const users = diesel.model.tables.find(t => t.name === 'users');
   check('Diesel: up.sql sırayla, down.sql atlanır', diesel.migration === 'Diesel' && diesel.skipped.length === 2 && diesel.skipped.every(s => s.reason === 'down') && users && users.columns.length === 2, [diesel.migration, diesel.order, diesel.skipped.map(s => s.reason)]);
   check('genel ad sürüm klasöründe değilse sıradan dosya', NS.classify('db/schema/migration.sql').kind === 'plain' && NS.fileLabel('db/V3__x.sql') === 'V3__x');
+}
+
+// Temalar: CSS'te kullanılan her değişken tanımlı, açık tema yalnızca var olanları ezer; tuvalin iki teması aynı renk adlarını taşır
+{
+  const css = fs.readFileSync(path.join(ROOT, 'style.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const block = sel => { const i = css.indexOf(sel + ' {'); return i < 0 ? '' : css.slice(i, css.indexOf('\n}', i)); };
+  const names = b => new Set([...b.matchAll(/^\s*(--[\w-]+):/gm)].map(m => m[1]));
+  const dark = names(block(':root')), light = names(block(':root[data-theme="light"]'));
+  const inline = new Set(['--c', '--sev']);   // öğe ya da sınıf başına verilir (style="--c:…", .sev-error)
+  const undef = [...new Set([...css.matchAll(/var\((--[\w-]+)/g)].map(m => m[1]))].filter(v => !dark.has(v) && !inline.has(v));
+  const extra = [...light].filter(v => !dark.has(v));
+  check('tema: CSS değişkenleri tanımlı, açık tema yalnızca var olanları ezer', light.size > 30 && !undef.length && !extra.length, { undef, extra });
+  const src = fs.readFileSync(path.join(ROOT, 'js', 'render.js'), 'utf8').replace(/^\s*\/\/.*$/gm, '');
+  const part = name => { const i = src.indexOf('  ' + name + ': {') + name.length + 5; return new Set([...src.slice(i, src.indexOf('\n  },', i)).matchAll(/(\w+): /g)].map(m => m[1])); };
+  const td = part('dark'), tl = part('light');
+  const diffKeys = [...td].filter(k => !tl.has(k)).concat([...tl].filter(k => !td.has(k)));
+  check('tema: tuvalin koyu ve açık temaları aynı renk adlarını taşır', td.size > 20 && !diffKeys.length, diffKeys);
 }
 
 // Dil desteği: iki sözlük aynı anahtarlara sahip, HTML ve kodda kullanılan her anahtar tanımlı

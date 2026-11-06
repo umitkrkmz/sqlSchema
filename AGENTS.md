@@ -42,7 +42,7 @@ Betikler `index.html`'de şu sırayla yüklenir ve her biri `globalThis.sqlSchem
 | `js/audit.js` | tasarım denetimi: kurallar (`AUDIT_RULES`), bulgular kod olarak; metinleri `i18n.js`'teki `auditRules`. Bulgu anahtarı (`findingKey`), borç kaydı, değişiklik incelemesi (`reviewChange`); tip profili (`typeProfile`, adlandırma penceresinin tip boyutları); `opts.standard` ve `opts.severity` ile ekibin standardı ve kural önemleri | yok |
 | `js/sample-small.js` | gömülü küçük örnek | yok |
 | `samples/catalog.js` | örnek kataloğu (üretilir) | yok |
-| `js/render.js` | canvas çizimi, kamera, karga ayağı | var |
+| `js/render.js` | canvas çizimi, kamera, karga ayağı; koyu / açık tema renkleri (`THEMES`, `setTheme`; arayüzünkiler `style.css` değişkenlerinde) | var |
 | `js/ui.js` | yükleme, dosya listesi, arama, panel, rapor, URL parametreleri; Tablolar / Kod geçişi (`S.view`, kod görünümünde tablo modeli `S.tableView`'da saklanır) | var |
 
 Veri akışı: `dosyalar → orderFiles → parseFile (parseSQL | parseMongo | parseEfCore) → buildModel → layoutModel → render`.
