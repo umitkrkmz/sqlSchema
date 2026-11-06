@@ -851,7 +851,7 @@ END P;
   const undef = [...new Set([...css.matchAll(/var\((--[\w-]+)/g)].map(m => m[1]))].filter(v => !dark.has(v) && !inline.has(v));
   const extra = [...light].filter(v => !dark.has(v));
   check('tema: CSS değişkenleri tanımlı, açık tema yalnızca var olanları ezer', light.size > 30 && !undef.length && !extra.length, { undef, extra });
-  const src = fs.readFileSync(path.join(ROOT, 'js', 'render.js'), 'utf8');
+  const src = fs.readFileSync(path.join(ROOT, 'js', 'render.js'), 'utf8').replace(/^\s*\/\/.*$/gm, '');
   const part = name => { const i = src.indexOf('  ' + name + ': {') + name.length + 5; return new Set([...src.slice(i, src.indexOf('\n  },', i)).matchAll(/(\w+): /g)].map(m => m[1])); };
   const td = part('dark'), tl = part('light');
   const diffKeys = [...td].filter(k => !tl.has(k)).concat([...tl].filter(k => !td.has(k)));

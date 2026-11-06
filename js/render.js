@@ -17,6 +17,7 @@ const THEMES = {
     edge: '150,172,228', hi: '236,241,255', text: '#e4e9f7', dim: '#8a96b8', card: 'rgba(10,16,36,0.95)',
     dust: '#c9d4ff', dustA: 0.6, ring: '200,212,245', label: '226,232,250', sub: '170,180,212',
     soft: '#aab4d4', groupLabel: '#b8c2e0', groupA: 0.32, chip: '6,10,24', chipText: '190,202,235',
+    regionA: 1, regionW: 1, regionFill: 0.03, schemaFill: 0, labelA: 1,
     strong: '#ffffff', emb: 'rgba(220,228,248,0.8)', nullCol: 'rgba(200,210,235,0.62)', core: 'rgba(255,255,255,0.55)',
     external: '#8892ad', accent: '#f2b45a', cyan: '#6cc6dc', rose: '#ef7b86', ok: '#7fd49a', violet: '#a58cf2', pink: '#d8a3d0', muted: '#8a96b8',
   },
@@ -25,7 +26,9 @@ const THEMES = {
     bg: '#f4efe4', grid: 'rgba(60,72,120,0.09)', gridLabel: 'rgba(60,72,120,0.55)',
     edge: '58,70,112', hi: '14,20,44', text: '#1b2140', dim: '#646d8a', card: 'rgba(255,253,248,0.97)',
     dust: '#5a6488', dustA: 0.22, ring: '60,72,120', label: '27,33,64', sub: '90,98,130',
-    soft: '#5f6889', groupLabel: '#4f5878', groupA: 0.55, chip: '244,239,228', chipText: '58,66,100',
+    soft: '#5f6889', groupLabel: '#4f5878', groupA: 0.8, chip: '244,239,228', chipText: '58,66,100',
+    // kâğıtta düşük saydamlık kaybolur: sınırlar ve adlar koyulaşır, şema bölgesi hafif boyanır
+    regionA: 2.8, regionW: 1.3, regionFill: 0.06, schemaFill: 0.035, labelA: 1.6,
     strong: '#0d1330', emb: 'rgba(40,48,84,0.8)', nullCol: 'rgba(40,48,84,0.62)', core: 'rgba(255,255,255,0.6)',
     external: '#7a8299', accent: '#a9670c', cyan: '#1b7f9a', rose: '#c43b52', ok: '#2a8a4e', violet: '#6a4bcf', pink: '#a8478f', muted: '#646d8a',
   },
@@ -488,7 +491,7 @@ function drawRegions(lv, labels) {
       const x = sx(db.x), y = sy(db.y), r = db.r * k;
       if (x + r < 0 || x - r > S.w || y + r < 0 || y - r > S.h) continue;
       if (!labels) {
-        ctx.strokeStyle = `rgba(${C.ring},${0.13 * faded})`;
+        ctx.strokeStyle = `rgba(${C.ring},${0.13 * C.regionA * faded})`;
         ctx.lineWidth = 1.2;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -522,11 +525,12 @@ function drawRegions(lv, labels) {
     const showCircle = multi && !(multiDb && s.db.schemas.length === 1);
     if (!labels) {
       if (showCircle) {
-        ctx.setLineDash([2, 6]);
-        ctx.strokeStyle = rgba(col, 0.16 * faded);
-        ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
+        if (C.schemaFill) { ctx.fillStyle = rgba(col, C.schemaFill * faded); ctx.fill(); }
+        ctx.setLineDash([2, 6]);
+        ctx.strokeStyle = rgba(col, 0.16 * C.regionA * faded);
+        ctx.lineWidth = C.regionW;
         ctx.stroke();
         ctx.setLineDash([]);
       }
@@ -534,9 +538,9 @@ function drawRegions(lv, labels) {
       for (const g of s.groups) {
         const gr = g.r * k;
         if (!g.file || gr < 14) continue;
-        ctx.fillStyle = rgba(col, 0.03 * faded);
-        ctx.strokeStyle = rgba(col, 0.22 * faded);
-        ctx.lineWidth = 1;
+        ctx.fillStyle = rgba(col, C.regionFill * faded);
+        ctx.strokeStyle = rgba(col, Math.min(0.9, 0.22 * C.regionA) * faded);
+        ctx.lineWidth = C.regionW;
         ctx.beginPath();
         ctx.arc(sx(g.x), sy(g.y), gr, 0, Math.PI * 2);
         ctx.fill();
@@ -569,7 +573,7 @@ function drawRegions(lv, labels) {
       spaced(2.5);
       const name = schemaLabel(s).toUpperCase();
       if (grid.claim(x, y - r - 12, ctx.measureText(name).width + 8, 14)) {
-        ctx.fillStyle = rgba(col, 0.6 * faded);
+        ctx.fillStyle = rgba(col, Math.min(1, 0.6 * C.labelA) * faded);
         ctx.textBaseline = 'bottom';
         ctx.fillText(name, x, y - r - 6);
       }
@@ -593,7 +597,7 @@ function drawRegions(lv, labels) {
         const name = groupLabel(g);
         const gx = sx(g.x), gy = sy(g.y - g.r) - 5;
         if (!grid.claim(gx, gy - 7, ctx.measureText(name).width + 8, 14)) continue;
-        ctx.fillStyle = rgba(col, 0.75 * faded);
+        ctx.fillStyle = rgba(col, Math.min(1, 0.75 * C.labelA) * faded);
         ctx.fillText(name, gx, gy);
       }
       spaced(0);
