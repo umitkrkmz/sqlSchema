@@ -1403,7 +1403,7 @@ function renderPrivacy() {
     const xs = p.columns.filter(x => x.cat === cat);
     if (!xs.length) return '';
     return `<details class="au-rule pv-${cat}" data-cat="${cat}"${open.has(cat) ? ' open' : ''}><summary><i class="dot"></i><b>${esc(t('privCats')[cat])}</b><span class="n">${xs.length}</span></summary>
-      <ul class="au-items">${xs.slice(0, 80).map(x => `<li data-go="${esc(x.t.key)}"${x.col ? ` data-col="${esc(x.col)}"` : ''} tabindex="0"><b>${esc(privLabel(x))}</b>${x.col ? '' : ` <span>${esc(t('privTable'))}</span>`}${x.src === 'comment' || (x.src === 'table' && x.col) ? ` <em>${esc(t('privSrc')[x.src])}</em>` : ''}</li>`).join('')}${xs.length > 80 ? `<li class="more">${esc(t('auditMore', { n: xs.length - 80 }))}</li>` : ''}</ul></details>`;
+      <ul class="au-items">${xs.slice(0, 80).map(x => `<li data-go="${esc(x.t.key)}"${x.col ? ` data-col="${esc(x.col)}"` : ''} title="${esc(privLabel(x) + (x.col ? '' : ' · ' + t('privTable')))}" tabindex="0"><b>${esc(privLabel(x))}</b>${x.col ? '' : ` <span>${esc(t('privTable'))}</span>`}${x.src === 'comment' || (x.src === 'table' && x.col) ? ` <em>${esc(t('privSrc')[x.src])}</em>` : ''}</li>`).join('')}${xs.length > 80 ? `<li class="more">${esc(t('auditMore', { n: xs.length - 80 }))}</li>` : ''}</ul></details>`;
   }).join('');
   const linked = [...p.linked.entries()].sort((a, b) => a[1].depth - b[1].depth || String(a[0].name).localeCompare(String(b[0].name)));
   el.innerHTML = `<h4>${esc(t('privTitle'))}</h4>
@@ -1411,7 +1411,7 @@ function renderPrivacy() {
     <p class="au-sum">${esc(t('privSummary', { personal: p.tables.size, linked: p.linked.size, tables: p.scanned }))}</p>
     ${cats || `<p class="nn">${esc(t('privNone'))}</p>`}
     ${linked.length ? `<details class="au-rule pv-linked" data-cat="linked"${open.has('linked') ? ' open' : ''}><summary><i class="dot"></i><b>${esc(t('privLinked'))}</b><span class="n">${linked.length}</span></summary>
-      <ul class="au-items">${linked.slice(0, 80).map(([tb, l]) => `<li data-go="${esc(tb.key)}" tabindex="0"><b>${esc(tb.name)}</b> <span>${esc(t('privVia', { via: l.via.name, depth: l.depth }))}</span></li>`).join('')}${linked.length > 80 ? `<li class="more">${esc(t('auditMore', { n: linked.length - 80 }))}</li>` : ''}</ul></details>` : ''}
+      <ul class="au-items">${linked.slice(0, 80).map(([tb, l]) => `<li data-go="${esc(tb.key)}" title="${esc(tb.name + ' · ' + t('privVia', { via: l.via.name, depth: l.depth }))}" tabindex="0"><b>${esc(tb.name)}</b> <span>${esc(t('privVia', { via: l.via.name, depth: l.depth }))}</span></li>`).join('')}${linked.length > 80 ? `<li class="more">${esc(t('auditMore', { n: linked.length - 80 }))}</li>` : ''}</ul></details>` : ''}
     <p class="nn pv-warn">${esc(t('privWarn'))}</p>
     <div class="df-row">
       ${p.tables.size ? `<button class="btn sm ${S.privMap ? '' : 'ghost'}" data-act="priv-map">${esc(t(S.privMap ? 'auditMapOff' : 'auditMap'))}</button>

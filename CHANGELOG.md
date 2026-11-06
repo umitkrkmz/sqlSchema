@@ -5,6 +5,11 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Düzeltildi · Fixed
+
+- **KVKK ve denetim pencereleri:** kapalıyken dar kalır, bir liste açılınca 520 piksele kadar genişler (yandaki ayrıntı paneliyle çakışmadan). KVKK listelerinde her satır tek satır: tablo adı solda, nereden geldiği sağda; sığmazsa … ile kısalır, tamamı üzerine gelince görünür. Yatay kaydırma çubuğu çıkmaz. Fark penceresi de istenen 360 piksele kavuştu; CSS sırası yüzünden bu pencereler hep 300 pikselde kalıyordu.
+  Personal data and audit windows: narrow while collapsed, they widen up to 520 pixels when a list is opened (without covering the detail panel). Each row in the personal data lists is a single line: the table name on the left, where it comes from on the right; anything that does not fit is shortened with …, and the full text shows on hover. No horizontal scroll bar. The diff window now gets its intended 360 pixels too; a CSS ordering issue kept these windows at 300 pixels.
+
 ## [0.15.1] - 2026-11-06
 
 ### Eklendi · Added

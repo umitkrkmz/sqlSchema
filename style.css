@@ -916,6 +916,21 @@ body:not(.loaded) .legend, body:not(.loaded) .hud { display: none; }
 .files-pop ul.skip li { display: block; font: 10.5px var(--mono); color: var(--faint); overflow-wrap: anywhere; }
 .files-pop ul.skip span { color: var(--dim); margin-left: 6px; }
 
+/* Denetim, KVKK ve fark pencereleri. .report'tan sonra gelmeli: önce yazılınca genişlikleri 300'e düşüyordu.
+   Kapalıyken dar (yalnızca başlıklar), bir liste açılınca genişler; yandaki panelle çakışmaz. */
+.report.diff-pop { width: 360px; }
+.report.audit-pop { width: 300px; overflow-x: hidden; transition: width 0.25s ease; }
+.report.audit-pop:has(details[open]) { width: min(520px, calc(100vw - 2 * var(--g3))); }
+.has-panel .report.audit-pop:has(details[open]) { width: max(300px, min(520px, calc(100vw - var(--panel-w) - 4 * var(--g3)))); }
+.audit-pop .au-items li b { overflow-wrap: anywhere; }
+/* KVKK satırları tek satır: ad solda, nereden geldiği sağda; sığmayan kısım … ile kısalır (tamamı title'da) */
+.priv-pop .au-items li { align-items: baseline; white-space: nowrap; overflow: hidden; }
+.priv-pop .au-items li > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.priv-pop .au-items li b { flex: 0 1 auto; overflow-wrap: normal; }
+.priv-pop .au-items li > :not(b) { flex: 0 3 auto; }
+.priv-pop .au-items li > :nth-child(2) { margin-left: auto; }
+.priv-pop .au-items li.more { white-space: normal; }
+
 .toast {
   position: absolute;
   left: 50%;
