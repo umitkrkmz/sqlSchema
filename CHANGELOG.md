@@ -5,6 +5,15 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Düzeltildi · Fixed
+
+- **PostgreSQL ve SQL Server iç içe yorumları:** `/* … /* … */ … */` yorumu ilk `*/` ile bitmiş sayılıyordu; yorumun kalanı (ör. kutu çizgili bir hiyerarşi çizimi) SQL gibi okunup sonraki `CREATE TABLE`'ı yutuyordu. Tablo eksik çıkıyor, indeksi "tablosu bulunamayan ifade" oluyordu. Gerçek bir PostgreSQL dökümünden. Oracle ve MySQL iç içe saymadığı için orada davranış aynı.
+  PostgreSQL and SQL Server nested comments: a `/* … /* … */ … */` comment was taken to end at the first `*/`; the rest of the comment (for example a box-drawing hierarchy diagram) was read as SQL and swallowed the next `CREATE TABLE`. The table went missing and its index showed up as a statement whose table was not found. Found in a real PostgreSQL dump. Oracle and MySQL do not nest comments, so nothing changes there.
+- **Sızan metne dayanıklılık:** bir ifade SQL sözcüğüyle başlamıyorsa, satır başındaki ilk `CREATE` / `ALTER` / `COMMENT`'ten okunur; öncesi raporda "tanınmayan metin" olarak sayılır. Kutu çizgisi ve ok gibi simgeler artık sözcük sayılmaz.
+  Resilience to leaked text: a statement that does not start with an SQL word is read from the first `CREATE` / `ALTER` / `COMMENT` at the start of a later line; what came before is counted as "unrecognised text" in the report. Symbols such as box-drawing lines and arrows are no longer read as words.
+- **Ayrıştırma raporu:** uzun yol ve ifade metinleri yatay kaydırma açıyordu. Her satır tek satır; sığmayan … ile kısalır, yol yalnızca dosya adıyla gösterilir, tamamı üzerine gelince görünür.
+  Parse report: long paths and statement texts opened a horizontal scroll bar. Each row is a single line; anything that does not fit is shortened with …, paths show only the file name, and the full text shows on hover.
+
 ## [0.15.2] - 2026-11-06
 
 ### Düzeltildi · Fixed

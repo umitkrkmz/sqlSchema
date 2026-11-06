@@ -388,9 +388,9 @@ function renderReport() {
       ${row('rTime', S.parseMs + ' ms')}
     </table>
     ${list('rWarnings', st.warnings.slice(0, 30).map(w => `<li class="w"><span>${esc(w.kind === 'dup' ? t('warnDup', w) : w.kind === 'ref' ? t('warnRef', w) : w.text || '')}</span></li>`))}
-    ${list('rOrphans', st.orphans.slice(0, 30).map(o => `<li><span>${esc(o.text)}</span><b>${esc(o.where)}</b></li>`))}
-    ${list('rSkipped', st.skipped.map(([k, v]) => `<li><span>${esc(k)}</span><b>${v}</b></li>`))}
-    ${list('rErrors', st.errors.slice(0, 20).map(e => `<li><span>${esc(e.file ? baseName(e.file) + ':' : t('line') + ' ')}${e.line}</span><b>${esc(e.message)}</b></li>`))}`;
+    ${list('rOrphans', st.orphans.slice(0, 30).map(o => `<li title="${esc(o.text + ' · ' + o.where)}"><span>${esc(o.text)}</span><b>${esc(baseName(o.where))}</b></li>`))}
+    ${list('rSkipped', st.skipped.map(([k, v]) => `<li><span>${esc(k === '?' ? t('rSkipText') : k)}</span><b>${v}</b></li>`))}
+    ${list('rErrors', st.errors.slice(0, 20).map(e => `<li title="${esc(e.message)}"><span>${esc(e.file ? baseName(e.file) + ':' : t('line') + ' ')}${e.line}</span><b>${esc(e.message)}</b></li>`))}`;
 }
 
 /* ─── Adlandırma profili ─── */
