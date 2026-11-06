@@ -115,6 +115,15 @@ const EXPECT = {
     check('telekom-bolunmus: aynı FK sayısı', m.stats.fk === one.fk, [m.stats.fk, one.fk]);
     check('telekom-bolunmus: aynı tahmini ilişki sayısı', m.stats.implicit === one.implicit, [m.stats.implicit, one.implicit]);
   },
+  buyuk({ model: m }) {
+    check('buyuk: 2 900 tablo, 30 modül şeması', m.stats.tables === 2900 && new Set(m.tables.map(t => t.schema)).size === 30, m.stats.tables);
+    check('buyuk: 4 000+ FK, hepsi çözüldü', m.stats.fk >= 4000 && !m.tables.some(t => t.external), m.stats.fk);
+    check('buyuk: eşleme tabloları ara tablo (M:N)', m.tables.filter(t => /_MAP$/.test(t.name)).every(t => t.junction));
+    // yük ve ambar modülleri merkez tablolara FK'siz bağlı: tahmini ilişki
+    const loose = m.rels.filter(r => r.kind === 'implicit' && ['CDR', 'MEDIATION', 'DWH'].includes(r.child.schema));
+    check('buyuk: çağrı kaydı, arabuluculuk ve ambardan merkez tablolara tahmini ilişki', loose.length >= 20 && loose.every(r => r.child.schema !== r.parent.schema), loose.length);
+    check('buyuk: modüller arası FK merkez tablolara', rel(m, 'BIL_ACCOUNT', 'CRM_CUSTOMER_ID', 'CRM_CUSTOMER') || m.rels.some(r => r.kind === 'fk' && r.parent.name === 'CRM_CUSTOMER' && r.child.schema !== 'CRM'));
+  },
   banka({ model: m }) {
     check('banka: SQL Server tanındı', m.stats.dialects.includes('tsql'), m.stats.dialects);
     check('banka: 80+ FK', m.stats.fk >= 80, m.stats.fk);

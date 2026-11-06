@@ -5,6 +5,11 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+### Eklendi · Added
+
+- **Yeni örnek: Büyük kurum (2 900 tablo).** 30 modül şeması, 4 000'i aşkın FK, modül önekli adlar (`CRM_`, `BIL_`, `GL_` …); ana tablolar ile satır, geçmiş, tip, durum ve eşleme tabloları. Büyük şemada açılış ve gezinme hızını denemek için. Sabit tohumla üretilir.
+  New sample: Large enterprise (2,900 tables). 30 module schemas, more than 4,000 FKs, module-prefixed names (`CRM_`, `BIL_`, `GL_` …); base tables with line, history, type, status and mapping tables. For trying how a large schema opens and how navigation feels. Generated from a fixed seed.
+
 ## [0.15.0] - 2026-11-06
 
 ### Eklendi · Added

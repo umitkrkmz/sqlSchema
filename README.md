@@ -650,6 +650,7 @@ Bulgular adlardan ve açıklamalardan tahmindir, hukuki görüş değildir; enva
 | Küçük telekom | Oracle | 20 tablo, uygulamaya gömülü |
 | Telekom BSS/OSS | Oracle | SQL Developer dökümü tek dosyada: 318 tablo, 16 şema, partition, trigger, paket |
 | Telekom, şema başına dosya | Oracle | Aynı şema 16 dosyaya bölünmüş; bütün FK'ler en sondaki dosyada |
+| Büyük kurum (2 900 tablo) | Oracle | 30 modül şeması, 4 000'i aşkın FK, modül önekli adlar (`CRM_`, `BIL_`, `GL_` …); büyük şemada açılış ve gezinme hızını denemek için |
 | Çekirdek bankacılık | SQL Server | SSMS "Generate Scripts": UTF-16, `GO`, `IDENTITY`, açıklamalar |
 | Sigorta (eski sistem) | Oracle | Modül başına klasör, Türkçe adlar, hiç FK yok |
 | Pazaryeri e-ticaret | MySQL | `mysqldump --no-data`, `DELIMITER`'lı yordam |
@@ -1447,6 +1448,7 @@ The samples under `samples/` are **synthetic**: they do not belong to any real o
 | Small telecom | Oracle | 20 tables, embedded in the app |
 | Telecom BSS/OSS | Oracle | SQL Developer dump in one file: 318 tables, 16 schemas, partitions, triggers, packages |
 | Telecom, one file per schema | Oracle | The same schema split into 16 files; all FKs in the final file |
+| Large enterprise (2,900 tables) | Oracle | 30 module schemas, more than 4,000 FKs, module-prefixed names (`CRM_`, `BIL_`, `GL_` …); for trying how a large schema opens and how navigation feels |
 | Core banking | SQL Server | SSMS "Generate Scripts": UTF-16, `GO`, `IDENTITY`, descriptions |
 | Insurance (legacy system) | Oracle | A folder per module, Turkish names, no FKs at all |
 | Marketplace e-commerce | MySQL | `mysqldump --no-data`, a `DELIMITER` procedure |
