@@ -5,6 +5,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 
 ## [Yayımlanmamış · Unreleased]
 
+## [0.15.3] - 2026-11-06
+
 ### Düzeltildi · Fixed
 
 - **PostgreSQL ve SQL Server iç içe yorumları:** `/* … /* … */ … */` yorumu ilk `*/` ile bitmiş sayılıyordu; yorumun kalanı (ör. kutu çizgili bir hiyerarşi çizimi) SQL gibi okunup sonraki `CREATE TABLE`'ı yutuyordu. Tablo eksik çıkıyor, indeksi "tablosu bulunamayan ifade" oluyordu. Gerçek bir PostgreSQL dökümünden. Oracle ve MySQL iç içe saymadığı için orada davranış aynı.
@@ -269,7 +271,8 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [
 - **Geliştirme araçları:** test seti, ekran görüntüsü üreticisi.
   Test suite and screenshot generator.
 
-[Yayımlanmamış · Unreleased]: ../../compare/v0.15.2...HEAD
+[Yayımlanmamış · Unreleased]: ../../compare/v0.15.3...HEAD
+[0.15.3]: ../../compare/v0.15.2...v0.15.3
 [0.15.2]: ../../compare/v0.15.1...v0.15.2
 [0.15.1]: ../../compare/v0.15.0...v0.15.1
 [0.15.0]: ../../compare/v0.14.1...v0.15.0
